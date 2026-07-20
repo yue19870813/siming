@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Siming 对话编辑器 · 交互稿</title>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #111218;
+      --panel-2: #16171f;
+      --panel-3: #1b1d27;
+      --line: #292b37;
+      --line-soft: #21232c;
+      --text: #f0f0f4;
+      --muted: #9295a5;
+      --muted-2: #666978;
+      --purple: #8b7cf6;
+      --purple-2: #6d5ed5;
+      --cyan: #5fc9c2;
+      --orange: #df9b61;
+      --pink: #d979a8;
+      --green: #68c799;
+      --red: #ef7373;
+      --yellow: #e3bc6b;
+      --shadow: 0 20px 60px rgba(0, 0, 0, .34);
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --sans: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { background: var(--bg); color: var(--text); font: 13px/1.45 var(--sans); }
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+    ::selection { background: rgba(139, 124, 246, .35); }
+    * { scrollbar-width: thin; scrollbar-color: #353744 transparent; }
+
+    .app {
+      height: 100%;
+      display: grid;
+      grid-template-rows: 52px minmax(0, 1fr) 26px;
+      background: var(--bg);
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto minmax(420px, 1fr);
+      align-items: center;
+      gap: 16px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(17, 18, 24, .96);
+      user-select: none;
+      z-index: 30;
+    }
+
+    .brand, .top-actions, .top-center, .inline, .section-title, .node-head,
+    .statusbar, .tool-group, .dialogue-row, .tabs, .panel-head, .sim-speaker {
+      display: flex;
+      align-items: center;
+    }
+
+    .brand { gap: 10px; min-width: 0; }
+    .brand-mark {
+      width: 30px; height: 30px; display: grid; place-items: center;
+      color: #fff; font-weight: 800; letter-spacing: -.05em;
+      border-radius: 9px;
+      background: linear-gradient(145deg, #a295ff, #6d5ed5 65%, #5145ab);
+      box-shadow: inset 0 1px rgba(255,255,255,.28), 0 6px 18px rgba(109,94,213,.24);
+    }
+    .brand-title { font-size: 14px; font-weight: 680; white-space: nowrap; }
+    .crumb { color: var(--muted-2); }
+    .doc-name { color: #c5c6cf; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }
+
+    .top-center { gap: 4px; }
+    .top-actions { justify-content: flex-end; gap: 7px; }
+    .btn, .icon-btn, .tab-btn, .palette-item, .rail-btn, .zoom-btn {
+      border: 1px solid transparent;
+      background: transparent;
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease, color .15s ease, transform .15s ease;
+    }
+    .btn:hover, .icon-btn:hover, .tab-btn:hover, .zoom-btn:hover { background: #20222c; border-color: #30323e; }
+    .btn:active, .icon-btn:active, .zoom-btn:active { transform: translateY(1px); }
+    .btn { height: 30px; padding: 0 11px; border-radius: 7px; color: #c8cad3; }
+    .btn.primary { background: var(--purple); border-color: #9c90f8; color: #fff; font-weight: 650; }
+    .btn.primary:hover { background: #978af8; }
+    .btn.soft { background: #1b1d26; border-color: #2b2d38; }
+    .btn.success { background: rgba(104,199,153,.12); color: #91dbb7; border-color: rgba(104,199,153,.24); }
+    .icon-btn { width: 30px; height: 30px; border-radius: 7px; color: var(--muted); }
+    .icon-btn:disabled { opacity: .3; cursor: default; }
+    .kbd { color: var(--muted-2); font-size: 11px; margin-left: 6px; }
+    .language-select {
+      height: 30px; padding: 0 26px 0 9px; color: #d9dae1;
+      background: #1a1c24; border: 1px solid #2b2d38; border-radius: 7px;
+      outline: none;
+    }
+
+    .body {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 58px 238px minmax(560px, 1fr) 318px;
+    }
+
+    .rail {
+      padding: 9px 7px;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      background: #0e0f14;
+      border-right: 1px solid var(--line);
+    }
+    .rail-btn {
+      width: 42px; height: 40px; display: grid; place-items: center;
+      color: #727584; border-radius: 8px; font-size: 17px; position: relative;
+    }
+    .rail-btn:hover { color: #d8d9e0; background: #1a1c24; }
+    .rail-btn.active { color: #fff; background: #20222d; }
+    .rail-btn.active::before {
+      content: ""; position: absolute; left: -7px; top: 8px; bottom: 8px;
+      width: 3px; border-radius: 0 3px 3px 0; background: var(--purple);
+    }
+    .rail-spacer { flex: 1; }
+    .avatar {
+      width: 29px; height: 29px; border-radius: 50%; display: grid; place-items: center;
+      color: #d6d2ff; background: #302d48; border: 1px solid #4d4870; font-size: 11px;
+    }
+
+    .library, .inspector {
+      min-width: 0; min-height: 0; overflow: hidden;
+      background: var(--panel); border-right: 1px solid var(--line);
+    }
+    .inspector { border-right: 0; border-left: 1px solid var(--line); }
+    .side-head {
+      height: 44px; padding: 0 13px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--line-soft); font-weight: 650;
+    }
+    .side-scroll { height: calc(100% - 44px); overflow: auto; padding: 10px; }
+    .search {
+      width: 100%; height: 30px; padding: 0 9px 0 28px;
+      color: var(--text); background: #0e0f14; border: 1px solid #262832; border-radius: 7px;
+      outline: none;
+    }
+    .search-wrap { position: relative; margin-bottom: 12px; }
+    .search-wrap::before { content: "⌕"; position: absolute; left: 9px; top: 5px; color: #747786; z-index: 1; }
+    .section-title { justify-content: space-between; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin: 14px 4px 7px; }
+    .count { color: var(--muted-2); font-variant-numeric: tabular-nums; }
+
+    .dialogue-list { display: grid; gap: 3px; }
+    .dialogue-row {
+      gap: 9px; width: 100%; min-height: 36px; padding: 7px 8px;
+      border: 1px solid transparent; border-radius: 7px; color: #afb1bd;
+      background: transparent; text-align: left; cursor: pointer;
+    }
+    .dialogue-row:hover { background: #191b23; }
+    .dialogue-row.active { color: #efeff3; background: rgba(139,124,246,.12); border-color: rgba(139,124,246,.18); }
+    .file-icon { color: #777a8a; font-family: var(--mono); }
+    .dialogue-row.active .file-icon { color: #a99fff; }
+    .row-main { flex: 1; min-width: 0; }
+    .row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .row-meta { margin-top: 2px; color: var(--muted-2); font-size: 10px; }
+    .issue-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); }
+
+    .palette { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .palette-item {
+      min-height: 48px; border-radius: 7px; background: #171921; border-color: #252733;
+      color: #adafbb; text-align: left; padding: 7px 8px;
+    }
+    .palette-item:hover { border-color: #3a3c4b; background: #1b1d27; color: #e3e4e9; }
+    .palette-glyph { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 6px; background: var(--purple); }
+    .palette-item:nth-child(2) .palette-glyph { background: var(--cyan); }
+    .palette-item:nth-child(3) .palette-glyph { background: var(--orange); transform: rotate(45deg); }
+    .palette-item:nth-child(4) .palette-glyph { background: var(--pink); border-radius: 50%; }
+    .palette-note { display: block; color: var(--muted-2); font-size: 10px; margin-top: 4px; }
+
+    .stage {
+      position: relative; min-width: 0; min-height: 0; overflow: hidden;
+      background-color: #0e0f14;
+      background-image: radial-gradient(circle, #2b2d37 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .stage::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(circle at 52% 42%, transparent 0, rgba(7,8,11,.26) 78%);
+    }
+    .canvas-toolbar {
+      position: absolute; left: 12px; top: 12px; z-index: 18;
+      display: flex; gap: 6px; padding: 5px; border-radius: 9px;
+      background: rgba(20,21,28,.9); border: 1px solid #292b36; box-shadow: 0 8px 24px rgba(0,0,0,.22);
+      backdrop-filter: blur(12px);
+    }
+    .zoom-btn { height: 28px; min-width: 28px; border-radius: 6px; color: #a7a9b5; }
+    .zoom-label { min-width: 48px; color: var(--muted); font: 11px var(--mono); }
+    .canvas-wrap {
+      position: absolute; left: 50%; top: 50%; width: 1300px; height: 720px;
+      transform-origin: center; transition: transform .18s ease;
+      z-index: 3;
+    }
+    .canvas-layer { position: absolute; inset: 0; }
+    .wires { z-index: 1; pointer-events: none; }
+    .nodes { z-index: 2; }
+    .wire {
+      position: absolute; height: 2px; transform-origin: 0 50%;
+      background: linear-gradient(90deg, #4d5060, #777a8e);
+      opacity: .8;
+    }
+    .wire::after {
+      content: ""; position: absolute; right: -1px; top: -3px;
+      width: 7px; height: 7px; border-top: 2px solid #777a8e; border-right: 2px solid #777a8e;
+      transform: rotate(45deg);
+    }
+    .wire.active { background: linear-gradient(90deg, var(--purple), #aaa0ff); opacity: 1; box-shadow: 0 0 12px rgba(139,124,246,.35); }
+    .wire.active::after { border-color: #aaa0ff; }
+
+    .node {
+      position: absolute; width: 214px; min-height: 88px;
+      border: 1px solid #343642; border-radius: 9px; background: #171921;
+      box-shadow: 0 10px 24px rgba(0,0,0,.26); overflow: visible;
+      cursor: grab; user-select: none;
+      transition: border-color .14s ease, box-shadow .14s ease, transform .14s ease;
+    }
+    .node:hover { border-color: #4b4e5e; }
+    .node.selected { border-color: var(--purple); box-shadow: 0 0 0 2px rgba(139,124,246,.14), 0 14px 32px rgba(0,0,0,.38); }
+    .node.dragging { cursor: grabbing; transform: scale(1.01); transition: none; }
+    .node-head { height: 30px; gap: 7px; padding: 0 10px; border-bottom: 1px solid #292b34; color: #cbccd4; font-size: 11px; font-weight: 650; }
+    .node-type { width: 8px; height: 8px; border-radius: 3px; background: var(--purple); }
+    .node[data-type="start"] .node-type, .node[data-type="end"] .node-type { background: var(--green); border-radius: 50%; }
+    .node[data-type="choice"] .node-type { background: var(--cyan); }
+    .node[data-type="condition"] .node-type { background: var(--orange); transform: rotate(45deg); }
+    .node[data-type="event"] .node-type { background: var(--pink); border-radius: 50%; }
+    .node-id { margin-left: auto; color: #5e6170; font: 9px var(--mono); }
+    .node-body { padding: 10px; color: #d9dae0; font-size: 12px; }
+    .speaker { color: #9c92f7; font-size: 10px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .06em; }
+    .node-text { line-height: 1.55; }
+    .node-text.fallback::after { content: " 回退"; color: var(--yellow); font-size: 9px; margin-left: 5px; }
+    .choice-list { display: grid; gap: 5px; }
+    .choice-item { padding: 6px 7px; background: #20222b; border-radius: 5px; color: #cfd0d7; border-left: 2px solid var(--cyan); }
+    .condition-row { display: flex; justify-content: space-between; color: #c9cad2; font-family: var(--mono); font-size: 10px; }
+    .condition-yes { color: var(--green); }
+    .condition-no { color: var(--red); }
+    .port { position: absolute; width: 10px; height: 10px; border: 2px solid #101116; border-radius: 50%; background: #737687; z-index: 4; }
+    .port.in { left: -6px; top: 42px; }
+    .port.out { right: -6px; top: 42px; background: #8b7cf6; }
+    .port.out.second { top: 68px; background: var(--red); }
+    .port-label { position: absolute; right: 9px; top: 54px; color: var(--muted-2); font: 9px var(--mono); }
+    .port-label.second { top: 78px; }
+
+    .minimap {
+      position: absolute; right: 12px; bottom: 12px; width: 150px; height: 92px; z-index: 15;
+      background: rgba(18,19,25,.91); border: 1px solid #2a2c37; border-radius: 8px; box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .minimap::before { content: ""; position: absolute; inset: 13px 18px; border: 1px solid rgba(139,124,246,.38); background: rgba(139,124,246,.06); }
+    .mini-node { position: absolute; width: 18px; height: 7px; border-radius: 2px; background: #626575; }
+    .mini-node.selected { background: var(--purple); }
+
+    .inspector .side-scroll { padding: 13px; }
+    .selection-badge { color: #a8a0f7; font: 10px var(--mono); background: rgba(139,124,246,.1); border: 1px solid rgba(139,124,246,.2); padding: 3px 6px; border-radius: 5px; }
+    .form-section { padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px solid var(--line-soft); }
+    .form-section:last-child { border-bottom: 0; }
+    .form-label { display: flex; justify-content: space-between; margin: 0 0 6px; color: #a5a7b3; font-size: 11px; }
+    .required { color: var(--pink); }
+    .field, .textarea {
+      width: 100%; color: #e6e6eb; background: #0e0f14; border: 1px solid #292b36;
+      border-radius: 7px; outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    .field { height: 32px; padding: 0 9px; }
+    .textarea { min-height: 86px; resize: vertical; padding: 8px 9px; line-height: 1.55; }
+    .field:focus, .textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 2px rgba(139,124,246,.12); }
+    .field.mono { font-family: var(--mono); font-size: 11px; color: #b8b2f3; }
+    .locale-tabs { display: flex; gap: 4px; margin-bottom: 7px; }
+    .locale-tab { padding: 4px 7px; border-radius: 5px; border: 1px solid #2a2c36; background: #171921; color: #858897; cursor: pointer; font-size: 10px; }
+    .locale-tab.active { color: #eeeefe; border-color: rgba(139,124,246,.4); background: rgba(139,124,246,.14); }
+    .progress-row { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 10px; }
+    .progress { flex: 1; height: 4px; border-radius: 4px; background: #282a34; overflow: hidden; }
+    .progress span { display: block; height: 100%; width: 78%; background: var(--yellow); }
+    .hint { margin-top: 6px; color: var(--muted-2); font-size: 10px; }
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; min-height: 30px; color: #b9bbc5; }
+    .toggle { width: 30px; height: 17px; border: 0; border-radius: 20px; background: #343641; padding: 2px; cursor: pointer; }
+    .toggle::after { content: ""; display: block; width: 13px; height: 13px; border-radius: 50%; background: #8a8d9b; transition: transform .15s; }
+    .toggle.on { background: var(--purple-2); }
+    .toggle.on::after { background: white; transform: translateX(13px); }
+
+    .bottom-panel {
+      position: absolute; left: 0; right: 0; bottom: 0; height: 246px; z-index: 22;
+      display: grid; grid-template-rows: 38px 1fr;
+      background: rgba(15,16,21,.98); border-top: 1px solid #323440;
+      box-shadow: 0 -16px 45px rgba(0,0,0,.35); transform: translateY(calc(100% - 38px));
+      transition: transform .22s ease;
+    }
+    .bottom-panel.open { transform: translateY(0); }
+    .panel-head { justify-content: space-between; padding: 0 8px 0 12px; border-bottom: 1px solid var(--line-soft); }
+    .tabs { height: 100%; gap: 2px; }
+    .tab-btn { height: 100%; padding: 0 10px; color: var(--muted); position: relative; }
+    .tab-btn.active { color: #f1f1f4; }
+    .tab-btn.active::after { content: ""; position: absolute; left: 9px; right: 9px; bottom: 0; height: 2px; background: var(--purple); }
+    .badge { margin-left: 6px; min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px; display: inline-grid; place-items: center; background: rgba(227,188,107,.13); color: var(--yellow); font-size: 9px; }
+    .panel-content { overflow: auto; padding: 12px 14px; }
+    .panel-page { display: none; height: 100%; }
+    .panel-page.active { display: block; }
+    .diagnostic { display: grid; grid-template-columns: 70px minmax(180px,1fr) auto; gap: 12px; align-items: center; padding: 8px 9px; border-radius: 6px; cursor: pointer; }
+    .diagnostic:hover { background: #1b1d25; }
+    .severity { font: 10px var(--mono); color: var(--yellow); }
+    .severity.info { color: var(--cyan); }
+    .diagnostic-msg { color: #c9cad2; }
+    .diagnostic-path { color: var(--muted-2); font: 10px var(--mono); }
+
+    .simulator { max-width: 680px; margin: 0 auto; }
+    .sim-speaker { gap: 8px; margin-bottom: 8px; color: #aaa2f6; font-weight: 650; }
+    .sim-avatar { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; background: #302d48; }
+    .sim-line { padding: 12px 14px; border: 1px solid #292b36; background: #15171e; border-radius: 8px; color: #dedee4; }
+    .sim-actions { display: flex; gap: 7px; margin-top: 10px; }
+    .terminal { height: 100%; display: grid; grid-template-rows: auto 1fr; gap: 8px; }
+    .terminal-bar { display: flex; gap: 7px; }
+    .command-input { flex: 1; font-family: var(--mono); }
+    .terminal-output { margin: 0; padding: 11px 12px; overflow: auto; border-radius: 7px; background: #090a0d; border: 1px solid #272934; color: #b9bdc9; font: 11px/1.55 var(--mono); white-space: pre-wrap; }
+    .term-green { color: #7fd2a7; }
+
+    .statusbar {
+      justify-content: space-between; padding: 0 9px; color: #747786; background: #101116; border-top: 1px solid #21232c;
+      font-size: 10px; user-select: none;
+    }
+    .status-left, .status-right { display: flex; align-items: center; gap: 15px; }
+    .status-ok { color: var(--green); }
+
+    .toast {
+      position: fixed; right: 332px; top: 65px; z-index: 60; min-width: 240px;
+      padding: 10px 12px; border-radius: 8px; color: #e8e8ec;
+      background: #20222a; border: 1px solid #373946; box-shadow: var(--shadow);
+      opacity: 0; transform: translateY(-8px); pointer-events: none; transition: .2s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast strong { color: #9cddb9; margin-right: 6px; }
+
+    @media (max-width: 1180px) {
+      .body { grid-template-columns: 52px 210px minmax(500px, 1fr) 280px; }
+      .topbar { grid-template-columns: minmax(210px,1fr) auto minmax(360px,1fr); }
+      .kbd { display: none; }
+      .toast { right: 294px; }
+    }
+    @media (max-width: 920px) {
+      .body { grid-template-columns: 52px minmax(480px,1fr) 280px; }
+      .library { display: none; }
+      .brand .crumb, .brand .doc-name { display: none; }
+      .topbar { grid-template-columns: 1fr auto; }
+      .top-center { display: none; }
+      .toast { right: 294px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">司</div>
+        <div class="brand-title">Siming</div>
+        <span class="crumb">/</span>
+        <span class="doc-name">天命 · 序章 · 雨夜来客</span>
+        <span class="dirty-dot" id="dirtyDot" title="有未保存修改"></span>
+      </div>
+      <div class="top-center">
+        <button class="icon-btn" id="undoBtn" aria-label="撤销" title="撤销">↶</button>
+        <button class="icon-btn" id="redoBtn" aria-label="重做" title="重做">↷</button>
+        <button class="icon-btn" id="fitBtn" aria-label="适应画布" title="适应画布">⌗</button>
+      </div>
+      <div class="top-actions">
+        <select class="language-select" id="topLocale" aria-label="预览语言">
+          <option value="zh-CN">简体中文 · 默认</option>
+          <option value="en-US">English · 78%</option>
+        </select>
+        <button class="btn soft" id="cliBtn">⌘ 命令行</button>
+        <button class="btn soft" id="validateBtn">✓ 校验 <span class="kbd">⌘⇧V</span></button>
+        <button class="btn success" id="simulateBtn">▷ 模拟运行</button>
+        <button class="btn primary" id="exportBtn">导出</button>
+      </div>
+    </header>
+
+    <section class="body">
+      <nav class="rail" aria-label="主导航">
+        <button class="rail-btn active" title="对话">◇</button>
+        <button class="rail-btn" title="角色">♙</button>
+        <button class="rail-btn" title="变量">𝑥</button>
+        <button class="rail-btn" title="事件">⚡</button>
+        <button class="rail-btn" title="项目搜索">⌕</button>
+        <div class="rail-spacer"></div>
+        <button class="rail-btn" title="项目设置">⚙</button>
+        <div class="avatar">YX</div>
+      </nav>
+
+      <aside class="library">
+        <div class="side-head"><span>项目内容</span><button class="icon-btn" id="newDialogueBtn" title="新建对话">＋</button></div>
+        <div class="side-scroll">
+          <div class="search-wrap"><input class="search" id="searchInput" placeholder="搜索对话、节点…" aria-label="搜索项目"></div>
+          <div class="section-title"><span>对话文件</span><span class="count">4</span></div>
+          <div class="dialogue-list" id="dialogueList">
+            <button class="dialogue-row active"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">序章 · 雨夜来客</span><span class="row-meta">8 个节点 · 刚刚编辑</span></span><span class="issue-dot"></span></button>
+            <button class="dialogue-row"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">第一章 · 鸿胪寺</span><span class="row-meta">24 个节点 · 昨天</span></span></button>
+            <button class="dialogue-row"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">支线 · 旧骨牌</span><span class="row-meta">11 个节点 · 7月18日</span></span></button>
+            <button class="dialogue-row"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">测试 · 条件分支</span><span class="row-meta">6 个节点 · 7月17日</span></span></button>
+          </div>
+
+          <div class="section-title"><span>添加节点</span><span class="count">拖入画布</span></div>
+          <div class="palette">
+            <button class="palette-item" data-add="dialogue"><span class="palette-glyph"></span>对话<span class="palette-note">角色或旁白</span></button>
+            <button class="palette-item" data-add="choice"><span class="palette-glyph"></span>选项<span class="palette-note">玩家分支</span></button>
+            <button class="palette-item" data-add="condition"><span class="palette-glyph"></span>条件<span class="palette-note">变量判断</span></button>
+            <button class="palette-item" data-add="event"><span class="palette-glyph"></span>事件<span class="palette-note">通知游戏侧</span></button>
+          </div>
+
+          <div class="section-title"><span>项目资源</span></div>
+          <div class="dialogue-list">
+            <button class="dialogue-row"><span class="file-icon">♙</span><span class="row-main"><span class="row-title">角色</span><span class="row-meta">5 个定义</span></span></button>
+            <button class="dialogue-row"><span class="file-icon">𝑥</span><span class="row-main"><span class="row-title">变量</span><span class="row-meta">8 个定义</span></span></button>
+            <button class="dialogue-row"><span class="file-icon">⚡</span><span class="row-main"><span class="row-title">事件</span><span class="row-meta">6 个定义</span></span></button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="stage" id="stage" aria-label="对话节点画布">
+        <div class="canvas-toolbar">
+          <button class="zoom-btn" id="zoomOut" aria-label="缩小">−</button>
+          <button class="zoom-btn zoom-label" id="zoomLabel">100%</button>
+          <button class="zoom-btn" id="zoomIn" aria-label="放大">＋</button>
+          <button class="zoom-btn" id="centerBtn" aria-label="居中">◎</button>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <div class="canvas-layer wires" id="wires"></div>
+          <div class="canvas-layer nodes" id="nodes"></div>
+        </div>
+        <div class="minimap" id="minimap" aria-hidden="true"></div>
+
+        <section class="bottom-panel" id="bottomPanel">
+          <div class="panel-head">
+            <div class="tabs">
+              <button class="tab-btn active" data-panel="problems">问题 <span class="badge">2</span></button>
+              <button class="tab-btn" data-panel="simulator">模拟运行</button>
+              <button class="tab-btn" data-panel="terminal">命令行</button>
+            </div>
+            <button class="icon-btn" id="panelToggle" aria-label="展开或收起底部面板">⌃</button>
+          </div>
+          <div class="panel-content">
+            <div class="panel-page active" id="panel-problems">
+              <div class="diagnostic" data-focus="n5"><span class="severity">WARNING</span><span class="diagnostic-msg">English 缺少一条选项翻译，将回退到简体中文</span><span class="diagnostic-path">choice-mercy · option-02</span></div>
+              <div class="diagnostic" data-focus="n6"><span class="severity info">INFO</span><span class="diagnostic-msg">条件节点存在循环路径，请确认它会等待玩家输入</span><span class="diagnostic-path">condition-favor</span></div>
+              <div class="diagnostic"><span class="severity info">SUMMARY</span><span class="diagnostic-msg">0 个错误 · 1 个警告 · 1 条建议</span><span class="diagnostic-path">47 ms</span></div>
+            </div>
+            <div class="panel-page" id="panel-simulator">
+              <div class="simulator" id="simulatorContent"></div>
+            </div>
+            <div class="panel-page" id="panel-terminal">
+              <div class="terminal">
+                <div class="terminal-bar">
+                  <input class="field command-input" id="commandInput" value="siming validate . --format json" aria-label="命令">
+                  <button class="btn primary" id="runCommand">运行</button>
+                </div>
+                <pre class="terminal-output" id="terminalOutput"><span class="term-green">$</span> siming --version
+siming 0.1.0-prototype
+
+选择一条命令并点击“运行”。</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <aside class="inspector">
+        <div class="side-head"><span>属性</span><span class="selection-badge" id="selectionBadge">choice-mercy</span></div>
+        <div class="side-scroll" id="inspectorContent"></div>
+      </aside>
+    </section>
+
+    <footer class="statusbar">
+      <div class="status-left"><span class="status-ok">● 项目正常</span><span>8 个节点</span><span>9 条连线</span></div>
+      <div class="status-right"><span>Schema v1</span><span>UTF-8</span><span>自动保存：开启</span><span>main</span></div>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast"><strong>完成</strong><span id="toastText">操作已完成</span></div>
+
+  <script>
+    const localeNames = { "zh-CN": "简体中文", "en-US": "English" };
+    let currentLocale = "zh-CN";
+    let inspectorLocale = "zh-CN";
+    let selectedId = "n5";
+    let zoom = .7;
+    let panelOpen = false;
+    let simStep = 0;
+    let newNodeCount = 0;
+
+    const nodes = [
+      { id: "n1", key: "start-prologue", type: "start", x: 60, y: 285, title: "开始", text: { "zh-CN": "序章入口", "en-US": "Prologue entry" } },
+      { id: "n2", key: "line-dur", type: "dialogue", x: 310, y: 165, title: "对话", speaker: "杜尔", text: { "zh-CN": "雨下得这样大，你还要进城？", "en-US": "The rain is fierce. You still mean to enter the city?" } },
+      { id: "n3", key: "line-di", type: "dialogue", x: 310, y: 405, title: "对话", speaker: "狄仁杰", text: { "zh-CN": "既然有人等我，这场雨便拦不住。", "en-US": "Someone is waiting. A little rain will not stop me." } },
+      { id: "n4", key: "event-rain", type: "event", x: 570, y: 165, title: "事件", event: "scene.rain_heavy", text: { "zh-CN": "加强雨势", "en-US": "Increase rain" } },
+      { id: "n5", key: "choice-mercy", type: "choice", x: 570, y: 405, title: "玩家选项", choices: [
+        { id: "option-01", text: { "zh-CN": "先去驿馆避雨", "en-US": "Shelter at the posthouse" } },
+        { id: "option-02", text: { "zh-CN": "继续赶往城门", "en-US": "" } }
+      ] },
+      { id: "n6", key: "condition-favor", type: "condition", x: 830, y: 285, title: "条件判断", condition: "favor >= 10", text: { "zh-CN": "杜尔好感", "en-US": "Dur affinity" } },
+      { id: "n7", key: "line-trust", type: "dialogue", x: 1070, y: 155, title: "对话", speaker: "杜尔", text: { "zh-CN": "那便同去。我认得一条近路。", "en-US": "Then I will come. I know a shorter road." } },
+      { id: "n8", key: "end-prologue", type: "end", x: 1070, y: 425, title: "结束", text: { "zh-CN": "进入长安城", "en-US": "Enter Chang'an" } }
+    ];
+
+    const edges = [
+      ["n1", "n2"], ["n1", "n3"], ["n2", "n4"], ["n3", "n5"],
+      ["n4", "n6"], ["n5", "n6"], ["n6", "n7"], ["n6", "n8"], ["n7", "n8"]
+    ];
+
+    const byId = id => nodes.find(node => node.id === id);
+    const localized = value => {
+      if (!value) return { text: "—", fallback: false };
+      const own = value[currentLocale];
+      return { text: own || value["zh-CN"] || "[缺少文本]", fallback: currentLocale !== "zh-CN" && !own };
+    };
+
+    function nodeSize(node) {
+      if (node.type === "choice") return { w: 214, h: 124 };
+      if (node.type === "condition") return { w: 214, h: 104 };
+      return { w: 214, h: 88 };
+    }
+
+    function nodeBody(node) {
+      const loc = localized(node.text);
+      if (node.type === "start" || node.type === "end") return `<div class="node-text ${loc.fallback ? "fallback" : ""}">${loc.text}</div>`;
+      if (node.type === "dialogue") return `<div class="speaker">${node.speaker}</div><div class="node-text ${loc.fallback ? "fallback" : ""}">${loc.text}</div>`;
+      if (node.type === "event") return `<div class="speaker">${node.event}</div><div class="node-text ${loc.fallback ? "fallback" : ""}">${loc.text}</div>`;
+      if (node.type === "choice") return `<div class="choice-list">${node.choices.map(c => {
+        const text = c.text[currentLocale] || c.text["zh-CN"] || "[缺少文本]";
+        const fallback = currentLocale !== "zh-CN" && !c.text[currentLocale];
+        return `<div class="choice-item node-text ${fallback ? "fallback" : ""}">${text}</div>`;
+      }).join("")}</div>`;
+      if (node.type === "condition") return `<div class="speaker">${loc.text}</div><div class="condition-row"><span>${node.condition}</span><span><b class="condition-yes">T</b> / <b class="condition-no">F</b></span></div>`;
+      return "";
+    }
+
+    function renderNodes() {
+      const container = document.getElementById("nodes");
+      container.innerHTML = nodes.map(node => {
+        const secondPort = node.type === "choice" || node.type === "condition";
+        return `<article class="node ${node.id === selectedId ? "selected" : ""}" data-id="${node.id}" data-type="${node.type}" style="left:${node.x}px;top:${node.y}px" tabindex="0" aria-label="${node.title}节点">
+          ${node.type !== "start" ? '<span class="port in"></span>' : ''}
+          <div class="node-head"><span class="node-type"></span><span>${node.title}</span><span class="node-id">${node.key}</span></div>
+          <div class="node-body">${nodeBody(node)}</div>
+          ${node.type !== "end" ? '<span class="port out"></span>' : ''}
+          ${secondPort ? '<span class="port out second"></span>' : ''}
+          ${node.type === "condition" ? '<span class="port-label">TRUE</span><span class="port-label second">FALSE</span>' : ''}
+        </article>`;
+      }).join("");
+
+      container.querySelectorAll(".node").forEach(el => {
+        el.addEventListener("pointerdown", startDrag);
+        el.addEventListener("click", () => selectNode(el.dataset.id));
+        el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") selectNode(el.dataset.id); });
+      });
+      renderWires();
+      renderMinimap();
+    }
+
+    function renderWires() {
+      const container = document.getElementById("wires");
+      container.innerHTML = edges.map(([fromId, toId]) => {
+        const from = byId(fromId), to = byId(toId);
+        if (!from || !to) return "";
+        const aSize = nodeSize(from), bSize = nodeSize(to);
+        const ax = from.x + aSize.w, ay = from.y + aSize.h / 2;
+        const bx = to.x, by = to.y + bSize.h / 2;
+        const dx = bx - ax, dy = by - ay;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        const active = fromId === selectedId || toId === selectedId;
+        return `<span class="wire ${active ? "active" : ""}" style="left:${ax}px;top:${ay}px;width:${length}px;transform:rotate(${angle}deg)"></span>`;
+      }).join("");
+    }
+
+    function renderMinimap() {
+      document.getElementById("minimap").innerHTML = nodes.map(n => `<span class="mini-node ${n.id === selectedId ? "selected" : ""}" style="left:${12 + n.x * .105}px;top:${10 + n.y * .1}px"></span>`).join("");
+    }
+
+    function startDrag(event) {
+      if (event.button !== 0) return;
+      const el = event.currentTarget;
+      const node = byId(el.dataset.id);
+      selectNode(node.id);
+      const startX = event.clientX, startY = event.clientY, originX = node.x, originY = node.y;
+      el.classList.add("dragging");
+      const move = e => {
+        node.x = Math.max(0, Math.min(1180, originX + (e.clientX - startX) / zoom));
+        node.y = Math.max(0, Math.min(630, originY + (e.clientY - startY) / zoom));
+        el.style.left = node.x + "px";
+        el.style.top = node.y + "px";
+        renderWires(); renderMinimap(); markDirty();
+      };
+      const up = () => { el.classList.remove("dragging"); document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", up); };
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerup", up, { once: true });
+    }
+
+    function selectNode(id) {
+      selectedId = id;
+      document.querySelectorAll(".node").forEach(el => el.classList.toggle("selected", el.dataset.id === id));
+      renderWires(); renderMinimap(); renderInspector();
+    }
+
+    function renderInspector() {
+      const node = byId(selectedId);
+      if (!node) return;
+      document.getElementById("selectionBadge").textContent = node.key;
+      let content = `<div class="form-section">
+        <label class="form-label">节点 ID <span>稳定 ID</span></label>
+        <input class="field mono" value="${node.key}" readonly>
+      </div>`;
+
+      if (node.speaker) content += `<div class="form-section"><label class="form-label">说话人 <span class="required">必填</span></label><select class="field" id="speakerField"><option ${node.speaker === "杜尔" ? "selected" : ""}>杜尔</option><option ${node.speaker === "狄仁杰" ? "selected" : ""}>狄仁杰</option><option>旁白</option></select></div>`;
+      if (node.event) content += `<div class="form-section"><label class="form-label">事件</label><input class="field mono" id="eventField" value="${node.event}"><div class="hint">事件由游戏侧实现，编辑器只校验参数定义。</div></div>`;
+      if (node.condition) content += `<div class="form-section"><label class="form-label">条件表达式</label><input class="field mono" id="conditionField" value="${node.condition}"><div class="hint">number · 支持 ==、!=、&gt;、&gt;=、&lt;、&lt;=</div></div>`;
+
+      if (node.type === "choice") {
+        content += node.choices.map((choice, index) => `<div class="form-section"><label class="form-label">选项 ${index + 1}<span>${choice.id}</span></label>${localeEditor(choice.text, `choice-${index}`)}</div>`).join("");
+      } else {
+        content += `<div class="form-section"><label class="form-label">${node.type === "dialogue" ? "对话文本" : "显示名称"}<span class="required">默认语言必填</span></label>${localeEditor(node.text, "node-text")}</div>`;
+      }
+
+      content += `<div class="form-section"><div class="toggle-row"><span>进入节点时暂停</span><button class="toggle ${node.type === "dialogue" || node.type === "choice" ? "on" : ""}" id="pauseToggle" aria-label="切换进入节点时暂停"></button></div><div class="toggle-row"><span>在画布中显示 ID</span><button class="toggle on" id="idToggle" aria-label="切换显示 ID"></button></div></div>`;
+      document.getElementById("inspectorContent").innerHTML = content;
+
+      document.querySelectorAll(".locale-tab").forEach(btn => btn.addEventListener("click", () => { inspectorLocale = btn.dataset.locale; renderInspector(); }));
+      document.querySelectorAll("[data-text-target]").forEach(field => field.addEventListener("input", e => {
+        const target = e.target.dataset.textTarget;
+        if (target.startsWith("choice-")) node.choices[Number(target.split("-")[1])].text[inspectorLocale] = e.target.value;
+        else node.text[inspectorLocale] = e.target.value;
+        markDirty(); renderNodes();
+      }));
+      const speaker = document.getElementById("speakerField");
+      if (speaker) speaker.addEventListener("change", e => { node.speaker = e.target.value; markDirty(); renderNodes(); });
+      const condition = document.getElementById("conditionField");
+      if (condition) condition.addEventListener("input", e => { node.condition = e.target.value; markDirty(); renderNodes(); });
+      const eventField = document.getElementById("eventField");
+      if (eventField) eventField.addEventListener("input", e => { node.event = e.target.value; markDirty(); renderNodes(); });
+      document.querySelectorAll(".toggle").forEach(t => t.addEventListener("click", () => t.classList.toggle("on")));
+    }
+
+    function localeEditor(texts, target) {
+      const value = texts[inspectorLocale] || "";
+      const missing = inspectorLocale !== "zh-CN" && !value;
+      return `<div class="locale-tabs"><button class="locale-tab ${inspectorLocale === "zh-CN" ? "active" : ""}" data-locale="zh-CN">简体中文</button><button class="locale-tab ${inspectorLocale === "en-US" ? "active" : ""}" data-locale="en-US">English</button></div>
+        <textarea class="textarea" data-text-target="${target}" placeholder="${missing ? "缺少翻译，将回退到简体中文" : "输入文本"}">${value}</textarea>
+        ${inspectorLocale === "en-US" ? '<div class="progress-row"><span>翻译完成度</span><div class="progress"><span></span></div><b>78%</b></div>' : '<div class="hint">默认语言 · 文本键将在导出时自动生成</div>'}`;
+    }
+
+    function markDirty() { document.getElementById("dirtyDot").style.display = "inline-block"; }
+    function save() { document.getElementById("dirtyDot").style.display = "none"; showToast("项目已保存 · 12:42:18"); }
+    function showToast(text) {
+      const toast = document.getElementById("toast");
+      document.getElementById("toastText").textContent = text;
+      toast.classList.add("show"); clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 2200);
+    }
+
+    function switchPanel(name, open = true) {
+      panelOpen = open;
+      document.getElementById("bottomPanel").classList.toggle("open", panelOpen);
+      document.getElementById("panelToggle").textContent = panelOpen ? "⌄" : "⌃";
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.panel === name));
+      document.querySelectorAll(".panel-page").forEach(page => page.classList.toggle("active", page.id === `panel-${name}`));
+      if (name === "simulator") renderSimulator();
+    }
+
+    function renderSimulator() {
+      const root = document.getElementById("simulatorContent");
+      const scenes = [
+        { speaker: "杜尔", line: localized(byId("n2").text).text, actions: [["继续", 1]] },
+        { speaker: "狄仁杰", line: localized(byId("n3").text).text, actions: [[currentLocale === "zh-CN" ? "先去驿馆避雨" : "Shelter at the posthouse", 2], [currentLocale === "zh-CN" ? "继续赶往城门" : "继续赶往城门 · 回退", 3]] },
+        { speaker: "杜尔", line: localized(byId("n7").text).text, actions: [["重新运行", 0]] },
+        { speaker: "系统", line: currentLocale === "zh-CN" ? "条件 favor >= 10 为 false，进入长安城。" : "Condition favor >= 10 is false. Enter Chang'an.", actions: [["重新运行", 0]] }
+      ];
+      const scene = scenes[simStep] || scenes[0];
+      root.innerHTML = `<div class="sim-speaker"><span class="sim-avatar">${scene.speaker.slice(0,1)}</span><span>${scene.speaker}</span><span style="margin-left:auto;color:var(--muted);font:10px var(--mono)">${localeNames[currentLocale]} · step ${simStep + 1}</span></div><div class="sim-line">${scene.line}</div><div class="sim-actions">${scene.actions.map(([label, next]) => `<button class="btn soft" data-sim-next="${next}">${label}</button>`).join("")}</div>`;
+      root.querySelectorAll("[data-sim-next]").forEach(btn => btn.addEventListener("click", () => { simStep = Number(btn.dataset.simNext); renderSimulator(); }));
+    }
+
+    function runCommand() {
+      const command = document.getElementById("commandInput").value.trim();
+      let result;
+      if (command.includes("export")) result = `$ ${command}\n✓ validated 4 dialogues (47 nodes)\n✓ wrote dialogues.runtime.json\n✓ wrote locales/zh-CN.json\n⚠ locales/en-US.json: 3 missing translations\n\nExport completed in 84 ms`;
+      else if (command.includes("info")) result = `$ ${command}\n{\n  "project": "天命",\n  "schemaVersion": 1,\n  "defaultLocale": "zh-CN",\n  "locales": ["zh-CN", "en-US"],\n  "dialogues": 4,\n  "nodes": 47\n}`;
+      else if (command.includes("migrate")) result = `$ ${command}\nSchema v1 is current. No migration required.\n\nExit code: 0`;
+      else result = `$ ${command}\n{\n  "valid": true,\n  "errors": [],\n  "warnings": [\n    {\n      "code": "I18N_MISSING_TRANSLATION",\n      "file": "dialogues/prologue.json",\n      "nodeId": "choice-mercy",\n      "locale": "en-US"\n    }\n  ],\n  "durationMs": 47\n}\n\nExit code: 0`;
+      document.getElementById("terminalOutput").textContent = result;
+    }
+
+    function addNode(type) {
+      newNodeCount += 1;
+      const id = `new-${newNodeCount}`;
+      const base = { id, key: `${type}-new-${newNodeCount}`, type, x: 500 + newNodeCount * 22, y: 270 + newNodeCount * 22, title: type === "dialogue" ? "对话" : type === "choice" ? "玩家选项" : type === "condition" ? "条件判断" : "事件", text: { "zh-CN": "新节点", "en-US": "" } };
+      if (type === "dialogue") base.speaker = "旁白";
+      if (type === "choice") base.choices = [{ id: "option-01", text: { "zh-CN": "新选项", "en-US": "" } }];
+      if (type === "condition") base.condition = "variable == true";
+      if (type === "event") base.event = "event.name";
+      nodes.push(base); selectedId = id; markDirty(); renderNodes(); renderInspector(); showToast(`已添加${base.title}节点`);
+    }
+
+    document.getElementById("topLocale").addEventListener("change", e => { currentLocale = e.target.value; inspectorLocale = currentLocale; renderNodes(); renderInspector(); renderSimulator(); showToast(`预览语言：${localeNames[currentLocale]}`); });
+    document.getElementById("validateBtn").addEventListener("click", () => switchPanel("problems"));
+    document.getElementById("simulateBtn").addEventListener("click", () => { simStep = 0; switchPanel("simulator"); });
+    document.getElementById("cliBtn").addEventListener("click", () => switchPanel("terminal"));
+    document.getElementById("exportBtn").addEventListener("click", () => showToast("已导出运行时 JSON 与 2 份语言资源"));
+    document.getElementById("panelToggle").addEventListener("click", () => switchPanel(document.querySelector(".tab-btn.active").dataset.panel, !panelOpen));
+    document.querySelectorAll(".tab-btn").forEach(btn => btn.addEventListener("click", () => switchPanel(btn.dataset.panel, true)));
+    document.querySelectorAll(".palette-item").forEach(btn => btn.addEventListener("click", () => addNode(btn.dataset.add)));
+    document.querySelectorAll(".diagnostic[data-focus]").forEach(row => row.addEventListener("click", () => selectNode(row.dataset.focus)));
+    document.getElementById("runCommand").addEventListener("click", runCommand);
+    document.getElementById("commandInput").addEventListener("keydown", e => { if (e.key === "Enter") runCommand(); });
+    document.getElementById("zoomIn").addEventListener("click", () => setZoom(zoom + .1));
+    document.getElementById("zoomOut").addEventListener("click", () => setZoom(zoom - .1));
+    document.getElementById("zoomLabel").addEventListener("click", () => setZoom(1));
+    document.getElementById("centerBtn").addEventListener("click", fitCanvas);
+    document.getElementById("fitBtn").addEventListener("click", fitCanvas);
+    document.getElementById("undoBtn").addEventListener("click", () => showToast("已撤销上一步操作"));
+    document.getElementById("redoBtn").addEventListener("click", () => showToast("已重做上一步操作"));
+    document.getElementById("newDialogueBtn").addEventListener("click", () => showToast("已创建对话草稿"));
+    document.querySelectorAll(".dialogue-row").forEach(row => row.addEventListener("click", () => { const parent = row.parentElement; if (parent && parent.id === "dialogueList") { parent.querySelectorAll(".dialogue-row").forEach(r => r.classList.remove("active")); row.classList.add("active"); showToast(`已打开：${row.querySelector(".row-title").textContent}`); } }));
+
+    function setZoom(value) {
+      zoom = Math.max(.45, Math.min(1.3, value));
+      document.getElementById("zoomLabel").textContent = Math.round(zoom * 100) + "%";
+      positionCanvas();
+    }
+    function positionCanvas() {
+      document.getElementById("canvasWrap").style.transform = `translate(-50%, -50%) scale(${zoom})`;
+    }
+
+    function fitCanvas() {
+      const stage = document.getElementById("stage");
+      setZoom(Math.min(.9, (stage.clientWidth - 44) / 1300, (stage.clientHeight - 78) / 720));
+    }
+
+    document.addEventListener("keydown", e => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "v") { e.preventDefault(); switchPanel("problems"); }
+      if (e.key === "Escape" && panelOpen) switchPanel(document.querySelector(".tab-btn.active").dataset.panel, false);
+    });
+
+    window.addEventListener("resize", fitCanvas);
+    fitCanvas(); renderNodes(); renderInspector(); renderSimulator();
+  </script>
+</body>
+</html>
