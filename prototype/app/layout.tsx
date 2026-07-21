@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Siming 对话编辑器 · 交互稿",
-  description: "Siming 剧情对话编辑器 HTML 交互原型。",
+  description: "支持可视化画布与真实源 JSON 编辑的 Siming 剧情对话编辑器 HTML 交互原型。",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

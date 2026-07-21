@@ -76,12 +76,23 @@
     .dirty-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }
 
     .top-center { gap: 4px; }
+    .view-switch { display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid #2a2c36; border-radius: 8px; background: #0e0f14; }
+    .view-mode { height: 24px; padding: 0 9px; border: 0; border-radius: 5px; color: #777a89; background: transparent; cursor: pointer; }
+    .view-mode:hover { color: #d5d6dd; }
+    .view-mode.active { color: #f4f3ff; background: #2a2b38; box-shadow: inset 0 0 0 1px #393b48; }
+    .toolbar-divider { width: 1px; height: 20px; margin: 0 3px; background: #2d2f39; }
     .top-actions { justify-content: flex-end; gap: 7px; }
-    .btn, .icon-btn, .tab-btn, .palette-item, .rail-btn, .zoom-btn {
+    .btn, .icon-btn, .tab-btn, .palette-item, .rail-btn, .zoom-btn,
+    .smart-row, .mini-action, .folder-row, .folder-menu button {
+      appearance: none;
       border: 1px solid transparent;
       background: transparent;
       cursor: pointer;
       transition: background .15s ease, border-color .15s ease, color .15s ease, transform .15s ease;
+    }
+    .smart-row:focus-visible, .mini-action:focus-visible, .folder-row:focus-visible, .folder-menu button:focus-visible {
+      outline: 1px solid rgba(155, 143, 247, .72);
+      outline-offset: 1px;
     }
     .btn:hover, .icon-btn:hover, .tab-btn:hover, .zoom-btn:hover { background: #20222c; border-color: #30323e; }
     .btn:active, .icon-btn:active, .zoom-btn:active { transform: translateY(1px); }
@@ -116,6 +127,15 @@
       color: #727584; border-radius: 8px; font-size: 17px; position: relative;
     }
     .rail-btn:hover { color: #d8d9e0; background: #1a1c24; }
+    .rail-btn::after {
+      content: attr(data-tooltip); position: absolute; left: 49px; top: 50%; z-index: 70;
+      padding: 6px 8px; border: 1px solid #363946; border-radius: 6px;
+      color: #e1e2e8; background: #20222b; box-shadow: var(--shadow);
+      font-size: 10px; line-height: 1; white-space: nowrap;
+      opacity: 0; pointer-events: none; transform: translate(4px, -50%);
+      transition: opacity .14s ease, transform .14s ease;
+    }
+    .rail-btn:hover::after, .rail-btn:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
     .rail-btn.active { color: #fff; background: #20222d; }
     .rail-btn.active::before {
       content: ""; position: absolute; left: -7px; top: 8px; bottom: 8px;
@@ -161,6 +181,41 @@
     .row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .row-meta { margin-top: 2px; color: var(--muted-2); font-size: 10px; }
     .issue-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); }
+    .smart-list { display: grid; gap: 1px; }
+    .smart-row { width: 100%; min-height: 28px; display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; color: #818493; text-align: left; }
+    .smart-row:hover { color: #c9cad3; background: rgba(255,255,255,.035); }
+    .smart-row.active { color: #e3e1f7; border-color: rgba(139,124,246,.13); background: rgba(139,124,246,.075); box-shadow: inset 2px 0 #8b7cf6; }
+    .smart-icon { color: #707382; text-align: center; font: 11px var(--mono); }
+    .smart-row.active .smart-icon { color: #aaa2f7; }
+    .smart-count { color: #666978; font: 9px var(--mono); }
+    .mini-action { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; color: #777a89; }
+    .mini-action:hover { color: #d7d4f3; border-color: rgba(139,124,246,.18); background: rgba(139,124,246,.08); }
+    .folder-tree { display: grid; gap: 2px; }
+    .folder-group { border-radius: 7px; background: transparent; }
+    .folder-group.drop-target { background: rgba(139,124,246,.08); box-shadow: inset 0 0 0 1px rgba(139,124,246,.3); }
+    .folder-row { width: 100%; height: 29px; display: grid; grid-template-columns: 12px 15px minmax(0,1fr) auto 18px; align-items: center; gap: 5px; padding: 0 6px; border-radius: 6px; color: #9295a3; text-align: left; }
+    .folder-row:hover { color: #d2d3da; background: rgba(255,255,255,.035); }
+    .folder-group:has(.dialogue-row.active) > .folder-row { color: #bbb8d8; }
+    .folder-caret { color: #626573; font-size: 8px; transition: transform .14s ease; }
+    .folder-group.collapsed .folder-caret { transform: rotate(-90deg); }
+    .folder-icon { width: 12px; height: 9px; position: relative; border: 1px solid #686879; border-radius: 2px; color: transparent; font-size: 0; }
+    .folder-icon::before { content: ""; position: absolute; left: 1px; top: -4px; width: 6px; height: 3px; border: 1px solid #686879; border-bottom: 0; border-radius: 2px 2px 0 0; }
+    .folder-group:has(.dialogue-row.active) > .folder-row .folder-icon,
+    .folder-group:has(.dialogue-row.active) > .folder-row .folder-icon::before { border-color: #8d85c4; }
+    .folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+    .folder-count { color: #5e6170; font: 9px var(--mono); }
+    .folder-more { color: #5f6270; text-align: center; letter-spacing: -1px; }
+    .folder-row:hover .folder-more { color: #888b99; }
+    .folder-children { display: grid; gap: 2px; margin: 1px 0 5px 12px; padding-left: 7px; border-left: 1px solid rgba(139,124,246,.12); }
+    .folder-group.collapsed .folder-children { display: none; }
+    .folder-children .dialogue-row { min-height: 34px; padding-left: 7px; }
+    .dialogue-row.dragging { opacity: .42; }
+    .dialogue-row[hidden], .folder-group[hidden] { display: none; }
+    .folder-menu { position: fixed; z-index: 90; display: none; width: 142px; padding: 5px; border: 1px solid #353743; border-radius: 8px; background: #1b1d25; box-shadow: var(--shadow); }
+    .folder-menu.open { display: grid; }
+    .folder-menu button { min-height: 28px; padding: 0 8px; border-radius: 5px; color: #bfc1cb; text-align: left; }
+    .folder-menu button:hover { color: #f0f0f3; background: #282a34; }
+    .folder-menu button.danger { color: #d98991; }
 
     .palette { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .palette-item {
@@ -184,6 +239,20 @@
       content: ""; position: absolute; inset: 0; pointer-events: none;
       background: radial-gradient(circle at 52% 42%, transparent 0, rgba(7,8,11,.26) 78%);
     }
+    .stage.data-mode { background-image: none; }
+    .stage.data-mode .canvas-toolbar,
+    .stage.data-mode .canvas-wrap,
+    .stage.data-mode .minimap { display: none; }
+    .stage.resource-mode { background-image: none; }
+    .stage.resource-mode .canvas-toolbar,
+    .stage.resource-mode .canvas-wrap,
+    .stage.resource-mode .minimap,
+    .stage.resource-mode .bottom-panel { display: none; }
+    .stage.search-mode { background-image: none; }
+    .stage.search-mode .canvas-toolbar,
+    .stage.search-mode .canvas-wrap,
+    .stage.search-mode .minimap,
+    .stage.search-mode .bottom-panel { display: none; }
     .canvas-toolbar {
       position: absolute; left: 12px; top: 12px; z-index: 18;
       display: flex; gap: 6px; padding: 5px; border-radius: 9px;
@@ -193,7 +262,7 @@
     .zoom-btn { height: 28px; min-width: 28px; border-radius: 6px; color: #a7a9b5; }
     .zoom-label { min-width: 48px; color: var(--muted); font: 11px var(--mono); }
     .canvas-wrap {
-      position: absolute; left: 50%; top: 50%; width: 1300px; height: 720px;
+      position: absolute; left: 50%; top: 50%; width: 1500px; height: 720px;
       transform-origin: center; transition: transform .18s ease;
       z-index: 3;
     }
@@ -254,6 +323,110 @@
     .minimap::before { content: ""; position: absolute; inset: 13px 18px; border: 1px solid rgba(139,124,246,.38); background: rgba(139,124,246,.06); }
     .mini-node { position: absolute; width: 18px; height: 7px; border-radius: 2px; background: #626575; }
     .mini-node.selected { background: var(--purple); }
+
+    .source-view {
+      position: absolute; inset: 0; z-index: 17; display: none;
+      grid-template-rows: 43px minmax(0, 1fr) 42px;
+      background: #0d0e13;
+    }
+    .source-view.active { display: grid; }
+    .source-head, .source-foot { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; background: #12131a; }
+    .source-head { border-bottom: 1px solid #292b36; }
+    .source-foot { border-top: 1px solid #292b36; }
+    .source-path { color: #858897; font: 10px var(--mono); }
+    .source-tabs { display: flex; height: 100%; align-items: end; gap: 2px; }
+    .source-tab { height: 34px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; color: #7f8290; background: transparent; cursor: pointer; }
+    .source-tab.active { color: #eeedf7; border-bottom-color: var(--purple); }
+    .schema-state { display: flex; align-items: center; gap: 6px; color: var(--green); font: 10px var(--mono); }
+    .schema-state.invalid { color: var(--red); }
+    .schema-state::before { content: "●"; font-size: 8px; }
+    .source-editor-shell { min-height: 0; display: grid; grid-template-columns: 54px minmax(0, 1fr); background: #0a0b0f; }
+    .line-gutter { margin: 0; padding: 14px 11px 24px 0; overflow: hidden; color: #464957; background: #0c0d11; border-right: 1px solid #20222b; text-align: right; font: 12px/1.65 var(--mono); user-select: none; }
+    .source-textarea {
+      width: 100%; height: 100%; min-height: 0; resize: none; border: 0; outline: none;
+      padding: 14px 18px 24px; color: #d6d7df; background: #0a0b0f;
+      caret-color: #b5acff; tab-size: 2; white-space: pre;
+      font: 12px/1.65 var(--mono);
+    }
+    .source-textarea[readonly] { color: #aeb1bf; background: #0c0d12; }
+    .source-message { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #858897; font: 10px var(--mono); }
+    .source-message.error { color: var(--red); }
+    .source-actions { display: flex; gap: 7px; margin-left: 12px; }
+    .btn:disabled { opacity: .38; cursor: not-allowed; transform: none; }
+
+    .resource-view {
+      position: absolute; inset: 0; z-index: 18; display: none;
+      grid-template-rows: 64px minmax(0, 1fr); background: #0f1015;
+    }
+    .resource-view.active { display: grid; }
+    .resource-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 16px; border-bottom: 1px solid #292b35; background: #13141a; }
+    .resource-head > div:first-child { min-width: 0; }
+    .resource-title { font-size: 15px; font-weight: 690; color: #ececf1; }
+    .resource-subtitle { margin-top: 2px; color: #777a89; font-size: 10px; }
+    .resource-tools { display: flex; flex: 0 1 310px; min-width: 230px; align-items: center; gap: 7px; }
+    .resource-search { flex: 1 1 160px; min-width: 0; width: 210px; }
+    #addResourceBtn { flex: 0 0 auto; min-width: 88px; white-space: nowrap; }
+    .resource-table-wrap { min-height: 0; overflow: auto; padding: 14px 16px 30px; }
+    .resource-table { min-width: 680px; border: 1px solid #292b36; border-radius: 9px; overflow: hidden; background: #13151b; }
+    .resource-grid { display: grid; grid-template-columns: minmax(210px, 1.5fr) minmax(130px, 1fr) minmax(100px, .8fr) 88px; align-items: center; min-height: 44px; padding: 0 13px; gap: 12px; border-bottom: 1px solid #24262f; }
+    .resource-grid.variables { grid-template-columns: minmax(170px, 1.3fr) 90px minmax(110px, .8fr) 90px 78px; }
+    .resource-grid.events { grid-template-columns: minmax(220px, 1.5fr) 82px minmax(110px, .8fr) 78px; }
+    .resource-grid:last-child { border-bottom: 0; }
+    .resource-grid.header { min-height: 34px; color: #666978; background: #101116; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+    .resource-row { color: #bfc1cb; cursor: pointer; transition: background .14s ease; }
+    .resource-row:hover { background: #191b23; }
+    .resource-row.selected { background: rgba(139,124,246,.11); box-shadow: inset 2px 0 var(--purple); }
+    .resource-primary { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .resource-avatar { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 8px; color: #fff; font-size: 11px; font-weight: 700; background: #4d4778; }
+    .resource-symbol { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 7px; color: #a7a0f3; background: #242334; font: 12px var(--mono); }
+    .resource-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e0e1e6; }
+    .resource-id { margin-top: 2px; color: #676a78; font: 9px var(--mono); }
+    .resource-type { color: #a8a1f4; font: 10px var(--mono); }
+    .resource-default { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #aeb0bc; font: 10px var(--mono); }
+    .tag-list { display: flex; gap: 4px; overflow: hidden; }
+    .tag-chip { padding: 2px 5px; border: 1px solid #333542; border-radius: 5px; color: #858896; background: #1a1c23; font-size: 9px; white-space: nowrap; }
+    .usage-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 43px; padding: 3px 6px; border-radius: 9px; color: #9d96ea; background: rgba(139,124,246,.1); font-size: 9px; }
+    .reference-list { display: grid; gap: 5px; margin-top: 8px; }
+    .reference-item { width: 100%; padding: 7px 8px; border: 1px solid #282a34; border-radius: 6px; color: #afb1bd; background: #15171e; text-align: left; cursor: pointer; }
+    .reference-item:hover { border-color: #45485a; background: #1a1c24; }
+    .reference-path { display: block; margin-top: 2px; color: #646775; font: 9px var(--mono); }
+    .param-list { display: grid; gap: 6px; }
+    .param-card { padding: 8px; border: 1px solid #292b36; border-radius: 7px; background: #111219; }
+    .param-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+    .param-name { color: #d1d2da; font: 10px var(--mono); }
+    .param-meta { color: #777a89; font-size: 9px; }
+
+    .search-view {
+      position: absolute; inset: 0; z-index: 18; display: none;
+      grid-template-rows: auto minmax(0, 1fr); background: #0f1015;
+    }
+    .search-view.active { display: grid; }
+    .project-search-head { padding: 22px 24px 18px; border-bottom: 1px solid #292b35; background: #13141a; }
+    .project-search-title { color: #ececf1; font-size: 17px; font-weight: 700; }
+    .project-search-subtitle { margin-top: 3px; color: #747786; font-size: 10px; }
+    .search-command { max-width: 720px; height: 42px; margin-top: 15px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; border: 1px solid #343743; border-radius: 9px; background: #0d0e13; box-shadow: 0 8px 24px rgba(0,0,0,.16); }
+    .search-command:focus-within { border-color: var(--purple); box-shadow: 0 0 0 2px rgba(139,124,246,.12); }
+    .search-command-icon { color: #898c9b; text-align: center; font-size: 15px; }
+    .project-search-input { width: 100%; height: 100%; border: 0; outline: 0; color: #e8e8ed; background: transparent; font-size: 12px; }
+    .search-command .kbd { margin: 0 10px; padding: 3px 6px; border: 1px solid #30323d; border-radius: 5px; background: #191b22; }
+    .project-search-body { min-height: 0; overflow: auto; padding: 14px 24px 32px; }
+    .search-summary { max-width: 820px; display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 13px; }
+    .search-filters { display: flex; gap: 5px; }
+    .search-filter { padding: 5px 9px; border: 1px solid #292b36; border-radius: 6px; color: #858897; background: #15171e; cursor: pointer; font-size: 10px; }
+    .search-filter.active { color: #e9e8fa; border-color: rgba(139,124,246,.42); background: rgba(139,124,246,.13); }
+    .search-count { color: #6d707f; font: 10px var(--mono); }
+    .search-results { max-width: 820px; display: grid; gap: 14px; }
+    .search-group { border: 1px solid #292b36; border-radius: 9px; overflow: hidden; background: #13151b; }
+    .search-group-head { display: flex; justify-content: space-between; padding: 8px 11px; border-bottom: 1px solid #252731; color: #747786; background: #101116; font-size: 10px; }
+    .search-result { width: 100%; min-height: 52px; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 18px; align-items: center; gap: 10px; padding: 7px 11px; border: 0; border-bottom: 1px solid #24262f; color: #c8cad3; background: transparent; text-align: left; cursor: pointer; }
+    .search-result:last-child { border-bottom: 0; }
+    .search-result:hover { background: #1a1c24; }
+    .search-result-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; color: #9d97db; background: #242431; font: 12px var(--mono); }
+    .search-result-title { display: block; color: #dedfe5; font-size: 11px; }
+    .search-result-path { display: block; margin-top: 3px; overflow: hidden; color: #686b79; font: 9px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+    .search-result-type { padding: 3px 6px; border-radius: 5px; color: #858897; background: #1c1e26; font-size: 9px; }
+    .search-result-arrow { color: #555866; }
+    .search-empty { padding: 54px 18px; border: 1px dashed #30323d; border-radius: 9px; color: #6d707e; text-align: center; }
 
     .inspector .side-scroll { padding: 13px; }
     .selection-badge { color: #a8a0f7; font: 10px var(--mono); background: rgba(139,124,246,.1); border: 1px solid rgba(139,124,246,.2); padding: 3px 6px; border-radius: 5px; }
@@ -356,10 +529,15 @@
         <div class="brand-mark">司</div>
         <div class="brand-title">Siming</div>
         <span class="crumb">/</span>
-        <span class="doc-name">天命 · 序章 · 雨夜来客</span>
+        <span class="doc-name" id="docName">天命 · 序章 · 雨夜来客</span>
         <span class="dirty-dot" id="dirtyDot" title="有未保存修改"></span>
       </div>
       <div class="top-center">
+        <div class="view-switch" aria-label="编辑视图">
+          <button class="view-mode active" id="canvasViewBtn">◇ 画布</button>
+          <button class="view-mode" id="dataViewBtn">{ } 数据</button>
+        </div>
+        <span class="toolbar-divider"></span>
         <button class="icon-btn" id="undoBtn" aria-label="撤销" title="撤销">↶</button>
         <button class="icon-btn" id="redoBtn" aria-label="重做" title="重做">↷</button>
         <button class="icon-btn" id="fitBtn" aria-label="适应画布" title="适应画布">⌗</button>
@@ -378,13 +556,13 @@
 
     <section class="body">
       <nav class="rail" aria-label="主导航">
-        <button class="rail-btn active" title="对话">◇</button>
-        <button class="rail-btn" title="角色">♙</button>
-        <button class="rail-btn" title="变量">𝑥</button>
-        <button class="rail-btn" title="事件">⚡</button>
-        <button class="rail-btn" title="项目搜索">⌕</button>
+        <button class="rail-btn active" data-nav="dialogue" data-tooltip="对话编辑器 · 编辑节点与连线" aria-label="打开对话编辑器">◇</button>
+        <button class="rail-btn" data-nav="characters" data-tooltip="角色资源 · 名称、标签与引用" aria-label="打开角色资源">♙</button>
+        <button class="rail-btn" data-nav="variables" data-tooltip="变量资源 · 类型、默认值与引用" aria-label="打开变量资源">𝑥</button>
+        <button class="rail-btn" data-nav="events" data-tooltip="事件资源 · 参数与调用位置" aria-label="打开事件资源">ϟ</button>
+        <button class="rail-btn" data-nav="search" data-tooltip="项目搜索 · 查找对话与节点" aria-label="聚焦项目搜索">⌕</button>
         <div class="rail-spacer"></div>
-        <button class="rail-btn" title="项目设置">⚙</button>
+        <button class="rail-btn" data-nav="settings" data-tooltip="项目设置 · 语言、导出与路径" aria-label="打开项目设置">⚙</button>
         <div class="avatar">YX</div>
       </nav>
 
@@ -392,12 +570,40 @@
         <div class="side-head"><span>项目内容</span><button class="icon-btn" id="newDialogueBtn" title="新建对话">＋</button></div>
         <div class="side-scroll">
           <div class="search-wrap"><input class="search" id="searchInput" placeholder="搜索对话、节点…" aria-label="搜索项目"></div>
-          <div class="section-title"><span>对话文件</span><span class="count">4</span></div>
-          <div class="dialogue-list" id="dialogueList">
-            <button class="dialogue-row active"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">序章 · 雨夜来客</span><span class="row-meta">8 个节点 · 刚刚编辑</span></span><span class="issue-dot"></span></button>
-            <button class="dialogue-row"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">第一章 · 鸿胪寺</span><span class="row-meta">24 个节点 · 昨天</span></span></button>
-            <button class="dialogue-row"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">支线 · 旧骨牌</span><span class="row-meta">11 个节点 · 7月18日</span></span></button>
-            <button class="dialogue-row"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">测试 · 条件分支</span><span class="row-meta">6 个节点 · 7月17日</span></span></button>
+          <div class="section-title"><span>快捷访问</span></div>
+          <div class="smart-list" id="smartDialogueViews">
+            <button class="smart-row active" data-smart-view="all"><span class="smart-icon">◇</span><span>全部对话</span><span class="smart-count">4</span></button>
+            <button class="smart-row" data-smart-view="recent"><span class="smart-icon">◷</span><span>最近编辑</span><span class="smart-count">2</span></button>
+            <button class="smart-row" data-smart-view="issues"><span class="smart-icon">!</span><span>存在错误</span><span class="smart-count">1</span></button>
+            <button class="smart-row" data-smart-view="i18n"><span class="smart-icon">文</span><span>翻译未完成</span><span class="smart-count">2</span></button>
+          </div>
+
+          <div class="section-title"><span>对话目录</span><button class="mini-action" id="newFolderBtn" title="新建文件夹" aria-label="新建文件夹">＋</button></div>
+          <div class="folder-tree" id="dialogueList">
+            <section class="folder-group" data-folder="prologue" data-folder-name="序章">
+              <button class="folder-row"><span class="folder-caret">▼</span><span class="folder-icon">▱</span><span class="folder-name">序章</span><span class="folder-count">1</span><span class="folder-more">•••</span></button>
+              <div class="folder-children">
+                <button class="dialogue-row active" draggable="true" data-dialogue-id="2fd88ddc-aa3b-466f-92a2-48785adce71e" data-dialogue-key="prologue-rainy-night" data-path="dialogues/prologue/rainy-night.json" data-recent="true" data-issue="true" data-i18n="true"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">雨夜来客</span><span class="row-meta">8 个节点 · 刚刚编辑</span></span><span class="issue-dot"></span></button>
+              </div>
+            </section>
+            <section class="folder-group" data-folder="chapter-01" data-folder-name="第一章 · 鸿胪寺">
+              <button class="folder-row"><span class="folder-caret">▼</span><span class="folder-icon">▱</span><span class="folder-name">第一章 · 鸿胪寺</span><span class="folder-count">1</span><span class="folder-more">•••</span></button>
+              <div class="folder-children">
+                <button class="dialogue-row" draggable="true" data-dialogue-id="cab9e63e-dffc-4122-ad41-f7536aa94ef3" data-dialogue-key="chapter-01-arrival" data-path="dialogues/chapter-01/arrival.json" data-recent="true" data-i18n="true"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">初入鸿胪寺</span><span class="row-meta">24 个节点 · 昨天</span></span></button>
+              </div>
+            </section>
+            <section class="folder-group collapsed" data-folder="side-quests" data-folder-name="支线">
+              <button class="folder-row"><span class="folder-caret">▼</span><span class="folder-icon">▱</span><span class="folder-name">支线</span><span class="folder-count">1</span><span class="folder-more">•••</span></button>
+              <div class="folder-children">
+                <button class="dialogue-row" draggable="true" data-dialogue-id="b7e2989c-b521-4ffc-a003-032fc4f18b94" data-dialogue-key="side-old-token" data-path="dialogues/side-quests/old-token.json"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">旧骨牌</span><span class="row-meta">11 个节点 · 7月18日</span></span></button>
+              </div>
+            </section>
+            <section class="folder-group collapsed" data-folder="tests" data-folder-name="测试">
+              <button class="folder-row"><span class="folder-caret">▼</span><span class="folder-icon">▱</span><span class="folder-name">测试</span><span class="folder-count">1</span><span class="folder-more">•••</span></button>
+              <div class="folder-children">
+                <button class="dialogue-row" draggable="true" data-dialogue-id="0ea01ca7-dd17-4235-ad50-fc9894d9a487" data-dialogue-key="test-condition-branch" data-path="dialogues/tests/condition-branch.json"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">条件分支</span><span class="row-meta">6 个节点 · 7月17日</span></span></button>
+              </div>
+            </section>
           </div>
 
           <div class="section-title"><span>添加节点</span><span class="count">拖入画布</span></div>
@@ -409,10 +615,10 @@
           </div>
 
           <div class="section-title"><span>项目资源</span></div>
-          <div class="dialogue-list">
-            <button class="dialogue-row"><span class="file-icon">♙</span><span class="row-main"><span class="row-title">角色</span><span class="row-meta">5 个定义</span></span></button>
-            <button class="dialogue-row"><span class="file-icon">𝑥</span><span class="row-main"><span class="row-title">变量</span><span class="row-meta">8 个定义</span></span></button>
-            <button class="dialogue-row"><span class="file-icon">⚡</span><span class="row-main"><span class="row-title">事件</span><span class="row-meta">6 个定义</span></span></button>
+          <div class="dialogue-list" id="resourceNav">
+            <button class="dialogue-row" data-resource="characters"><span class="file-icon">♙</span><span class="row-main"><span class="row-title">角色</span><span class="row-meta">5 个定义</span></span></button>
+            <button class="dialogue-row" data-resource="variables"><span class="file-icon">𝑥</span><span class="row-main"><span class="row-title">变量</span><span class="row-meta">8 个定义</span></span></button>
+            <button class="dialogue-row" data-resource="events"><span class="file-icon">ϟ</span><span class="row-main"><span class="row-title">事件</span><span class="row-meta">6 个定义</span></span></button>
           </div>
         </div>
       </aside>
@@ -429,6 +635,63 @@
           <div class="canvas-layer nodes" id="nodes"></div>
         </div>
         <div class="minimap" id="minimap" aria-hidden="true"></div>
+
+        <section class="source-view" id="sourceView" aria-label="对话源数据编辑器">
+          <header class="source-head">
+            <div class="source-tabs">
+              <button class="source-tab active" id="sourceDataTab">编辑源 JSON</button>
+              <button class="source-tab" id="runtimeDataTab">运行时预览</button>
+            </div>
+            <span class="source-path" id="sourcePath">dialogues/prologue/rainy-night.json</span>
+            <span class="schema-state" id="schemaState">Schema 有效</span>
+          </header>
+          <div class="source-editor-shell">
+            <pre class="line-gutter" id="lineGutter">1</pre>
+            <textarea class="source-textarea" id="sourceTextarea" spellcheck="false" aria-label="对话源 JSON"></textarea>
+          </div>
+          <footer class="source-foot">
+            <span class="source-message" id="sourceMessage">源数据与画布同步 · JSON Schema v1</span>
+            <div class="source-actions">
+              <button class="btn soft" id="formatSourceBtn">格式化</button>
+              <button class="btn primary" id="applySourceBtn" disabled>应用修改</button>
+            </div>
+          </footer>
+        </section>
+
+        <section class="resource-view" id="resourceView" aria-label="项目资源编辑器">
+          <header class="resource-head">
+            <div><div class="resource-title" id="resourceTitle">角色</div><div class="resource-subtitle" id="resourceSubtitle">管理角色显示名、主题色与对话引用</div></div>
+            <div class="resource-tools">
+              <input class="field resource-search" id="resourceSearch" placeholder="搜索角色…" aria-label="搜索项目资源">
+              <button class="btn primary" id="addResourceBtn">＋ 新建角色</button>
+            </div>
+          </header>
+          <div class="resource-table-wrap"><div class="resource-table" id="resourceTable"></div></div>
+        </section>
+
+        <section class="search-view" id="projectSearchView" aria-label="项目搜索">
+          <header class="project-search-head">
+            <div class="project-search-title">项目搜索</div>
+            <div class="project-search-subtitle">在当前项目中查找对话文件、节点、角色、变量和事件</div>
+            <label class="search-command">
+              <span class="search-command-icon">⌕</span>
+              <input class="project-search-input" id="projectSearchInput" placeholder="输入名称、ID、文本或条件表达式…" autocomplete="off">
+              <span class="kbd">⌘ K</span>
+            </label>
+          </header>
+          <div class="project-search-body">
+            <div class="search-summary">
+              <div class="search-filters" id="searchFilters">
+                <button class="search-filter active" data-search-filter="all">全部</button>
+                <button class="search-filter" data-search-filter="dialogue">对话文件</button>
+                <button class="search-filter" data-search-filter="node">节点</button>
+                <button class="search-filter" data-search-filter="resource">项目资源</button>
+              </div>
+              <span class="search-count" id="projectSearchCount">输入关键词开始搜索</span>
+            </div>
+            <div class="search-results" id="projectSearchResults"></div>
+          </div>
+        </section>
 
         <section class="bottom-panel" id="bottomPanel">
           <div class="panel-head">
@@ -477,6 +740,11 @@ siming 0.1.0-prototype
   </main>
 
   <div class="toast" id="toast"><strong>完成</strong><span id="toastText">操作已完成</span></div>
+  <div class="folder-menu" id="folderMenu" role="menu">
+    <button data-folder-action="new-dialogue">＋ 在此新建对话</button>
+    <button data-folder-action="rename">重命名文件夹</button>
+    <button class="danger" data-folder-action="delete">删除空文件夹</button>
+  </div>
 
   <script>
     const localeNames = { "zh-CN": "简体中文", "en-US": "English" };
@@ -487,32 +755,647 @@ siming 0.1.0-prototype
     let panelOpen = false;
     let simStep = 0;
     let newNodeCount = 0;
+    let editorView = "canvas";
+    let sourceMode = "source";
+    let sourceDraft = "";
+    let sourceDraftDirty = false;
+    let sourceDraftValid = true;
+    let projectSearchFilter = "all";
+    const dialogueMeta = {
+      id: "2fd88ddc-aa3b-466f-92a2-48785adce71e",
+      key: "prologue-rainy-night",
+      name: "雨夜来客",
+      path: "dialogues/prologue/rainy-night.json"
+    };
 
     const nodes = [
-      { id: "n1", key: "start-prologue", type: "start", x: 60, y: 285, title: "开始", text: { "zh-CN": "序章入口", "en-US": "Prologue entry" } },
-      { id: "n2", key: "line-dur", type: "dialogue", x: 310, y: 165, title: "对话", speaker: "杜尔", text: { "zh-CN": "雨下得这样大，你还要进城？", "en-US": "The rain is fierce. You still mean to enter the city?" } },
-      { id: "n3", key: "line-di", type: "dialogue", x: 310, y: 405, title: "对话", speaker: "狄仁杰", text: { "zh-CN": "既然有人等我，这场雨便拦不住。", "en-US": "Someone is waiting. A little rain will not stop me." } },
-      { id: "n4", key: "event-rain", type: "event", x: 570, y: 165, title: "事件", event: "scene.rain_heavy", text: { "zh-CN": "加强雨势", "en-US": "Increase rain" } },
-      { id: "n5", key: "choice-mercy", type: "choice", x: 570, y: 405, title: "玩家选项", choices: [
+      { id: "n1", uuid: "8e47fc2b-1f48-43df-a61d-61729af59a01", key: "start-prologue", type: "start", x: 40, y: 285, title: "开始", text: { "zh-CN": "序章入口", "en-US": "Prologue entry" } },
+      { id: "n2", uuid: "70164d7e-2a86-4551-9958-d329e5d0635b", key: "line-dur", type: "dialogue", x: 510, y: 125, title: "对话", speaker: "dur", text: { "zh-CN": "雨下得这样大，你还要进城？", "en-US": "The rain is fierce. You still mean to enter the city?" } },
+      { id: "n3", uuid: "68d926bd-1d43-4a17-98d7-c34903837a10", key: "line-di", type: "dialogue", x: 750, y: 425, title: "对话", speaker: "di-renjie", text: { "zh-CN": "既然有人等我，这场雨便拦不住。", "en-US": "Someone is waiting. A little rain will not stop me." } },
+      { id: "n4", uuid: "1dba4c69-465a-4df1-8713-ea77e469d552", key: "event-rain", type: "event", x: 750, y: 125, title: "事件", event: "scene.rain_heavy", text: { "zh-CN": "加强雨势", "en-US": "Increase rain" } },
+      { id: "n5", uuid: "fc05b621-1b67-4bb7-88a0-1c7f65d0dcc7", key: "choice-mercy", type: "choice", x: 270, y: 285, title: "玩家选项", choices: [
         { id: "option-01", text: { "zh-CN": "先去驿馆避雨", "en-US": "Shelter at the posthouse" } },
         { id: "option-02", text: { "zh-CN": "继续赶往城门", "en-US": "" } }
       ] },
-      { id: "n6", key: "condition-favor", type: "condition", x: 830, y: 285, title: "条件判断", condition: "favor >= 10", text: { "zh-CN": "杜尔好感", "en-US": "Dur affinity" } },
-      { id: "n7", key: "line-trust", type: "dialogue", x: 1070, y: 155, title: "对话", speaker: "杜尔", text: { "zh-CN": "那便同去。我认得一条近路。", "en-US": "Then I will come. I know a shorter road." } },
-      { id: "n8", key: "end-prologue", type: "end", x: 1070, y: 425, title: "结束", text: { "zh-CN": "进入长安城", "en-US": "Enter Chang'an" } }
+      { id: "n6", uuid: "877239d2-6276-4ed0-a17b-6b4cc2bf0558", key: "condition-favor", type: "condition", x: 990, y: 285, title: "条件判断", condition: { variable: "favor", operator: ">=", value: 10 }, text: { "zh-CN": "杜尔好感", "en-US": "Dur affinity" } },
+      { id: "n7", uuid: "0ba9e4a5-25dc-4540-8d48-3c952b62c04e", key: "line-trust", type: "dialogue", x: 1240, y: 125, title: "对话", speaker: "dur", text: { "zh-CN": "那便同去。我认得一条近路。", "en-US": "Then I will come. I know a shorter road." } },
+      { id: "n8", uuid: "95efe338-ae83-4b29-a9ed-e4cd2eddd688", key: "end-prologue", type: "end", x: 1240, y: 425, title: "结束", text: { "zh-CN": "进入长安城", "en-US": "Enter Chang'an" } }
     ];
 
     const edges = [
-      ["n1", "n2"], ["n1", "n3"], ["n2", "n4"], ["n3", "n5"],
-      ["n4", "n6"], ["n5", "n6"], ["n6", "n7"], ["n6", "n8"], ["n7", "n8"]
+      { id: "edge-start-choice", from: "n1", sourcePort: "next", to: "n5", targetPort: "in" },
+      { id: "edge-choice-shelter", from: "n5", sourcePort: "option-01", to: "n2", targetPort: "in" },
+      { id: "edge-choice-gate", from: "n5", sourcePort: "option-02", to: "n3", targetPort: "in" },
+      { id: "edge-dur-rain", from: "n2", sourcePort: "next", to: "n4", targetPort: "in" },
+      { id: "edge-rain-condition", from: "n4", sourcePort: "next", to: "n6", targetPort: "in" },
+      { id: "edge-di-condition", from: "n3", sourcePort: "next", to: "n6", targetPort: "in" },
+      { id: "edge-condition-true", from: "n6", sourcePort: "true", to: "n7", targetPort: "in" },
+      { id: "edge-condition-false", from: "n6", sourcePort: "false", to: "n8", targetPort: "in" },
+      { id: "edge-trust-end", from: "n7", sourcePort: "next", to: "n8", targetPort: "in" }
     ];
 
+    const projectResources = {
+      characters: [
+        { id: "dur", names: { "zh-CN": "杜尔", "en-US": "Dur" }, shortName: "杜尔", color: "#8b7cf6", tags: ["主角", "鸿胪寺"], description: "来自西域的年轻使者，观察敏锐，行事直接。", references: [{ label: "雨下得这样大……", path: "序章 · 雨夜来客 / line-dur", nodeId: "n2" }, { label: "那便同去……", path: "序章 · 雨夜来客 / line-trust", nodeId: "n7" }, { label: "厅事对质", path: "第一章 · 鸿胪寺 / line-18", nodeId: "n2" }] },
+        { id: "di-renjie", names: { "zh-CN": "狄仁杰", "en-US": "Di Renjie" }, shortName: "狄公", color: "#5fc9c2", tags: ["主角", "大唐"], description: "初入仕途的年轻官员，善于从细节中寻找真相。", references: [{ label: "既然有人等我……", path: "序章 · 雨夜来客 / line-di", nodeId: "n3" }, { label: "狄仁杰时间", path: "第一章 · 鸿胪寺 / observe-01", nodeId: "n3" }] },
+        { id: "narrator", names: { "zh-CN": "旁白", "en-US": "Narrator" }, shortName: "旁白", color: "#767988", tags: ["系统"], description: "用于环境描写和无角色对白。", references: [{ label: "长安落雨", path: "序章 · 雨夜来客 / intro", nodeId: "n1" }] },
+        { id: "muhan", names: { "zh-CN": "慕寒", "en-US": "Muhan" }, shortName: "慕寒", color: "#df9b61", tags: ["证人"], description: "鸿胪寺案相关证人。", references: [{ label: "分开问询", path: "第一章 · 鸿胪寺 / interview-muhan", nodeId: "n5" }] },
+        { id: "sunan", names: { "zh-CN": "苏南", "en-US": "Sunan" }, shortName: "苏南", color: "#d979a8", tags: ["证人"], description: "鸿胪寺案相关证人。", references: [{ label: "厅事证词", path: "第一章 · 鸿胪寺 / testimony-sunan", nodeId: "n6" }] }
+      ],
+      variables: [
+        { id: "favor", label: "杜尔好感", type: "number", defaultValue: "0", scope: "story", description: "记录杜尔对玩家的信任程度。", references: [{ label: "favor >= 10", path: "序章 · 雨夜来客 / condition-favor", nodeId: "n6" }, { label: "favor + 1", path: "第一章 · 鸿胪寺 / event-12", nodeId: "n4" }] },
+        { id: "hasKey", label: "持有旧钥匙", type: "boolean", defaultValue: "false", scope: "story", description: "玩家是否获得驿馆旧钥匙。", references: [{ label: "hasKey == true", path: "支线 · 旧骨牌 / condition-key", nodeId: "n6" }] },
+        { id: "chapter", label: "当前章节", type: "string", defaultValue: "prologue", scope: "global", description: "当前剧情章节标识。", references: [{ label: "设置章节", path: "序章 · 雨夜来客 / end-prologue", nodeId: "n8" }] },
+        { id: "rainLevel", label: "雨势等级", type: "number", defaultValue: "2", scope: "scene", description: "当前场景雨势强度。", references: [{ label: "加强雨势", path: "序章 · 雨夜来客 / event-rain", nodeId: "n4" }] },
+        { id: "metDur", label: "已遇见杜尔", type: "boolean", defaultValue: "false", scope: "story", description: "是否完成杜尔首次登场。", references: [] },
+        { id: "clueCount", label: "线索数量", type: "number", defaultValue: "0", scope: "chapter", description: "本章已发现线索数。", references: [] },
+        { id: "playerName", label: "玩家称呼", type: "string", defaultValue: "客人", scope: "global", description: "对话中使用的玩家称呼。", references: [] },
+        { id: "isNight", label: "是否夜晚", type: "boolean", defaultValue: "true", scope: "scene", description: "场景时间状态。", references: [] }
+      ],
+      events: [
+        { id: "scene.rain_heavy", label: "加强雨势", category: "场景", description: "通知场景系统将雨势切换为强降雨。", builtin: false, params: [{ name: "duration", type: "number", required: false, defaultValue: "2.0" }], references: [{ label: "加强雨势", path: "序章 · 雨夜来客 / event-rain", nodeId: "n4" }] },
+        { id: "quest.start", label: "开始任务", category: "任务", description: "创建并激活一个任务。", builtin: false, params: [{ name: "questId", type: "string", required: true, defaultValue: "" }], references: [] },
+        { id: "variable.set", label: "设置变量", category: "系统", description: "将变量设置为指定值。", builtin: true, params: [{ name: "variable", type: "string", required: true, defaultValue: "" }, { name: "value", type: "json", required: true, defaultValue: "null" }], references: [] },
+        { id: "variable.add", label: "增加变量", category: "系统", description: "给 number 类型变量增加指定数值。", builtin: true, params: [{ name: "variable", type: "string", required: true, defaultValue: "" }, { name: "amount", type: "number", required: true, defaultValue: "1" }], references: [] },
+        { id: "portrait.show", label: "显示立绘", category: "演出", description: "显示指定角色立绘及表情。", builtin: false, params: [{ name: "characterId", type: "string", required: true, defaultValue: "" }, { name: "expression", type: "string", required: false, defaultValue: "default" }], references: [] },
+        { id: "audio.play", label: "播放音频", category: "音频", description: "播放项目资源中的音频事件。", builtin: false, params: [{ name: "audioId", type: "string", required: true, defaultValue: "" }], references: [] }
+      ]
+    };
+
+    const resourceConfig = {
+      characters: { title: "角色", subtitle: "管理角色显示名、主题色与对话引用", singular: "角色", placeholder: "搜索角色名称或 ID…" },
+      variables: { title: "变量", subtitle: "管理变量类型、默认值、作用域与读写引用", singular: "变量", placeholder: "搜索变量键或说明…" },
+      events: { title: "事件", subtitle: "管理事件参数 Schema 与剧情调用位置", singular: "事件", placeholder: "搜索事件名或分类…" }
+    };
+    let activeResourceType = "characters";
+    let selectedResourceId = "dur";
+
     const byId = id => nodes.find(node => node.id === id);
+    const stableId = internalId => byId(internalId)?.key || internalId;
+    const stableUuid = internalId => byId(internalId)?.uuid || internalId;
+    const characterName = id => projectResources.characters.find(character => character.id === id)?.names[currentLocale] || id;
+    const generateUuid = () => crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, char => {
+      const value = Math.random() * 16 | 0;
+      return (char === "x" ? value : value & 3 | 8).toString(16);
+    });
+
+    function buildSourceDocument() {
+      return {
+        schemaVersion: 1,
+        id: dialogueMeta.id,
+        key: dialogueMeta.key,
+        name: dialogueMeta.name,
+        entryNodeId: stableUuid("n1"),
+        nodes: nodes.map(node => {
+          const data = {};
+          if (node.text) data.text = node.text;
+          if (node.speaker) data.speakerId = node.speaker;
+          if (node.choices) data.choices = node.choices;
+          if (node.condition) data.condition = node.condition;
+          if (node.event) data.event = node.event;
+          return { id: node.uuid, key: node.key, type: node.type, position: { x: Math.round(node.x), y: Math.round(node.y) }, data };
+        }),
+        edges: edges.map(edge => ({
+          id: edge.id,
+          sourceNodeId: stableUuid(edge.from),
+          sourcePort: edge.sourcePort,
+          targetNodeId: stableUuid(edge.to),
+          targetPort: edge.targetPort
+        }))
+      };
+    }
+
+    function buildRuntimeDocument(source) {
+      const outgoing = {};
+      source.edges.forEach(edge => { (outgoing[edge.sourceNodeId] ||= []).push(edge); });
+      const runtimeNodes = {};
+      source.nodes.forEach(node => {
+        const value = { key: node.key, type: node.type };
+        const nodeEdges = outgoing[node.id] || [];
+        const targetFor = port => nodeEdges.find(edge => edge.sourcePort === port)?.targetNodeId;
+        if (node.data?.speakerId) value.speakerId = node.data.speakerId;
+        if (node.data?.condition) value.condition = node.data.condition;
+        if (node.data?.event) value.event = node.data.event;
+        if (node.data?.text) value.textKey = `dialogue.${source.id}.${node.id}.text`;
+        if (node.type === "choice") value.choices = node.data.choices.map(choice => ({ id: choice.id, textKey: `dialogue.${source.id}.${node.id}.choice.${choice.id}.text`, next: targetFor(choice.id) }));
+        else if (node.type === "condition") value.branches = { true: targetFor("true"), false: targetFor("false") };
+        else if (node.type !== "end") value.next = targetFor("next");
+        runtimeNodes[node.id] = value;
+      });
+      return { schemaVersion: 1, dialogueId: source.id, dialogueKey: source.key, entryNodeId: source.entryNodeId, nodes: runtimeNodes };
+    }
+
+    function validateSourceValue(value) {
+      const parsed = JSON.parse(value);
+      if (parsed.schemaVersion !== 1) throw new Error("schemaVersion 必须为 1");
+      if (!parsed.id || !parsed.key || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) throw new Error("必须包含 id、key、nodes 和 edges");
+      const ids = new Set();
+      const keys = new Set();
+      const nodesById = new Map();
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidPattern.test(parsed.id)) throw new Error(`对话 id 不是有效 UUID：${parsed.id}`);
+      if (!/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(parsed.key)) throw new Error(`对话 key 格式无效：${parsed.key}`);
+      parsed.nodes.forEach((node, index) => {
+        if (!node.id || !node.key || !node.type || !node.position || !node.data) throw new Error(`nodes[${index}] 缺少 id、key、type、position 或 data`);
+        if (!uuidPattern.test(node.id)) throw new Error(`节点 id 不是有效 UUID：${node.id}`);
+        if (!/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(node.key)) throw new Error(`节点 key 格式无效：${node.key}`);
+        if (ids.has(node.id)) throw new Error(`节点 UUID 重复：${node.id}`);
+        if (keys.has(node.key)) throw new Error(`节点 key 重复：${node.key}`);
+        ids.add(node.id);
+        keys.add(node.key);
+        nodesById.set(node.id, node);
+      });
+      if (!ids.has(parsed.entryNodeId)) throw new Error("entryNodeId 引用了不存在的节点 UUID");
+      if (nodesById.get(parsed.entryNodeId)?.type !== "start") throw new Error("entryNodeId 必须引用 start 节点");
+      const edgeIds = new Set();
+      const outgoing = new Map();
+      parsed.edges.forEach((edge, index) => {
+        if (!edge.id || !edge.sourcePort || !edge.targetPort) throw new Error(`edges[${index}] 缺少 id、sourcePort 或 targetPort`);
+        if (edgeIds.has(edge.id)) throw new Error(`连线 ID 重复：${edge.id}`);
+        if (!ids.has(edge.sourceNodeId) || !ids.has(edge.targetNodeId)) throw new Error(`edges[${index}] 引用了不存在的节点`);
+        edgeIds.add(edge.id);
+        if (!outgoing.has(edge.sourceNodeId)) outgoing.set(edge.sourceNodeId, []);
+        outgoing.get(edge.sourceNodeId).push(edge);
+      });
+      parsed.nodes.forEach(node => {
+        const nodeEdges = outgoing.get(node.id) || [];
+        const ports = nodeEdges.map(edge => edge.sourcePort);
+        if (new Set(ports).size !== ports.length) throw new Error(`节点 ${node.key} 的出口端口重复`);
+        if (["start", "dialogue", "event"].includes(node.type)) {
+          if (nodeEdges.length !== 1 || ports[0] !== "next") throw new Error(`${node.type} 节点 ${node.key} 必须且只能有一个 next 出口`);
+        } else if (node.type === "choice") {
+          const choiceIds = (node.data.choices || []).map(choice => choice.id);
+          if (!choiceIds.length || new Set(choiceIds).size !== choiceIds.length) throw new Error(`选项节点 ${node.key} 的选项 ID 缺失或重复`);
+          if (nodeEdges.length !== choiceIds.length || choiceIds.some(id => !ports.includes(id))) throw new Error(`选项节点 ${node.key} 的每个选项必须对应一个同名出口`);
+        } else if (node.type === "condition") {
+          const condition = node.data.condition;
+          if (!condition || typeof condition !== "object" || !condition.variable || !condition.operator || !("value" in condition)) throw new Error(`条件节点 ${node.key} 缺少结构化 condition`);
+          if (nodeEdges.length !== 2 || !ports.includes("true") || !ports.includes("false")) throw new Error(`条件节点 ${node.key} 必须同时包含 true 和 false 出口`);
+        } else if (node.type === "end") {
+          if (nodeEdges.length) throw new Error(`结束节点 ${node.key} 不能包含出口`);
+        } else {
+          throw new Error(`节点 ${node.key} 使用了未知类型：${node.type}`);
+        }
+      });
+      return parsed;
+    }
+
+    function sourceErrorLine(error, value) {
+      const match = String(error.message).match(/position\s+(\d+)/i);
+      if (!match) return null;
+      return value.slice(0, Number(match[1])).split("\n").length;
+    }
+
+    function updateLineGutter() {
+      const textarea = document.getElementById("sourceTextarea");
+      const lines = Math.max(1, textarea.value.split("\n").length);
+      document.getElementById("lineGutter").textContent = Array.from({ length: lines }, (_, index) => index + 1).join("\n");
+    }
+
+    function updateSourceValidation() {
+      const schema = document.getElementById("schemaState");
+      const message = document.getElementById("sourceMessage");
+      const apply = document.getElementById("applySourceBtn");
+      if (sourceMode === "runtime") {
+        schema.textContent = "编译结果 · 只读";
+        schema.classList.remove("invalid");
+        message.textContent = "运行时预览已移除坐标，并将多语言文本替换为稳定文本键";
+        message.classList.remove("error");
+        apply.disabled = true;
+        return;
+      }
+      try {
+        validateSourceValue(sourceDraft);
+        sourceDraftValid = true;
+        schema.textContent = "Schema 有效";
+        schema.classList.remove("invalid");
+        message.textContent = sourceDraftDirty ? "草稿已通过校验，应用后将同步到画布" : "源数据与画布同步 · JSON Schema v1";
+        message.classList.remove("error");
+        apply.disabled = !sourceDraftDirty;
+      } catch (error) {
+        sourceDraftValid = false;
+        const line = sourceErrorLine(error, sourceDraft);
+        schema.textContent = "Schema 无效";
+        schema.classList.add("invalid");
+        message.textContent = `${line ? `第 ${line} 行 · ` : ""}${error.message}`;
+        message.classList.add("error");
+        apply.disabled = true;
+      }
+    }
+
+    function showSourceMode(mode) {
+      sourceMode = mode;
+      const textarea = document.getElementById("sourceTextarea");
+      document.getElementById("sourceDataTab").classList.toggle("active", mode === "source");
+      document.getElementById("runtimeDataTab").classList.toggle("active", mode === "runtime");
+      document.getElementById("formatSourceBtn").disabled = mode === "runtime";
+      if (mode === "runtime") {
+        let parsed;
+        try { parsed = validateSourceValue(sourceDraft); } catch { parsed = buildSourceDocument(); }
+        textarea.value = JSON.stringify(buildRuntimeDocument(parsed), null, 2);
+        textarea.readOnly = true;
+      } else {
+        textarea.value = sourceDraft;
+        textarea.readOnly = false;
+      }
+      updateLineGutter();
+      updateSourceValidation();
+    }
+
+    function refreshSourceDraft() {
+      sourceDraft = JSON.stringify(buildSourceDocument(), null, 2);
+      sourceDraftDirty = false;
+      showSourceMode("source");
+    }
+
+    function switchEditorView(view) {
+      if (editorView === "data" && sourceDraftDirty) {
+        const discard = window.confirm("数据视图中有未应用的修改。要放弃草稿并返回画布吗？");
+        if (!discard) return;
+      }
+      editorView = view;
+      const stage = document.getElementById("stage");
+      stage.classList.toggle("data-mode", view === "data");
+      stage.classList.remove("resource-mode");
+      stage.classList.remove("search-mode");
+      document.getElementById("sourceView").classList.toggle("active", view === "data");
+      document.getElementById("resourceView").classList.remove("active");
+      document.getElementById("projectSearchView").classList.remove("active");
+      document.getElementById("canvasViewBtn").classList.toggle("active", view === "canvas");
+      document.getElementById("dataViewBtn").classList.toggle("active", view === "data");
+      document.getElementById("canvasViewBtn").disabled = false;
+      document.getElementById("dataViewBtn").disabled = false;
+      const activeDialogueRow = document.querySelector("#dialogueList .dialogue-row.active");
+      const activeFolderName = activeDialogueRow?.closest(".folder-group")?.dataset.folderName;
+      document.getElementById("docName").textContent = activeDialogueRow ? `天命 · ${activeFolderName} · ${activeDialogueRow.querySelector(".row-title").textContent}` : "天命 · 对话编辑器";
+      document.querySelectorAll("#resourceNav .dialogue-row").forEach(row => row.classList.remove("active"));
+      setRailActive("dialogue");
+      if (view === "data") {
+        refreshSourceDraft();
+        document.getElementById("selectionBadge").textContent = "SOURCE JSON";
+        document.getElementById("inspectorContent").innerHTML = `<div class="form-section"><label class="form-label">数据模式</label><div class="hint">这里编辑的是当前对话的真实源结构。修改会先保留为草稿，通过校验并点击“应用修改”后才同步到画布。</div></div><div class="form-section"><label class="form-label">对话标识</label><div class="hint"><code>id</code> 是跨目录稳定的 UUID；<code>key</code> 是可读别名。移动文件夹只更新项目清单中的相对路径。</div></div><div class="form-section"><label class="form-label">节点标识</label><div class="hint"><code>id</code> 是自动生成且不可变的 UUID，连线通过它引用节点；<code>key</code> 是可读别名。直接修改 UUID 可能使现有引用失效。</div></div><div class="form-section"><label class="form-label">当前文件</label><input class="field mono" value="${dialogueMeta.path}" readonly><div class="hint">Schema v1 · UTF-8 · 8 个节点 · 9 条连线</div></div>`;
+      } else {
+        sourceDraftDirty = false;
+        renderInspector();
+        fitCanvas();
+      }
+    }
+
+    const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+    const activeResources = () => projectResources[activeResourceType];
+    const selectedResource = () => activeResources().find(item => item.id === selectedResourceId);
+
+    function setRailActive(name) {
+      document.querySelectorAll(".rail-btn[data-nav]").forEach(button => button.classList.toggle("active", button.dataset.nav === name));
+    }
+
+    function syncRailActive() {
+      setRailActive(editorView === "resource" ? activeResourceType : editorView === "search" ? "search" : "dialogue");
+    }
+
+    function resourceSearchText(item) {
+      if (activeResourceType === "characters") return [item.id, ...Object.values(item.names), item.shortName, item.description, ...item.tags].join(" ");
+      if (activeResourceType === "variables") return [item.id, item.label, item.type, item.scope, item.description].join(" ");
+      return [item.id, item.label, item.category, item.description, ...item.params.map(param => `${param.name} ${param.type}`)].join(" ");
+    }
+
+    function renderResourceTable() {
+      const query = document.getElementById("resourceSearch").value.trim().toLowerCase();
+      const items = activeResources().filter(item => resourceSearchText(item).toLowerCase().includes(query));
+      let header;
+      if (activeResourceType === "characters") header = `<div class="resource-grid header"><span>角色</span><span>标签</span><span>说明</span><span>引用</span></div>`;
+      else if (activeResourceType === "variables") header = `<div class="resource-grid variables header"><span>变量</span><span>类型</span><span>默认值</span><span>作用域</span><span>引用</span></div>`;
+      else header = `<div class="resource-grid events header"><span>事件</span><span>参数</span><span>分类</span><span>引用</span></div>`;
+
+      const rows = items.map(item => {
+        const selected = item.id === selectedResourceId ? " selected" : "";
+        if (activeResourceType === "characters") {
+          const name = item.names["zh-CN"] || item.names["en-US"] || item.id;
+          return `<div class="resource-grid resource-row${selected}" data-resource-id="${escapeHtml(item.id)}"><span class="resource-primary"><span class="resource-avatar" style="background:${escapeHtml(item.color)}">${escapeHtml(name.slice(0, 1))}</span><span><span class="resource-name">${escapeHtml(name)}</span><span class="resource-id">${escapeHtml(item.id)}</span></span></span><span class="tag-list">${item.tags.map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("") || '<span class="resource-default">—</span>'}</span><span class="resource-default">${escapeHtml(item.description)}</span><span><span class="usage-pill">${item.references.length} 处</span></span></div>`;
+        }
+        if (activeResourceType === "variables") {
+          return `<div class="resource-grid variables resource-row${selected}" data-resource-id="${escapeHtml(item.id)}"><span class="resource-primary"><span class="resource-symbol">𝑥</span><span><span class="resource-name">${escapeHtml(item.label)}</span><span class="resource-id">${escapeHtml(item.id)}</span></span></span><span class="resource-type">${escapeHtml(item.type)}</span><span class="resource-default">${escapeHtml(item.defaultValue)}</span><span class="tag-chip">${escapeHtml(item.scope)}</span><span><span class="usage-pill">${item.references.length} 处</span></span></div>`;
+        }
+        return `<div class="resource-grid events resource-row${selected}" data-resource-id="${escapeHtml(item.id)}"><span class="resource-primary"><span class="resource-symbol">ϟ</span><span><span class="resource-name">${escapeHtml(item.label)}</span><span class="resource-id">${escapeHtml(item.id)}</span></span></span><span class="resource-default">${item.params.length} 个</span><span><span class="tag-chip">${escapeHtml(item.category)}</span>${item.builtin ? '<span class="tag-chip">内置</span>' : ""}</span><span><span class="usage-pill">${item.references.length} 处</span></span></div>`;
+      }).join("");
+      document.getElementById("resourceTable").innerHTML = header + (rows || `<div style="padding:42px;text-align:center;color:#696c7a">没有匹配的${resourceConfig[activeResourceType].singular}</div>`);
+      document.querySelectorAll("[data-resource-id]").forEach(row => row.addEventListener("click", () => {
+        selectedResourceId = row.dataset.resourceId;
+        renderResourceTable();
+        renderResourceInspector();
+      }));
+    }
+
+    function referenceSection(item) {
+      const refs = item.references.map(ref => `<button class="reference-item" data-ref-node="${escapeHtml(ref.nodeId)}"><span>${escapeHtml(ref.label)}</span><span class="reference-path">↗ ${escapeHtml(ref.path)}</span></button>`).join("");
+      return `<div class="form-section"><label class="form-label">剧情引用 <span>${item.references.length} 处</span></label><div class="reference-list">${refs || '<div class="hint">当前没有被任何对话节点引用，可安全删除。</div>'}</div></div>`;
+    }
+
+    function resourceActions(item) {
+      return `<div class="form-section"><div style="display:flex;gap:7px"><button class="btn soft" id="duplicateResourceBtn">复制定义</button><button class="btn soft" id="deleteResourceBtn" ${item.references.length || item.builtin ? "disabled" : ""}>删除</button></div><div class="hint">${item.builtin ? "内置事件不可删除。" : item.references.length ? `存在 ${item.references.length} 处引用，删除前需要先解除引用。` : "该定义没有引用，可以安全删除。"}</div></div>`;
+    }
+
+    function renderResourceInspector() {
+      const item = selectedResource();
+      if (!item) {
+        document.getElementById("selectionBadge").textContent = "NONE";
+        document.getElementById("inspectorContent").innerHTML = `<div class="hint">选择一条资源定义查看属性。</div>`;
+        return;
+      }
+      document.getElementById("selectionBadge").textContent = item.id;
+      let content = `<div class="form-section"><label class="form-label">稳定 ID <span>创建后不可修改</span></label><input class="field mono" value="${escapeHtml(item.id)}" readonly></div>`;
+      if (activeResourceType === "characters") {
+        content += `<div class="form-section"><label class="form-label">主题色</label><input class="field" type="color" data-resource-field="color" value="${escapeHtml(item.color)}"></div><div class="form-section"><label class="form-label">简体中文名 <span class="required">必填</span></label><input class="field" data-resource-field="names.zh-CN" value="${escapeHtml(item.names["zh-CN"])}"><label class="form-label" style="margin-top:9px">English</label><input class="field" data-resource-field="names.en-US" value="${escapeHtml(item.names["en-US"])}"></div><div class="form-section"><label class="form-label">简称</label><input class="field" data-resource-field="shortName" value="${escapeHtml(item.shortName)}"><label class="form-label" style="margin-top:9px">标签 <span>逗号分隔</span></label><input class="field" data-resource-field="tags" value="${escapeHtml(item.tags.join(", "))}"></div><div class="form-section"><label class="form-label">角色说明</label><textarea class="textarea" data-resource-field="description">${escapeHtml(item.description)}</textarea></div>`;
+      } else if (activeResourceType === "variables") {
+        content += `<div class="form-section"><label class="form-label">显示名称</label><input class="field" data-resource-field="label" value="${escapeHtml(item.label)}"></div><div class="form-section"><label class="form-label">数据类型 <span class="required">影响默认值校验</span></label><select class="field" data-resource-field="type">${["boolean","number","string","json"].map(type => `<option ${item.type === type ? "selected" : ""}>${type}</option>`).join("")}</select><label class="form-label" style="margin-top:9px">默认值</label><input class="field mono" data-resource-field="defaultValue" value="${escapeHtml(item.defaultValue)}"><label class="form-label" style="margin-top:9px">作用域</label><select class="field" data-resource-field="scope">${["global","story","chapter","scene"].map(scope => `<option ${item.scope === scope ? "selected" : ""}>${scope}</option>`).join("")}</select></div><div class="form-section"><label class="form-label">用途说明</label><textarea class="textarea" data-resource-field="description">${escapeHtml(item.description)}</textarea><div class="hint">类型变化后会重新校验默认值和所有读写节点。</div></div>`;
+      } else {
+        content += `<div class="form-section"><label class="form-label">显示名称</label><input class="field" data-resource-field="label" value="${escapeHtml(item.label)}"><label class="form-label" style="margin-top:9px">分类</label><input class="field" data-resource-field="category" value="${escapeHtml(item.category)}"></div><div class="form-section"><label class="form-label">事件说明</label><textarea class="textarea" data-resource-field="description">${escapeHtml(item.description)}</textarea></div><div class="form-section"><label class="form-label">参数 Schema <span>${item.params.length} 个</span></label><div class="param-list">${item.params.map((param, index) => `<div class="param-card"><div class="param-head"><span class="param-name">${escapeHtml(param.name)}</span><span class="param-meta">${escapeHtml(param.type)} · ${param.required ? "必填" : "可选"}</span></div><input class="field mono" data-param-index="${index}" data-param-field="defaultValue" value="${escapeHtml(param.defaultValue)}" placeholder="默认值"></div>`).join("")}</div><button class="btn soft" id="addParamBtn" style="margin-top:7px" ${item.builtin ? "disabled" : ""}>＋ 添加参数</button><div class="hint">参数名称与类型构成调用契约；内置事件的 Schema 只读。</div></div>`;
+      }
+      document.getElementById("inspectorContent").innerHTML = content + referenceSection(item) + resourceActions(item);
+      document.querySelectorAll("[data-resource-field]").forEach(field => {
+        const eventName = field.tagName === "SELECT" || field.type === "color" ? "change" : "input";
+        field.addEventListener(eventName, e => {
+          const path = e.target.dataset.resourceField;
+          if (path === "tags") item.tags = e.target.value.split(",").map(tag => tag.trim()).filter(Boolean);
+          else if (path.startsWith("names.")) item.names[path.slice(6)] = e.target.value;
+          else item[path] = e.target.value;
+          markDirty(); renderResourceTable();
+        });
+      });
+      document.querySelectorAll("[data-param-index]").forEach(field => field.addEventListener("input", e => {
+        item.params[Number(e.target.dataset.paramIndex)][e.target.dataset.paramField] = e.target.value;
+        markDirty();
+      }));
+      document.querySelectorAll("[data-ref-node]").forEach(button => button.addEventListener("click", () => {
+        openDialogueView(); selectNode(button.dataset.refNode); showToast(`已定位引用节点：${stableId(button.dataset.refNode)}`);
+      }));
+      const addParam = document.getElementById("addParamBtn");
+      if (addParam) addParam.addEventListener("click", () => { item.params.push({ name: `param${item.params.length + 1}`, type: "string", required: false, defaultValue: "" }); markDirty(); renderResourceTable(); renderResourceInspector(); });
+      document.getElementById("duplicateResourceBtn").addEventListener("click", duplicateResource);
+      document.getElementById("deleteResourceBtn").addEventListener("click", deleteResource);
+    }
+
+    function buildProjectSearchIndex() {
+      const dialogues = [...document.querySelectorAll("#dialogueList .dialogue-row")].map((row, index) => ({
+        kind: "dialogue", filter: "dialogue", group: "对话文件", icon: "◇", id: String(index),
+        title: row.querySelector(".row-title").textContent,
+        path: `${row.closest(".folder-group")?.dataset.folderName || "未分类"} / ${row.dataset.dialogueKey} · ${row.querySelector(".row-meta").textContent}`
+      }));
+      const nodeItems = nodes.map(node => {
+        const detail = node.text?.["zh-CN"] || node.condition || node.event || node.title;
+        return { kind: "node", filter: "node", group: "对话节点", icon: node.type === "event" ? "ϟ" : node.type === "condition" ? "◇" : "⌘", id: node.id, title: `${node.title} · ${node.key}`, path: `序章 / 雨夜来客 / ${detail} · ${node.uuid}` };
+      });
+      const resources = Object.entries(projectResources).flatMap(([type, items]) => items.map(item => ({
+        kind: "resource", filter: "resource", group: resourceConfig[type].title, resourceType: type,
+        icon: type === "characters" ? "♙" : type === "variables" ? "𝑥" : "ϟ", id: item.id,
+        title: type === "characters" ? item.names["zh-CN"] : item.label,
+        path: `${item.id} · ${type === "characters" ? item.description : type === "variables" ? `${item.type} / ${item.scope}` : `${item.category} / ${item.params.length} 个参数`}`
+      })));
+      return [...dialogues, ...nodeItems, ...resources];
+    }
+
+    function renderProjectSearchResults() {
+      const query = document.getElementById("projectSearchInput").value.trim().toLowerCase();
+      let items = buildProjectSearchIndex().filter(item => projectSearchFilter === "all" || item.filter === projectSearchFilter);
+      if (query) items = items.filter(item => `${item.title} ${item.path} ${item.id}`.toLowerCase().includes(query));
+      else items = items.slice(0, 8);
+      document.getElementById("projectSearchCount").textContent = query ? `${items.length} 个结果` : `最近内容 · ${items.length} 项`;
+      const groups = new Map();
+      items.forEach(item => { if (!groups.has(item.group)) groups.set(item.group, []); groups.get(item.group).push(item); });
+      document.getElementById("projectSearchResults").innerHTML = items.length ? [...groups.entries()].map(([group, entries]) => `<section class="search-group"><header class="search-group-head"><span>${escapeHtml(group)}</span><span>${entries.length}</span></header>${entries.map(item => `<button class="search-result" data-search-kind="${item.kind}" data-search-id="${escapeHtml(item.id)}" ${item.resourceType ? `data-resource-type="${item.resourceType}"` : ""}><span class="search-result-icon">${item.icon}</span><span><span class="search-result-title">${escapeHtml(item.title)}</span><span class="search-result-path">${escapeHtml(item.path)}</span></span><span class="search-result-type">${escapeHtml(group)}</span><span class="search-result-arrow">›</span></button>`).join("")}</section>`).join("") : `<div class="search-empty">没有找到匹配内容<br><span class="hint">尝试名称、稳定 ID、对白文本或条件表达式</span></div>`;
+      document.querySelectorAll("[data-search-kind]").forEach(button => button.addEventListener("click", () => openSearchResult(button)));
+    }
+
+    function openSearchResult(button) {
+      if (button.dataset.searchKind === "dialogue") {
+        const row = document.querySelectorAll("#dialogueList .dialogue-row")[Number(button.dataset.searchId)];
+        openDialogueView(row); showToast(`已打开：${row.querySelector(".row-title").textContent}`);
+      } else if (button.dataset.searchKind === "node") {
+        openDialogueView(); selectNode(button.dataset.searchId); showToast(`已定位节点：${stableId(button.dataset.searchId)}`);
+      } else {
+        openResource(button.dataset.resourceType);
+        selectedResourceId = button.dataset.searchId;
+        renderResourceTable(); renderResourceInspector();
+        showToast(`已打开资源：${button.querySelector(".search-result-title").textContent}`);
+      }
+    }
+
+    function openProjectSearch(query = "", shouldFocus = true) {
+      if (editorView === "data" && sourceDraftDirty && !window.confirm("数据视图中有未应用的修改。要放弃草稿并打开项目搜索吗？")) return;
+      editorView = "search";
+      const stage = document.getElementById("stage");
+      stage.classList.remove("data-mode", "resource-mode"); stage.classList.add("search-mode");
+      document.getElementById("sourceView").classList.remove("active");
+      document.getElementById("resourceView").classList.remove("active");
+      document.getElementById("projectSearchView").classList.add("active");
+      document.querySelectorAll(".view-mode").forEach(button => { button.classList.remove("active"); button.disabled = true; });
+      document.querySelectorAll("#dialogueList .dialogue-row, #resourceNav .dialogue-row").forEach(row => row.classList.remove("active"));
+      document.getElementById("docName").textContent = "天命 · 项目搜索";
+      document.getElementById("selectionBadge").textContent = "SEARCH";
+      document.getElementById("inspectorContent").innerHTML = `<div class="form-section"><label class="form-label">搜索范围</label><div class="hint">对话文件、全部节点及三类项目资源。支持名称、稳定 ID、文本内容和表达式。</div></div><div class="form-section"><label class="form-label">快速定位</label><div class="hint">点击搜索结果会打开对应对话节点或资源定义，并同步侧边栏选中状态。</div></div>`;
+      const input = document.getElementById("projectSearchInput");
+      input.value = query;
+      document.getElementById("searchInput").value = query;
+      setRailActive("search"); renderProjectSearchResults();
+      if (shouldFocus) { input.focus(); input.select(); }
+    }
+
+    let draggedDialogueRow = null;
+    let activeFolderMenuGroup = null;
+
+    function updateFolderCounts() {
+      document.querySelectorAll("#dialogueList .folder-group").forEach(group => {
+        group.querySelector(".folder-count").textContent = group.querySelectorAll(".dialogue-row").length;
+      });
+      const rows = [...document.querySelectorAll("#dialogueList .dialogue-row")];
+      const counts = { all: rows.length, recent: rows.filter(row => row.dataset.recent === "true").length, issues: rows.filter(row => row.dataset.issue === "true").length, i18n: rows.filter(row => row.dataset.i18n === "true").length };
+      Object.entries(counts).forEach(([view, count]) => { const label = document.querySelector(`[data-smart-view='${view}'] .smart-count`); if (label) label.textContent = count; });
+    }
+
+    function filterDialogueTree(view) {
+      document.querySelectorAll("[data-smart-view]").forEach(button => button.classList.toggle("active", button.dataset.smartView === view));
+      document.querySelectorAll("#dialogueList .folder-group").forEach(group => {
+        let visible = 0;
+        group.querySelectorAll(".dialogue-row").forEach(row => {
+          const show = view === "all" || view === "recent" && row.dataset.recent === "true" || view === "issues" && row.dataset.issue === "true" || view === "i18n" && row.dataset.i18n === "true";
+          row.hidden = !show;
+          if (show) visible += 1;
+        });
+        group.hidden = visible === 0;
+        if (view !== "all" && visible) group.classList.remove("collapsed");
+      });
+    }
+
+    function openFolderMenu(group, x, y) {
+      activeFolderMenuGroup = group;
+      const menu = document.getElementById("folderMenu");
+      menu.style.left = `${Math.min(x, window.innerWidth - 154)}px`;
+      menu.style.top = `${Math.min(y, window.innerHeight - 108)}px`;
+      menu.classList.add("open");
+    }
+
+    function closeFolderMenu() {
+      document.getElementById("folderMenu").classList.remove("open");
+    }
+
+    function wireDialogueDrag(row) {
+      if (row.dataset.dragWired) return;
+      row.dataset.dragWired = "true";
+      row.addEventListener("dragstart", event => { draggedDialogueRow = row; row.classList.add("dragging"); event.dataTransfer.effectAllowed = "move"; });
+      row.addEventListener("dragend", () => { row.classList.remove("dragging"); draggedDialogueRow = null; document.querySelectorAll(".drop-target").forEach(item => item.classList.remove("drop-target")); });
+    }
+
+    function wireDialogueOpen(row) {
+      if (row.dataset.openWired) return;
+      row.dataset.openWired = "true";
+      row.addEventListener("click", () => { openDialogueView(row); showToast(`已打开：${row.querySelector(".row-title").textContent}`); });
+    }
+
+    function wireFolderGroup(group) {
+      if (group.dataset.folderWired) return;
+      group.dataset.folderWired = "true";
+      const header = group.querySelector(".folder-row");
+      header.addEventListener("click", event => {
+        if (event.target.closest(".folder-more")) openFolderMenu(group, event.clientX, event.clientY);
+        else group.classList.toggle("collapsed");
+      });
+      header.addEventListener("contextmenu", event => { event.preventDefault(); openFolderMenu(group, event.clientX, event.clientY); });
+      group.addEventListener("dragover", event => { if (!draggedDialogueRow) return; event.preventDefault(); group.classList.add("drop-target"); });
+      group.addEventListener("dragleave", event => { if (!group.contains(event.relatedTarget)) group.classList.remove("drop-target"); });
+      group.addEventListener("drop", event => {
+        event.preventDefault(); group.classList.remove("drop-target");
+        if (!draggedDialogueRow || group.contains(draggedDialogueRow)) return;
+        group.querySelector(".folder-children").appendChild(draggedDialogueRow);
+        group.classList.remove("collapsed");
+        const filename = draggedDialogueRow.dataset.path.split("/").pop();
+        draggedDialogueRow.dataset.path = `dialogues/${group.dataset.folder}/${filename}`;
+        if (draggedDialogueRow.classList.contains("active")) { dialogueMeta.path = draggedDialogueRow.dataset.path; document.getElementById("sourcePath").textContent = dialogueMeta.path; }
+        updateFolderCounts(); markDirty(); showToast(`已移动到：${group.dataset.folderName}`);
+      });
+      group.querySelectorAll(".dialogue-row").forEach(row => { wireDialogueDrag(row); wireDialogueOpen(row); });
+    }
+
+    function createDialogueInFolder(group) {
+      if (!group) return;
+      const count = document.querySelectorAll("#dialogueList .dialogue-row").length + 1;
+      const key = `dialogue-new-${count}`;
+      const rowHtml = `<button class="dialogue-row" draggable="true" data-dialogue-id="${generateUuid()}" data-dialogue-key="${key}" data-path="dialogues/${escapeHtml(group.dataset.folder)}/${key}.json" data-recent="true" data-i18n="true"><span class="file-icon">⌘</span><span class="row-main"><span class="row-title">未命名对话 ${count}</span><span class="row-meta">1 个节点 · 刚刚创建</span></span></button>`;
+      group.querySelector(".folder-children").insertAdjacentHTML("beforeend", rowHtml);
+      const row = group.querySelector(".folder-children").lastElementChild;
+      wireDialogueDrag(row); wireDialogueOpen(row); group.classList.remove("collapsed"); updateFolderCounts(); markDirty(); showToast(`已在“${group.dataset.folderName}”中新建对话`);
+    }
+
+    function createFolder() {
+      const name = window.prompt("文件夹名称", "新章节");
+      if (!name?.trim()) return;
+      const slugBase = name.trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-").replace(/^-|-$/g, "") || `folder-${Date.now()}`;
+      let slug = slugBase, suffix = 2;
+      while (document.querySelector(`#dialogueList [data-folder='${CSS.escape(slug)}']`)) slug = `${slugBase}-${suffix++}`;
+      const tree = document.getElementById("dialogueList");
+      tree.insertAdjacentHTML("beforeend", `<section class="folder-group" data-folder="${escapeHtml(slug)}" data-folder-name="${escapeHtml(name.trim())}"><button class="folder-row"><span class="folder-caret">▼</span><span class="folder-icon">▱</span><span class="folder-name">${escapeHtml(name.trim())}</span><span class="folder-count">0</span><span class="folder-more">•••</span></button><div class="folder-children"></div></section>`);
+      const group = tree.lastElementChild; wireFolderGroup(group); updateFolderCounts(); markDirty(); showToast(`已创建文件夹：${name.trim()}`);
+    }
+
+    function openResource(type) {
+      if (editorView === "data" && sourceDraftDirty && !window.confirm("数据视图中有未应用的修改。要放弃草稿并打开资源编辑器吗？")) return;
+      activeResourceType = type;
+      selectedResourceId = projectResources[type][0]?.id || "";
+      editorView = "resource";
+      const config = resourceConfig[type];
+      const stage = document.getElementById("stage");
+      stage.classList.remove("data-mode", "search-mode"); stage.classList.add("resource-mode");
+      document.getElementById("sourceView").classList.remove("active");
+      document.getElementById("projectSearchView").classList.remove("active");
+      document.getElementById("resourceView").classList.add("active");
+      document.getElementById("resourceTitle").textContent = config.title;
+      document.getElementById("resourceSubtitle").textContent = config.subtitle;
+      document.getElementById("resourceSearch").value = "";
+      document.getElementById("resourceSearch").placeholder = config.placeholder;
+      document.getElementById("addResourceBtn").textContent = `＋ 新建${config.singular}`;
+      document.getElementById("docName").textContent = `天命 · 项目资源 · ${config.title}`;
+      document.querySelectorAll(".view-mode").forEach(button => { button.classList.remove("active"); button.disabled = true; });
+      document.querySelectorAll("#dialogueList .dialogue-row").forEach(row => row.classList.remove("active"));
+      document.querySelectorAll("#resourceNav .dialogue-row").forEach(row => row.classList.toggle("active", row.dataset.resource === type));
+      setRailActive(type);
+      renderResourceTable(); renderResourceInspector();
+    }
+
+    function openDialogueView(row) {
+      switchEditorView("canvas");
+      const target = row || document.querySelector("#dialogueList .dialogue-row");
+      if (target?.hidden) filterDialogueTree("all");
+      document.querySelectorAll("#dialogueList .dialogue-row").forEach(item => item.classList.toggle("active", item === target));
+      if (target) {
+        const folder = target.closest(".folder-group");
+        folder?.classList.remove("collapsed");
+        dialogueMeta.id = target.dataset.dialogueId;
+        dialogueMeta.key = target.dataset.dialogueKey;
+        dialogueMeta.name = target.querySelector(".row-title").textContent;
+        dialogueMeta.path = target.dataset.path;
+        document.getElementById("sourcePath").textContent = dialogueMeta.path;
+        document.getElementById("docName").textContent = `天命 · ${folder?.dataset.folderName || "未分类"} · ${target.querySelector(".row-title").textContent}`;
+      }
+    }
+
+    function addResource() {
+      const number = activeResources().length + 1;
+      let item;
+      if (activeResourceType === "characters") item = { id: `character-${number}`, names: { "zh-CN": `新角色 ${number}`, "en-US": "" }, shortName: `角色${number}`, color: "#8b7cf6", tags: [], description: "", references: [] };
+      else if (activeResourceType === "variables") item = { id: `variable${number}`, label: `新变量 ${number}`, type: "boolean", defaultValue: "false", scope: "story", description: "", references: [] };
+      else item = { id: `custom.event_${number}`, label: `新事件 ${number}`, category: "自定义", description: "", builtin: false, params: [], references: [] };
+      activeResources().push(item); selectedResourceId = item.id; markDirty(); renderResourceTable(); renderResourceInspector(); showToast(`已创建${resourceConfig[activeResourceType].singular}定义`);
+    }
+
+    function duplicateResource() {
+      const item = selectedResource();
+      if (!item) return;
+      const copy = JSON.parse(JSON.stringify(item));
+      copy.id = `${item.id}-copy`; copy.references = []; copy.builtin = false;
+      activeResources().push(copy); selectedResourceId = copy.id; markDirty(); renderResourceTable(); renderResourceInspector(); showToast("已复制资源定义，引用未随定义复制");
+    }
+
+    function deleteResource() {
+      const item = selectedResource();
+      if (!item || item.references.length || item.builtin) return;
+      const index = activeResources().indexOf(item);
+      activeResources().splice(index, 1);
+      selectedResourceId = activeResources()[Math.max(0, index - 1)]?.id || "";
+      markDirty(); renderResourceTable(); renderResourceInspector(); showToast("资源定义已删除");
+    }
+
+    function applySourceChanges() {
+      let parsed;
+      try { parsed = validateSourceValue(sourceDraft); } catch { updateSourceValidation(); return; }
+      const existingByUuid = new Map(nodes.map(node => [node.uuid, node]));
+      const internalByUuid = new Map();
+      const nextNodes = parsed.nodes.map((sourceNode, index) => {
+        const existing = existingByUuid.get(sourceNode.id);
+        const internalId = existing?.id || `source-${Date.now()}-${index}`;
+        internalByUuid.set(sourceNode.id, internalId);
+        const data = sourceNode.data || {};
+        const titles = { start: "开始", dialogue: "对话", choice: "玩家选项", condition: "条件判断", event: "事件", end: "结束" };
+        const next = { id: internalId, uuid: sourceNode.id, key: sourceNode.key, type: sourceNode.type, x: Number(sourceNode.position.x) || 0, y: Number(sourceNode.position.y) || 0, title: titles[sourceNode.type] || sourceNode.type, text: data.text || { "zh-CN": "" } };
+        if (data.speakerId) next.speaker = data.speakerId;
+        if (data.choices) next.choices = data.choices;
+        if (data.condition) next.condition = data.condition;
+        if (data.event) next.event = data.event;
+        return next;
+      });
+      const nextEdges = parsed.edges.map(edge => ({ id: edge.id, from: internalByUuid.get(edge.sourceNodeId), sourcePort: edge.sourcePort, to: internalByUuid.get(edge.targetNodeId), targetPort: edge.targetPort }));
+      nodes.splice(0, nodes.length, ...nextNodes);
+      edges.splice(0, edges.length, ...nextEdges);
+      selectedId = internalByUuid.get(parsed.entryNodeId) || nextNodes[0]?.id;
+      sourceDraftDirty = false;
+      markDirty(); renderNodes(); refreshSourceDraft();
+      showToast("源 JSON 已应用，画布已同步更新");
+    }
+
     const localized = value => {
       if (!value) return { text: "—", fallback: false };
       const own = value[currentLocale];
       return { text: own || value["zh-CN"] || "[缺少文本]", fallback: currentLocale !== "zh-CN" && !own };
     };
+    const formatCondition = condition => condition && typeof condition === "object" ? `${condition.variable} ${condition.operator} ${JSON.stringify(condition.value)}` : String(condition || "");
 
     function nodeSize(node) {
       if (node.type === "choice") return { w: 214, h: 124 };
@@ -523,14 +1406,14 @@ siming 0.1.0-prototype
     function nodeBody(node) {
       const loc = localized(node.text);
       if (node.type === "start" || node.type === "end") return `<div class="node-text ${loc.fallback ? "fallback" : ""}">${loc.text}</div>`;
-      if (node.type === "dialogue") return `<div class="speaker">${node.speaker}</div><div class="node-text ${loc.fallback ? "fallback" : ""}">${loc.text}</div>`;
+      if (node.type === "dialogue") return `<div class="speaker">${characterName(node.speaker)}</div><div class="node-text ${loc.fallback ? "fallback" : ""}">${loc.text}</div>`;
       if (node.type === "event") return `<div class="speaker">${node.event}</div><div class="node-text ${loc.fallback ? "fallback" : ""}">${loc.text}</div>`;
       if (node.type === "choice") return `<div class="choice-list">${node.choices.map(c => {
         const text = c.text[currentLocale] || c.text["zh-CN"] || "[缺少文本]";
         const fallback = currentLocale !== "zh-CN" && !c.text[currentLocale];
         return `<div class="choice-item node-text ${fallback ? "fallback" : ""}">${text}</div>`;
       }).join("")}</div>`;
-      if (node.type === "condition") return `<div class="speaker">${loc.text}</div><div class="condition-row"><span>${node.condition}</span><span><b class="condition-yes">T</b> / <b class="condition-no">F</b></span></div>`;
+      if (node.type === "condition") return `<div class="speaker">${loc.text}</div><div class="condition-row"><span>${formatCondition(node.condition)}</span><span><b class="condition-yes">T</b> / <b class="condition-no">F</b></span></div>`;
       return "";
     }
 
@@ -559,11 +1442,13 @@ siming 0.1.0-prototype
 
     function renderWires() {
       const container = document.getElementById("wires");
-      container.innerHTML = edges.map(([fromId, toId]) => {
+      container.innerHTML = edges.map(edge => {
+        const fromId = edge.from, toId = edge.to;
         const from = byId(fromId), to = byId(toId);
         if (!from || !to) return "";
         const aSize = nodeSize(from), bSize = nodeSize(to);
-        const ax = from.x + aSize.w, ay = from.y + aSize.h / 2;
+        const secondPort = edge.sourcePort === "false" || edge.sourcePort === "option-02";
+        const ax = from.x + aSize.w, ay = from.y + (secondPort ? 68 : 42);
         const bx = to.x, by = to.y + bSize.h / 2;
         const dx = bx - ax, dy = by - ay;
         const length = Math.sqrt(dx * dx + dy * dy);
@@ -574,7 +1459,7 @@ siming 0.1.0-prototype
     }
 
     function renderMinimap() {
-      document.getElementById("minimap").innerHTML = nodes.map(n => `<span class="mini-node ${n.id === selectedId ? "selected" : ""}" style="left:${12 + n.x * .105}px;top:${10 + n.y * .1}px"></span>`).join("");
+      document.getElementById("minimap").innerHTML = nodes.map(n => `<span class="mini-node ${n.id === selectedId ? "selected" : ""}" style="left:${12 + n.x * .087}px;top:${10 + n.y * .1}px"></span>`).join("");
     }
 
     function startDrag(event) {
@@ -585,7 +1470,7 @@ siming 0.1.0-prototype
       const startX = event.clientX, startY = event.clientY, originX = node.x, originY = node.y;
       el.classList.add("dragging");
       const move = e => {
-        node.x = Math.max(0, Math.min(1180, originX + (e.clientX - startX) / zoom));
+        node.x = Math.max(0, Math.min(1280, originX + (e.clientX - startX) / zoom));
         node.y = Math.max(0, Math.min(630, originY + (e.clientY - startY) / zoom));
         el.style.left = node.x + "px";
         el.style.top = node.y + "px";
@@ -599,7 +1484,8 @@ siming 0.1.0-prototype
     function selectNode(id) {
       selectedId = id;
       document.querySelectorAll(".node").forEach(el => el.classList.toggle("selected", el.dataset.id === id));
-      renderWires(); renderMinimap(); renderInspector();
+      renderWires(); renderMinimap();
+      if (editorView === "canvas") renderInspector();
     }
 
     function renderInspector() {
@@ -607,18 +1493,30 @@ siming 0.1.0-prototype
       if (!node) return;
       document.getElementById("selectionBadge").textContent = node.key;
       let content = `<div class="form-section">
-        <label class="form-label">节点 ID <span>稳定 ID</span></label>
-        <input class="field mono" value="${node.key}" readonly>
+        <label class="form-label">内部 UUID <span>自动生成 · 不可修改</span></label>
+        <input class="field mono" value="${node.uuid}" readonly>
+        <label class="form-label" style="margin-top:9px">节点 Key <span>可读别名 · 当前文件唯一</span></label>
+        <input class="field mono" id="nodeKeyField" value="${node.key}">
+        <div class="hint">连线使用 UUID 引用；Key 用于搜索、调试和界面展示。</div>
       </div>`;
 
-      if (node.speaker) content += `<div class="form-section"><label class="form-label">说话人 <span class="required">必填</span></label><select class="field" id="speakerField"><option ${node.speaker === "杜尔" ? "selected" : ""}>杜尔</option><option ${node.speaker === "狄仁杰" ? "selected" : ""}>狄仁杰</option><option>旁白</option></select></div>`;
+      if (node.speaker) content += `<div class="form-section"><label class="form-label">说话人 <span class="required">稳定角色 ID</span></label><select class="field" id="speakerField">${projectResources.characters.slice(0, 3).map(character => `<option value="${character.id}" ${node.speaker === character.id ? "selected" : ""}>${character.names["zh-CN"]} · ${character.id}</option>`).join("")}</select></div>`;
       if (node.event) content += `<div class="form-section"><label class="form-label">事件</label><input class="field mono" id="eventField" value="${node.event}"><div class="hint">事件由游戏侧实现，编辑器只校验参数定义。</div></div>`;
-      if (node.condition) content += `<div class="form-section"><label class="form-label">条件表达式</label><input class="field mono" id="conditionField" value="${node.condition}"><div class="hint">number · 支持 ==、!=、&gt;、&gt;=、&lt;、&lt;=</div></div>`;
+      if (node.condition) content += `<div class="form-section"><label class="form-label">结构化条件</label><select class="field" id="conditionVariableField">${projectResources.variables.map(variable => `<option value="${variable.id}" ${node.condition.variable === variable.id ? "selected" : ""}>${variable.label} · ${variable.id}</option>`).join("")}</select><select class="field mono" id="conditionOperatorField" style="margin-top:7px">${["==","!=",">",">=","<","<="].map(operator => `<option ${node.condition.operator === operator ? "selected" : ""}>${operator}</option>`).join("")}</select><input class="field mono" id="conditionValueField" style="margin-top:7px" value="${node.condition.value}"><div class="hint">条件以 variable、operator、value 三个字段保存，不执行任意脚本。</div></div>`;
 
       if (node.type === "choice") {
-        content += node.choices.map((choice, index) => `<div class="form-section"><label class="form-label">选项 ${index + 1}<span>${choice.id}</span></label>${localeEditor(choice.text, `choice-${index}`)}</div>`).join("");
+        content += node.choices.map((choice, index) => {
+          const target = edges.find(edge => edge.from === node.id && edge.sourcePort === choice.id)?.to;
+          return `<div class="form-section"><label class="form-label">选项 ${index + 1}<span>${choice.id}</span></label>${localeEditor(choice.text, `choice-${index}`)}<div class="hint">跳转至 → <code>${stableId(target)}</code></div></div>`;
+        }).join("");
       } else {
         content += `<div class="form-section"><label class="form-label">${node.type === "dialogue" ? "对话文本" : "显示名称"}<span class="required">默认语言必填</span></label>${localeEditor(node.text, "node-text")}</div>`;
+      }
+
+      if (node.type === "condition") {
+        const trueTarget = edges.find(edge => edge.from === node.id && edge.sourcePort === "true")?.to;
+        const falseTarget = edges.find(edge => edge.from === node.id && edge.sourcePort === "false")?.to;
+        content += `<div class="form-section"><label class="form-label">分支目标 <span>显式端口</span></label><div class="hint"><b class="condition-yes">TRUE</b> → <code>${stableId(trueTarget)}</code></div><div class="hint"><b class="condition-no">FALSE</b> → <code>${stableId(falseTarget)}</code></div></div>`;
       }
 
       content += `<div class="form-section"><div class="toggle-row"><span>进入节点时暂停</span><button class="toggle ${node.type === "dialogue" || node.type === "choice" ? "on" : ""}" id="pauseToggle" aria-label="切换进入节点时暂停"></button></div><div class="toggle-row"><span>在画布中显示 ID</span><button class="toggle on" id="idToggle" aria-label="切换显示 ID"></button></div></div>`;
@@ -631,10 +1529,24 @@ siming 0.1.0-prototype
         else node.text[inspectorLocale] = e.target.value;
         markDirty(); renderNodes();
       }));
+      const nodeKey = document.getElementById("nodeKeyField");
+      nodeKey.addEventListener("change", e => {
+        const nextKey = e.target.value.trim();
+        if (!/^[a-zA-Z][a-zA-Z0-9._-]*$/.test(nextKey) || nodes.some(other => other !== node && other.key === nextKey)) {
+          e.target.value = node.key;
+          showToast("Key 必须以字母开头，且在当前对话中唯一");
+          return;
+        }
+        node.key = nextKey; markDirty(); renderNodes(); document.getElementById("selectionBadge").textContent = nextKey;
+      });
       const speaker = document.getElementById("speakerField");
       if (speaker) speaker.addEventListener("change", e => { node.speaker = e.target.value; markDirty(); renderNodes(); });
-      const condition = document.getElementById("conditionField");
-      if (condition) condition.addEventListener("input", e => { node.condition = e.target.value; markDirty(); renderNodes(); });
+      const conditionVariable = document.getElementById("conditionVariableField");
+      const conditionOperator = document.getElementById("conditionOperatorField");
+      const conditionValue = document.getElementById("conditionValueField");
+      if (conditionVariable) conditionVariable.addEventListener("change", e => { node.condition.variable = e.target.value; markDirty(); renderNodes(); });
+      if (conditionOperator) conditionOperator.addEventListener("change", e => { node.condition.operator = e.target.value; markDirty(); renderNodes(); });
+      if (conditionValue) conditionValue.addEventListener("input", e => { const value = e.target.value; node.condition.value = value !== "" && !Number.isNaN(Number(value)) ? Number(value) : value; markDirty(); renderNodes(); });
       const eventField = document.getElementById("eventField");
       if (eventField) eventField.addEventListener("input", e => { node.event = e.target.value; markDirty(); renderNodes(); });
       document.querySelectorAll(".toggle").forEach(t => t.addEventListener("click", () => t.classList.toggle("on")));
@@ -649,7 +1561,15 @@ siming 0.1.0-prototype
     }
 
     function markDirty() { document.getElementById("dirtyDot").style.display = "inline-block"; }
-    function save() { document.getElementById("dirtyDot").style.display = "none"; showToast("项目已保存 · 12:42:18"); }
+    function save() {
+      if (sourceDraftDirty) {
+        showToast("请先应用或放弃数据视图中的草稿");
+        if (editorView !== "data") switchEditorView("data");
+        return;
+      }
+      document.getElementById("dirtyDot").style.display = "none";
+      showToast("项目已保存 · 12:42:18");
+    }
     function showToast(text) {
       const toast = document.getElementById("toast");
       document.getElementById("toastText").textContent = text;
@@ -690,17 +1610,39 @@ siming 0.1.0-prototype
     }
 
     function addNode(type) {
+      if (editorView !== "canvas") { showToast("请先返回画布，再添加节点"); return; }
       newNodeCount += 1;
       const id = `new-${newNodeCount}`;
-      const base = { id, key: `${type}-new-${newNodeCount}`, type, x: 500 + newNodeCount * 22, y: 270 + newNodeCount * 22, title: type === "dialogue" ? "对话" : type === "choice" ? "玩家选项" : type === "condition" ? "条件判断" : "事件", text: { "zh-CN": "新节点", "en-US": "" } };
+      const base = { id, uuid: generateUuid(), key: `${type}-new-${newNodeCount}`, type, x: 500 + newNodeCount * 22, y: 270 + newNodeCount * 22, title: type === "dialogue" ? "对话" : type === "choice" ? "玩家选项" : type === "condition" ? "条件判断" : "事件", text: { "zh-CN": "新节点", "en-US": "" } };
       if (type === "dialogue") base.speaker = "旁白";
       if (type === "choice") base.choices = [{ id: "option-01", text: { "zh-CN": "新选项", "en-US": "" } }];
-      if (type === "condition") base.condition = "variable == true";
+      if (type === "condition") base.condition = { variable: "favor", operator: ">=", value: 0 };
       if (type === "event") base.event = "event.name";
       nodes.push(base); selectedId = id; markDirty(); renderNodes(); renderInspector(); showToast(`已添加${base.title}节点`);
     }
 
-    document.getElementById("topLocale").addEventListener("change", e => { currentLocale = e.target.value; inspectorLocale = currentLocale; renderNodes(); renderInspector(); renderSimulator(); showToast(`预览语言：${localeNames[currentLocale]}`); });
+    document.getElementById("topLocale").addEventListener("change", e => { currentLocale = e.target.value; inspectorLocale = currentLocale; renderNodes(); if (editorView === "canvas") renderInspector(); renderSimulator(); showToast(`预览语言：${localeNames[currentLocale]}`); });
+    document.getElementById("canvasViewBtn").addEventListener("click", () => { if (editorView !== "canvas") switchEditorView("canvas"); });
+    document.getElementById("dataViewBtn").addEventListener("click", () => { if (editorView !== "data") switchEditorView("data"); });
+    document.getElementById("sourceDataTab").addEventListener("click", () => showSourceMode("source"));
+    document.getElementById("runtimeDataTab").addEventListener("click", () => showSourceMode("runtime"));
+    document.getElementById("sourceTextarea").addEventListener("input", e => {
+      if (sourceMode !== "source") return;
+      sourceDraft = e.target.value;
+      sourceDraftDirty = true;
+      updateLineGutter();
+      updateSourceValidation();
+    });
+    document.getElementById("sourceTextarea").addEventListener("scroll", e => { document.getElementById("lineGutter").scrollTop = e.target.scrollTop; });
+    document.getElementById("formatSourceBtn").addEventListener("click", () => {
+      try {
+        sourceDraft = JSON.stringify(validateSourceValue(sourceDraft), null, 2);
+        sourceDraftDirty = true;
+        showSourceMode("source");
+        showToast("源 JSON 已格式化");
+      } catch { updateSourceValidation(); }
+    });
+    document.getElementById("applySourceBtn").addEventListener("click", applySourceChanges);
     document.getElementById("validateBtn").addEventListener("click", () => switchPanel("problems"));
     document.getElementById("simulateBtn").addEventListener("click", () => { simStep = 0; switchPanel("simulator"); });
     document.getElementById("cliBtn").addEventListener("click", () => switchPanel("terminal"));
@@ -708,7 +1650,7 @@ siming 0.1.0-prototype
     document.getElementById("panelToggle").addEventListener("click", () => switchPanel(document.querySelector(".tab-btn.active").dataset.panel, !panelOpen));
     document.querySelectorAll(".tab-btn").forEach(btn => btn.addEventListener("click", () => switchPanel(btn.dataset.panel, true)));
     document.querySelectorAll(".palette-item").forEach(btn => btn.addEventListener("click", () => addNode(btn.dataset.add)));
-    document.querySelectorAll(".diagnostic[data-focus]").forEach(row => row.addEventListener("click", () => selectNode(row.dataset.focus)));
+    document.querySelectorAll(".diagnostic[data-focus]").forEach(row => row.addEventListener("click", () => { if (editorView === "resource") openDialogueView(); selectNode(row.dataset.focus); }));
     document.getElementById("runCommand").addEventListener("click", runCommand);
     document.getElementById("commandInput").addEventListener("keydown", e => { if (e.key === "Enter") runCommand(); });
     document.getElementById("zoomIn").addEventListener("click", () => setZoom(zoom + .1));
@@ -718,8 +1660,52 @@ siming 0.1.0-prototype
     document.getElementById("fitBtn").addEventListener("click", fitCanvas);
     document.getElementById("undoBtn").addEventListener("click", () => showToast("已撤销上一步操作"));
     document.getElementById("redoBtn").addEventListener("click", () => showToast("已重做上一步操作"));
-    document.getElementById("newDialogueBtn").addEventListener("click", () => showToast("已创建对话草稿"));
-    document.querySelectorAll(".dialogue-row").forEach(row => row.addEventListener("click", () => { const parent = row.parentElement; if (parent && parent.id === "dialogueList") { parent.querySelectorAll(".dialogue-row").forEach(r => r.classList.remove("active")); row.classList.add("active"); showToast(`已打开：${row.querySelector(".row-title").textContent}`); } }));
+    document.getElementById("newDialogueBtn").addEventListener("click", () => createDialogueInFolder(document.querySelector("#dialogueList .dialogue-row.active")?.closest(".folder-group") || document.querySelector("#dialogueList .folder-group")));
+    document.getElementById("newFolderBtn").addEventListener("click", createFolder);
+    document.querySelectorAll("#dialogueList .folder-group").forEach(wireFolderGroup);
+    document.querySelectorAll("[data-smart-view]").forEach(button => button.addEventListener("click", () => filterDialogueTree(button.dataset.smartView)));
+    document.querySelectorAll("[data-folder-action]").forEach(button => button.addEventListener("click", () => {
+      const group = activeFolderMenuGroup;
+      closeFolderMenu();
+      if (!group) return;
+      if (button.dataset.folderAction === "new-dialogue") createDialogueInFolder(group);
+      if (button.dataset.folderAction === "rename") {
+        const name = window.prompt("重命名文件夹", group.dataset.folderName);
+        if (!name?.trim()) return;
+        const slugBase = name.trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-").replace(/^-|-$/g, "") || group.dataset.folder;
+        let slug = slugBase, suffix = 2;
+        while ([...document.querySelectorAll("#dialogueList .folder-group")].some(item => item !== group && item.dataset.folder === slug)) slug = `${slugBase}-${suffix++}`;
+        group.dataset.folder = slug; group.dataset.folderName = name.trim(); group.querySelector(".folder-name").textContent = name.trim();
+        group.querySelectorAll(".dialogue-row").forEach(row => { const filename = row.dataset.path.split("/").pop(); row.dataset.path = `dialogues/${slug}/${filename}`; if (row.classList.contains("active")) { dialogueMeta.path = row.dataset.path; document.getElementById("sourcePath").textContent = dialogueMeta.path; } });
+        markDirty(); showToast(`文件夹已重命名为：${name.trim()}`);
+      }
+      if (button.dataset.folderAction === "delete") {
+        if (group.querySelector(".dialogue-row")) showToast("文件夹内仍有对话，无法删除");
+        else { group.remove(); markDirty(); updateFolderCounts(); showToast("空文件夹已删除"); }
+      }
+    }));
+    document.addEventListener("click", event => { if (!event.target.closest("#folderMenu") && !event.target.closest(".folder-more")) closeFolderMenu(); });
+    updateFolderCounts();
+    document.querySelectorAll("#resourceNav [data-resource]").forEach(row => row.addEventListener("click", () => openResource(row.dataset.resource)));
+    document.querySelector(".rail-btn[data-nav='dialogue']").addEventListener("click", () => openDialogueView());
+    ["characters", "variables", "events"].forEach(type => document.querySelector(`.rail-btn[data-nav='${type}']`).addEventListener("click", () => openResource(type)));
+    document.querySelector(".rail-btn[data-nav='search']").addEventListener("click", () => openProjectSearch(document.getElementById("searchInput").value));
+    document.getElementById("searchInput").addEventListener("focus", e => { if (editorView !== "search") openProjectSearch(e.target.value, false); });
+    document.getElementById("searchInput").addEventListener("input", e => {
+      if (editorView !== "search") openProjectSearch(e.target.value, false);
+      document.getElementById("projectSearchInput").value = e.target.value; renderProjectSearchResults();
+    });
+    document.getElementById("projectSearchInput").addEventListener("input", e => { document.getElementById("searchInput").value = e.target.value; renderProjectSearchResults(); });
+    document.querySelectorAll("[data-search-filter]").forEach(button => button.addEventListener("click", () => {
+      projectSearchFilter = button.dataset.searchFilter;
+      document.querySelectorAll("[data-search-filter]").forEach(item => item.classList.toggle("active", item === button));
+      renderProjectSearchResults();
+    }));
+    document.querySelector(".rail-btn[data-nav='settings']").addEventListener("click", () => {
+      setRailActive("settings"); showToast("项目设置入口 · 后续交互待补充"); setTimeout(syncRailActive, 1800);
+    });
+    document.getElementById("resourceSearch").addEventListener("input", renderResourceTable);
+    document.getElementById("addResourceBtn").addEventListener("click", addResource);
 
     function setZoom(value) {
       zoom = Math.max(.45, Math.min(1.3, value));
@@ -732,12 +1718,14 @@ siming 0.1.0-prototype
 
     function fitCanvas() {
       const stage = document.getElementById("stage");
-      setZoom(Math.min(.9, (stage.clientWidth - 44) / 1300, (stage.clientHeight - 78) / 720));
+      setZoom(Math.min(.9, (stage.clientWidth - 44) / 1500, (stage.clientHeight - 78) / 720));
     }
 
     document.addEventListener("keydown", e => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openProjectSearch(document.getElementById("searchInput").value); }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "v") { e.preventDefault(); switchPanel("problems"); }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "j") { e.preventDefault(); switchEditorView(editorView === "canvas" ? "data" : "canvas"); }
       if (e.key === "Escape" && panelOpen) switchPanel(document.querySelector(".tab-btn.active").dataset.panel, false);
     });
 
