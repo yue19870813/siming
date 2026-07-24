@@ -16,6 +16,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 serde.workspace = true
+serde_json.workspace = true
 siming-core.workspace = true
+siming-storage.workspace = true
 tauri = { version = "2", features = [] }
-
+tauri-plugin-dialog = "2"

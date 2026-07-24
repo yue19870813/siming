@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 
@@ -7,25 +7,30 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(),
+}));
+
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
+  localStorage.clear();
 });
 
-test("shows the shared core version returned by IPC", async () => {
-  vi.mocked(invoke).mockResolvedValue("0.1.0");
-
+test("renders the editable demo workspace", async () => {
   render(<App />);
 
-  expect(await screen.findByText("IPC 已连接")).toBeInTheDocument();
-  expect(screen.getByTestId("core-version")).toHaveTextContent("0.1.0");
-  expect(invoke).toHaveBeenCalledWith("core_version");
+  expect(screen.getByText("司命演示项目")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "画布" })).toBeInTheDocument();
+  expect(screen.getAllByText("序章 · 雨夜来客")).not.toHaveLength(0);
+  expect(screen.getByText(/演示项目尚未写入磁盘/)).toBeInTheDocument();
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
 });
 
-test("falls back to browser preview when Tauri IPC is unavailable", async () => {
-  vi.mocked(invoke).mockRejectedValue(new Error("not running in Tauri"));
-
+test("uses dark as the default browser theme", async () => {
   render(<App />);
 
-  expect(await screen.findByText("浏览器预览模式")).toBeInTheDocument();
-  expect(screen.getByTestId("core-version")).toHaveTextContent("web preview");
+  await screen.findByText("项目内容");
+  expect(document.documentElement.dataset.theme).toBe("dark");
 });

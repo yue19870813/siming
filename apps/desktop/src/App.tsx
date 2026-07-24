@@ -1,69 +1,215 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { CanvasView } from "./components/CanvasView";
+import { DataView } from "./components/DataView";
+import { Inspector } from "./components/Inspector";
+import { ResourceView } from "./components/ResourceView";
+import { SettingsView } from "./components/SettingsView";
+import { Sidebar } from "./components/Sidebar";
+import { TableView } from "./components/TableView";
+import { TopBar } from "./components/TopBar";
+import {
+  chooseProjectDirectory,
+  createProject,
+  openProject,
+  readUserSettings,
+  saveProject,
+  writeUserSettings,
+} from "./lib/projectApi";
+import type { UserSettings } from "./model/types";
+import { useEditorStore } from "./store/editorStore";
 
-const FALLBACK_VERSION = "web preview";
+const defaultSettings: UserSettings = {
+  schemaVersion: 1,
+  theme: "dark",
+  defaultProjectDirectory: null,
+  editorFontSize: 13,
+  recoverySnapshotIntervalSeconds: 60,
+  restoreLastProject: true,
+};
 
 export default function App() {
-  const [coreVersion, setCoreVersion] = useState("正在连接共享核心…");
-  const [connectionState, setConnectionState] = useState<
-    "connecting" | "connected" | "browser"
-  >("connecting");
+  const project = useEditorStore((state) => state.project);
+  const activity = useEditorStore((state) => state.activity);
+  const viewMode = useEditorStore((state) => state.viewMode);
+  const dirty = useEditorStore((state) => state.dirty);
+  const sourceDraftDirty = useEditorStore((state) => state.sourceDraftDirty);
+  const notice = useEditorStore((state) => state.notice);
+  const setProject = useEditorStore((state) => state.setProject);
+  const setBusy = useEditorStore((state) => state.setBusy);
+  const setNotice = useEditorStore((state) => state.setNotice);
+  const markSaved = useEditorStore((state) => state.markSaved);
+  const undo = useEditorStore((state) => state.undo);
+  const redo = useEditorStore((state) => state.redo);
+  const [settings, setSettings] = useState(defaultSettings);
 
   useEffect(() => {
-    let active = true;
-
-    invoke<string>("core_version")
-      .then((version) => {
-        if (active) {
-          setCoreVersion(version);
-          setConnectionState("connected");
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setCoreVersion(FALLBACK_VERSION);
-          setConnectionState("browser");
-        }
-      });
-
-    return () => {
-      active = false;
-    };
+    readUserSettings()
+      .then(setSettings)
+      .catch(() => setSettings(defaultSettings));
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+    document.documentElement.style.setProperty(
+      "--editor-font-size",
+      `${settings.editorFontSize}px`,
+    );
+  }, [settings.editorFontSize, settings.theme]);
+
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirty && !sourceDraftDirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const keydown = (event: KeyboardEvent) => {
+      const command = event.metaKey || event.ctrlKey;
+      if (!command) return;
+      if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void handleSave();
+      }
+      if (event.key.toLowerCase() === "z" && !event.shiftKey) {
+        event.preventDefault();
+        undo();
+      }
+      if (
+        (event.key.toLowerCase() === "z" && event.shiftKey) ||
+        event.key.toLowerCase() === "y"
+      ) {
+        event.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    window.addEventListener("keydown", keydown);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      window.removeEventListener("keydown", keydown);
+    };
+  });
+
+  async function handleNew() {
+    if (
+      (dirty || sourceDraftDirty) &&
+      !window.confirm("当前项目有未保存修改或源数据草稿，仍要新建项目吗？")
+    )
+      return;
+    try {
+      const rootPath = await chooseProjectDirectory();
+      if (!rootPath) return;
+      const name = window.prompt("项目名称", "新的司命项目")?.trim();
+      if (!name) return;
+      setBusy(true);
+      const snapshot = await createProject(rootPath, name, "zh-CN");
+      setProject(snapshot);
+      setNotice(`已创建项目：${snapshot.rootPath}`);
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleOpen() {
+    if (
+      (dirty || sourceDraftDirty) &&
+      !window.confirm("当前项目有未保存修改或源数据草稿，仍要打开其他项目吗？")
+    )
+      return;
+    try {
+      const rootPath = await chooseProjectDirectory();
+      if (!rootPath) return;
+      setBusy(true);
+      const snapshot = await openProject(rootPath);
+      setProject(snapshot);
+      setNotice(`已打开：${snapshot.rootPath}`);
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSave() {
+    if (sourceDraftDirty) {
+      setNotice("请先应用或放弃源 JSON 草稿，再保存项目。");
+      return;
+    }
+    if (!project.rootPath) {
+      setNotice("演示项目不能直接保存，请先新建真实项目。");
+      return;
+    }
+    try {
+      setBusy(true);
+      await saveProject(project);
+      markSaved();
+    } catch (error) {
+      setNotice(`保存失败：${errorMessage(error)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSettingsChange(next: UserSettings) {
+    setSettings(next);
+    try {
+      await writeUserSettings(next);
+      setNotice("用户设置已保存在本机。");
+    } catch (error) {
+      setNotice(`用户设置保存失败：${errorMessage(error)}`);
+    }
+  }
+
+  const editorActivity = activity === "project" || activity === "search";
+  const resourceActivity = [
+    "characters",
+    "variables",
+    "events",
+    "tags",
+  ].includes(activity);
 
   return (
     <main className="app-shell">
-      <section className="baseline-card" aria-labelledby="product-name">
-        <div className="brand-mark" aria-hidden="true">
-          司
-        </div>
-        <p className="eyebrow">SIMING ENGINEERING BASELINE</p>
-        <h1 id="product-name">司命（Siming）</h1>
-        <p className="description">
-          剧情对话编辑器工程基线已经就绪。下一阶段将在此接入项目、画布和数据编辑能力。
-        </p>
-        <dl className="status-grid">
-          <div>
-            <dt>React</dt>
-            <dd>19</dd>
-          </div>
-          <div>
-            <dt>Tauri</dt>
-            <dd>2</dd>
-          </div>
-          <div>
-            <dt>共享核心</dt>
-            <dd data-testid="core-version">{coreVersion}</dd>
-          </div>
-        </dl>
-        <p className={`connection-state connection-state--${connectionState}`}>
-          {connectionState === "connected"
-            ? "IPC 已连接"
-            : connectionState === "browser"
-              ? "浏览器预览模式"
-              : "连接中"}
-        </p>
-      </section>
+      <TopBar onNew={handleNew} onOpen={handleOpen} onSave={handleSave} />
+      <div className="app-body">
+        <Sidebar />
+        <section
+          className={`workspace ${editorActivity ? "workspace--editor" : ""}`}
+        >
+          {editorActivity &&
+            (viewMode === "canvas" ? (
+              <CanvasView />
+            ) : viewMode === "table" ? (
+              <TableView />
+            ) : (
+              <DataView />
+            ))}
+          {resourceActivity && <ResourceView activity={activity} />}
+          {activity === "settings" && (
+            <SettingsView
+              settings={settings}
+              onSettingsChange={handleSettingsChange}
+            />
+          )}
+        </section>
+        {editorActivity && <Inspector />}
+      </div>
+      <footer className="statusbar">
+        <span>{notice}</span>
+        <span>
+          {project.rootPath || "IN-MEMORY"} · Schema v
+          {project.manifest.schemaVersion}
+        </span>
+      </footer>
     </main>
   );
+}
+
+function errorMessage(error: unknown) {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    return String(error.message);
+  }
+  return "发生未知错误";
 }
