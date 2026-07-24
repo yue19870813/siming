@@ -1,0 +1,12 @@
+[package]
+name = "siming-storage"
+description = "Safe local storage primitives for Siming projects."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+

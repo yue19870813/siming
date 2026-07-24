@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "projectId": "2c11b58a-c76c-4c0b-89bc-e53ad457512a",
+  "name": "阶段 0 固定样例",
+  "paths": {
+    "dialogues": "dialogues/",
+    "exports": "exports/runtime/"
+  },
+  "defaultExportFormat": "json",
+  "defaultLocale": "zh-CN",
+  "locales": ["zh-CN", "en-US"],
+  "dialogues": [
+    {
+      "id": "2fd88ddc-aa3b-466f-92a2-48785adce71e",
+      "key": "intro",
+      "path": "dialogues/intro.json"
+    }
+  ]
+}
+

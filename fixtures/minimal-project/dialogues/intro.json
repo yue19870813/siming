@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "2fd88ddc-aa3b-466f-92a2-48785adce71e",
+  "key": "intro",
+  "name": "最小对话",
+  "description": "用于 GUI、CLI、Schema 和共享核心契约测试。",
+  "tags": [],
+  "entryNodeId": "3f0e9d88-5ec4-4cf5-9a83-9ad4ee9f7451",
+  "nodes": [
+    {
+      "id": "3f0e9d88-5ec4-4cf5-9a83-9ad4ee9f7451",
+      "key": "start",
+      "type": "start",
+      "position": {
+        "x": 80,
+        "y": 160
+      },
+      "data": {
+        "hostEvents": []
+      }
+    },
+    {
+      "id": "b4aa0f79-bd0e-45cd-8a6e-094e6f50ccfd",
+      "key": "end",
+      "type": "end",
+      "position": {
+        "x": 360,
+        "y": 160
+      },
+      "data": {
+        "hostEvents": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-end",
+      "sourceNodeId": "3f0e9d88-5ec4-4cf5-9a83-9ad4ee9f7451",
+      "sourcePort": "next",
+      "targetNodeId": "b4aa0f79-bd0e-45cd-8a6e-094e6f50ccfd",
+      "targetPort": "in"
+    }
+  ]
+}
+

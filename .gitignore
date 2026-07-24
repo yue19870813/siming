@@ -1,0 +1,19 @@
+# Rust
+/target/
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Tauri
+apps/desktop/src-tauri/gen/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
+# Local application data
+.siming-local/
+

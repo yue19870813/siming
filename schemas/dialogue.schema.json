@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://siming.dev/schemas/dialogue.schema.json",
+  "title": "Siming Dialogue Source Document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "key",
+    "name",
+    "entryNodeId",
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "key": {
+      "$ref": "#/$defs/key"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/key"
+      }
+    },
+    "entryNodeId": {
+      "$ref": "#/$defs/uuid"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
+    },
+    "localizedText": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+      }
+    },
+    "hostEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "payload"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
+        },
+        "payload": {
+          "type": "object"
+        }
+      }
+    },
+    "advancePolicy": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {
+              "const": "manual"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "delayMs"],
+          "properties": {
+            "mode": {
+              "const": "auto"
+            },
+            "delayMs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "type", "position", "data"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "type": {
+          "enum": ["start", "dialogue", "choice", "condition", "event", "end"]
+        },
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          }
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "speakerId": {
+              "type": "string"
+            },
+            "text": {
+              "$ref": "#/$defs/localizedText"
+            },
+            "hostEvents": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/hostEvent"
+              }
+            },
+            "advancePolicy": {
+              "$ref": "#/$defs/advancePolicy"
+            },
+            "tags": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/key"
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sourceNodeId",
+        "sourcePort",
+        "targetNodeId",
+        "targetPort"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceNodeId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "sourcePort": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetNodeId": {
+          "$ref": "#/$defs/uuid"
+        },
+        "targetPort": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
+

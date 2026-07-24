@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://siming.dev/schemas/project.schema.json",
+  "title": "Siming Project Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "name",
+    "paths",
+    "defaultExportFormat",
+    "defaultLocale",
+    "locales",
+    "dialogues"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "projectId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dialogues", "exports"],
+      "properties": {
+        "dialogues": {
+          "$ref": "#/$defs/projectRelativePath"
+        },
+        "exports": {
+          "$ref": "#/$defs/projectRelativePath"
+        }
+      }
+    },
+    "defaultExportFormat": {
+      "const": "json"
+    },
+    "defaultLocale": {
+      "$ref": "#/$defs/locale"
+    },
+    "locales": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/locale"
+      }
+    },
+    "dialogues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "key", "path"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "$ref": "#/$defs/key"
+          },
+          "path": {
+            "$ref": "#/$defs/projectRelativePath"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "key": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "projectRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^(?:/|[A-Za-z]:[\\\\/])"
+          },
+          {
+            "pattern": "(?:^|/)\\.\\.(?:/|$)"
+          }
+        ]
+      }
+    }
+  }
+}
+
