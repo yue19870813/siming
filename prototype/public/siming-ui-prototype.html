@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <title>Siming 对话编辑器 · 交互稿</title>
+  <meta name="color-scheme" content="dark light">
+  <title>司命（Siming）剧情对话编辑器 · 交互稿</title>
   <style>
     :root {
       --bg: #0b0c10;
@@ -689,6 +689,137 @@
     .toast.show { opacity: 1; transform: translateY(0); }
     .toast strong { color: #9cddb9; margin-right: 6px; }
 
+    html[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f2f3f7;
+      --panel: #ffffff;
+      --panel-2: #f7f8fb;
+      --panel-3: #eceef4;
+      --line: #d8dbe5;
+      --line-soft: #e4e6ed;
+      --text: #202330;
+      --muted: #646978;
+      --muted-2: #9297a6;
+      --purple: #7162df;
+      --purple-2: #5f50c9;
+      --shadow: 0 18px 48px rgba(47, 52, 69, .16);
+    }
+    html[data-theme="light"] * { scrollbar-color: #c7cad4 transparent; }
+    html[data-theme="light"] .topbar,
+    html[data-theme="light"] .library,
+    html[data-theme="light"] .inspector,
+    html[data-theme="light"] .statusbar { background: #fff; }
+    html[data-theme="light"] .rail { background: #f7f8fb; }
+    html[data-theme="light"] .stage {
+      background-color: #f7f8fb;
+      background-image: radial-gradient(circle, #cdd1dc 1px, transparent 1px);
+    }
+    html[data-theme="light"] .stage::after { background: radial-gradient(circle at 52% 42%, transparent 0, rgba(219,222,231,.2) 78%); }
+    html[data-theme="light"] .doc-name,
+    html[data-theme="light"] .node-body,
+    html[data-theme="light"] .settings-title,
+    html[data-theme="light"] .settings-page-title,
+    html[data-theme="light"] .resource-title,
+    html[data-theme="light"] .project-search-title,
+    html[data-theme="light"] .table-view-title { color: #2a2d3a; }
+    html[data-theme="light"] .view-switch,
+    html[data-theme="light"] .search,
+    html[data-theme="light"] .search-command,
+    html[data-theme="light"] .field,
+    html[data-theme="light"] .textarea,
+    html[data-theme="light"] .language-select,
+    html[data-theme="light"] .segmented,
+    html[data-theme="light"] .source-editor-shell { color: #272a36; border-color: #d5d8e1; background: #fff; }
+    html[data-theme="light"] .view-mode:hover,
+    html[data-theme="light"] .rail-btn:hover,
+    html[data-theme="light"] .folder-row:hover,
+    html[data-theme="light"] .dialogue-row:hover,
+    html[data-theme="light"] .smart-row:hover { color: #2f3240; background: #eceef4; }
+    html[data-theme="light"] .view-mode.active,
+    html[data-theme="light"] .segment-btn.active { color: #29253f; border-color: #d2d5df; background: #e7e8ef; box-shadow: inset 0 0 0 1px #d4d7e0; }
+    html[data-theme="light"] .btn:hover,
+    html[data-theme="light"] .icon-btn:hover,
+    html[data-theme="light"] .tab-btn:hover,
+    html[data-theme="light"] .zoom-btn:hover { background: #eceef3; border-color: #d5d8e1; }
+    html[data-theme="light"] .btn { color: #4a4f5f; }
+    html[data-theme="light"] .btn.primary { color: #fff; }
+    html[data-theme="light"] .btn.soft { color: #4b5060; border-color: #d7dae3; background: #f3f4f7; }
+    html[data-theme="light"] .rail-btn { color: #747a89; }
+    html[data-theme="light"] .rail-btn.active { color: #5d4fd0; background: rgba(113,98,223,.11); }
+    html[data-theme="light"] .rail-btn::after,
+    html[data-theme="light"] .toast { color: #313542; border-color: #d1d4de; background: #fff; }
+    html[data-theme="light"] .section-title,
+    html[data-theme="light"] .settings-nav-label,
+    html[data-theme="light"] .settings-page-desc,
+    html[data-theme="light"] .setting-help,
+    html[data-theme="light"] .hint { color: #777c8b; }
+    html[data-theme="light"] .folder-row { color: #656a79; }
+    html[data-theme="light"] .dialogue-row { color: #555a69; }
+    html[data-theme="light"] .dialogue-row.active,
+    html[data-theme="light"] .smart-row.active { color: #413a72; border-color: rgba(113,98,223,.2); background: rgba(113,98,223,.1); }
+    html[data-theme="light"] .palette-item { color: #5e6371; border-color: #daddE5; background: #fff; }
+    html[data-theme="light"] .palette-item:hover { color: #282c38; border-color: #c7cad6; background: #f5f6f9; }
+    html[data-theme="light"] .node { color: #2f3340; border-color: #cfd3dd; background: #fff; box-shadow: 0 10px 24px rgba(57,62,79,.12); }
+    html[data-theme="light"] .node-head { color: #3b3f4d; border-color: #e0e2e9; }
+    html[data-theme="light"] .node-id { color: #969aa8; }
+    html[data-theme="light"] .choice-item { color: #3b4050; background: #f0f2f6; }
+    html[data-theme="light"] .condition-row { color: #464b59; }
+    html[data-theme="light"] .canvas-toolbar,
+    html[data-theme="light"] .minimap { border-color: #d6d9e2; background: rgba(255,255,255,.94); box-shadow: 0 8px 24px rgba(57,62,79,.12); }
+    html[data-theme="light"] .bottom-panel { color: #343845; border-color: #d5d8e1; background: rgba(255,255,255,.98); box-shadow: 0 -14px 36px rgba(57,62,79,.12); }
+    html[data-theme="light"] .diagnostic,
+    html[data-theme="light"] .sim-line,
+    html[data-theme="light"] .terminal-output { color: #343845; border-color: #d9dce5; background: #f7f8fb; }
+    html[data-theme="light"] .terminal-output { color: #3c4250; background: #eef0f5; }
+    html[data-theme="light"] .table-view,
+    html[data-theme="light"] .resource-view,
+    html[data-theme="light"] .search-view,
+    html[data-theme="light"] .settings-view { background: #f5f6f9; }
+    html[data-theme="light"] .table-view-head,
+    html[data-theme="light"] .resource-head,
+    html[data-theme="light"] .project-search-head,
+    html[data-theme="light"] .settings-head { border-color: #d9dce5; background: #fff; }
+    html[data-theme="light"] .dialogue-table,
+    html[data-theme="light"] .resource-table,
+    html[data-theme="light"] .search-group,
+    html[data-theme="light"] .settings-card { border-color: #d9dce5; background: #fff; }
+    html[data-theme="light"] .dialogue-table-header,
+    html[data-theme="light"] .resource-grid.header,
+    html[data-theme="light"] .search-group-head,
+    html[data-theme="light"] .settings-card-head { color: #6d7280; border-color: #e1e3ea; background: #f5f6f9; }
+    html[data-theme="light"] .dialogue-table-row,
+    html[data-theme="light"] .resource-grid,
+    html[data-theme="light"] .search-result,
+    html[data-theme="light"] .setting-row { color: #4c5160; border-color: #e5e7ed; }
+    html[data-theme="light"] .dialogue-table-row:hover,
+    html[data-theme="light"] .resource-row:hover,
+    html[data-theme="light"] .search-result:hover { color: #252935; background: #f2f3f7; }
+    html[data-theme="light"] .settings-nav { border-color: #dfe1e8; background: #f0f2f6; }
+    html[data-theme="light"] .settings-nav-btn { color: #666b79; }
+    html[data-theme="light"] .settings-nav-btn:hover { color: #303440; background: #e6e8ef; }
+    html[data-theme="light"] .settings-nav-btn.active { color: #443a8f; background: rgba(113,98,223,.1); }
+    html[data-theme="light"] .setting-name,
+    html[data-theme="light"] .settings-card-head,
+    html[data-theme="light"] .resource-name,
+    html[data-theme="light"] .table-copy,
+    html[data-theme="light"] .search-result-title { color: #353945; }
+    html[data-theme="light"] .source-view { background: #f5f6f9; }
+    html[data-theme="light"] .source-head,
+    html[data-theme="light"] .source-foot { border-color: #d9dce5; background: #fff; }
+    html[data-theme="light"] .source-textarea,
+    html[data-theme="light"] .line-gutter { color: #303543; background: #fff; }
+    html[data-theme="light"] .line-gutter { color: #a0a5b2; border-color: #e0e2e8; }
+    html[data-theme="light"] .export-menu,
+    html[data-theme="light"] .export-menu::before,
+    html[data-theme="light"] .folder-menu { color: #343845; border-color: #d3d6df; background: #fff; }
+    html[data-theme="light"] .export-option { color: #424754; }
+    html[data-theme="light"] .export-option:hover { color: #222632; background: #f0f2f6; }
+    html[data-theme="light"] .export-format-icon,
+    html[data-theme="light"] .search-result-icon,
+    html[data-theme="light"] .resource-symbol { border-color: #d8dbe4; background: #f0eff9; }
+    html[data-theme="light"] .host-event-card { border-color: #d9dce5; background: #fff; }
+    html[data-theme="light"] .host-event-card-head { border-color: #e1e3ea; background: #f6f7fa; }
+
     @media (max-width: 1180px) {
       .body { grid-template-columns: 52px 210px minmax(500px, 1fr) 280px; }
       .topbar { grid-template-columns: minmax(210px,1fr) auto minmax(360px,1fr); }
@@ -710,7 +841,7 @@
     <header class="topbar">
       <div class="brand">
         <div class="brand-mark">司</div>
-        <div class="brand-title">Siming</div>
+        <div class="brand-title">司命 <span style="color:var(--muted);font-weight:500">Siming</span></div>
         <span class="crumb">/</span>
         <span class="doc-name" id="docName">天命 · 序章 · 雨夜来客</span>
         <span class="dirty-dot" id="dirtyDot" title="有未保存修改"></span>
@@ -990,7 +1121,7 @@
                 <section class="settings-card">
                   <header class="settings-card-head">外观与编辑</header>
                   <div class="setting-row"><div><span class="setting-name">界面语言</span><span class="setting-help">只影响编辑器界面。</span></div><div class="setting-control"><select class="field user-setting-input"><option>简体中文</option><option>English</option></select></div></div>
-                  <div class="setting-row"><div><span class="setting-name">主题</span><span class="setting-help">跟随系统或固定编辑器外观。</span></div><div class="setting-control"><select class="field user-setting-input"><option>深色</option><option>浅色</option><option>跟随系统</option></select></div></div>
+                  <div class="setting-row"><div><span class="setting-name">主题</span><span class="setting-help">仅保存在本机，切换后立即应用到整个编辑器。</span></div><div class="setting-control"><div class="segmented" aria-label="界面主题"><button class="segment-btn active" data-user-theme="dark">Dark</button><button class="segment-btn" data-user-theme="light">Light</button></div></div></div>
                   <div class="setting-row"><div><span class="setting-name">数据编辑器字号</span><span class="setting-help">仅影响 JSON 数据视图。</span></div><div class="setting-control"><select class="field user-setting-input"><option>12 px</option><option>13 px</option><option>14 px</option><option>16 px</option></select></div></div>
                   <div class="setting-row"><div><span class="setting-name">快捷键方案</span><span class="setting-help">可使用系统默认或常见编辑器键位。</span></div><div class="setting-control"><select class="field user-setting-input"><option>系统默认</option><option>VS Code</option><option>JetBrains</option></select></div></div>
                 </section>
@@ -1077,6 +1208,10 @@ siming 0.1.0-prototype
     let projectSearchFilter = "all";
     let settingsPage = "project";
     let exportPathMode = "relative";
+    let userTheme = (() => {
+      try { return localStorage.getItem("siming.user.theme") === "light" ? "light" : "dark"; }
+      catch { return "dark"; }
+    })();
     const dialogueMeta = {
       id: "2fd88ddc-aa3b-466f-92a2-48785adce71e",
       key: "prologue-rainy-night",
@@ -1167,6 +1302,17 @@ siming 0.1.0-prototype
       const value = Math.random() * 16 | 0;
       return (char === "x" ? value : value & 3 | 8).toString(16);
     });
+
+    function applyUserTheme(theme, persist = true) {
+      userTheme = theme === "light" ? "light" : "dark";
+      document.documentElement.dataset.theme = userTheme;
+      document.querySelectorAll("[data-user-theme]").forEach(button => button.classList.toggle("active", button.dataset.userTheme === userTheme));
+      if (persist) {
+        try { localStorage.setItem("siming.user.theme", userTheme); } catch {}
+      }
+    }
+
+    applyUserTheme(userTheme, false);
 
     function buildSourceDocument() {
       return {
@@ -2454,6 +2600,11 @@ siming 0.1.0-prototype
     document.querySelectorAll(".user-setting-input").forEach(input => input.addEventListener("input", () => {
       document.getElementById("settingsSaveState").textContent = "● 已自动保存到本机";
     }));
+    document.querySelectorAll("[data-user-theme]").forEach(button => button.addEventListener("click", () => {
+      applyUserTheme(button.dataset.userTheme);
+      document.getElementById("settingsSaveState").textContent = "● 已自动保存到本机";
+      showToast(`主题已切换为 ${button.textContent}`);
+    }));
     document.querySelectorAll("[data-browse-path]").forEach(button => button.addEventListener("click", () => {
       showToast("已打开文件夹选择器（交互示意）");
     }));
@@ -2476,6 +2627,7 @@ siming 0.1.0-prototype
     });
     document.getElementById("resetUserSettings").addEventListener("click", () => {
       document.getElementById("defaultProjectLocation").value = "/Users/yue/Documents/Siming Projects";
+      applyUserTheme("dark");
       document.getElementById("settingsSaveState").textContent = "● 已恢复默认";
       showToast("用户设置已恢复默认");
     });
