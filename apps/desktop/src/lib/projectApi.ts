@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { ProjectSnapshot, SystemSettings } from "../model/types";
+import type {
+  Diagnostic,
+  ProjectSnapshot,
+  SimulationRequest,
+  SimulationSession,
+  SystemSettings,
+} from "../model/types";
 
 export const isTauri = () => "__TAURI_INTERNALS__" in window;
 
@@ -34,6 +40,20 @@ export async function openProject(rootPath: string) {
 
 export async function saveProject(snapshot: ProjectSnapshot) {
   return invoke<void>("save_project", { snapshot });
+}
+
+export async function validateProject(snapshot: ProjectSnapshot) {
+  if (!isTauri()) {
+    throw new Error("完整校验需要在 Tauri dev 模式中运行。");
+  }
+  return invoke<Diagnostic[]>("validate_project", { snapshot });
+}
+
+export async function simulateStep(request: SimulationRequest) {
+  if (!isTauri()) {
+    throw new Error("模拟运行需要在 Tauri dev 模式中运行。");
+  }
+  return invoke<SimulationSession>("simulate_step", { request });
 }
 
 export async function readSystemSettings(): Promise<SystemSettings> {

@@ -27,6 +27,12 @@ impl From<siming_storage::StorageError> for CommandError {
     }
 }
 
+impl From<siming_core::SimulationError> for CommandError {
+    fn from(error: siming_core::SimulationError) -> Self {
+        Self::new("SIMULATION_ERROR", error, true)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SystemSettings {
@@ -109,6 +115,18 @@ fn save_project(snapshot: ProjectSnapshot) -> Result<(), CommandError> {
 }
 
 #[tauri::command]
+fn validate_project(snapshot: ProjectSnapshot) -> Vec<siming_core::Diagnostic> {
+    siming_core::validate_project(&snapshot.manifest, &snapshot.dialogues, &snapshot.resources)
+}
+
+#[tauri::command]
+fn simulate_step(
+    request: siming_core::SimulationRequest,
+) -> Result<siming_core::SimulationSession, CommandError> {
+    Ok(siming_core::simulate_step(request)?)
+}
+
+#[tauri::command]
 fn read_system_settings(app: tauri::AppHandle) -> Result<SystemSettings, CommandError> {
     let path = system_settings_path(&app)?;
     if !path.exists() {
@@ -168,6 +186,8 @@ pub fn run() {
             create_project,
             open_project,
             save_project,
+            validate_project,
+            simulate_step,
             read_system_settings,
             write_system_settings
         ])
@@ -188,5 +208,18 @@ mod tests {
             super::SystemSettings::default().theme,
             super::Theme::Dark
         ));
+    }
+
+    #[test]
+    fn validation_command_uses_shared_core() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../fixtures/minimal-project");
+        let snapshot = siming_storage::open_project(&root).expect("fixture should open");
+        let expected = siming_core::validate_project(
+            &snapshot.manifest,
+            &snapshot.dialogues,
+            &snapshot.resources,
+        );
+        assert_eq!(super::validate_project(snapshot), expected);
     }
 }

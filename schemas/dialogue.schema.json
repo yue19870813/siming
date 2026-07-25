@@ -115,6 +115,77 @@
         }
       ]
     },
+    "conditionComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["variable", "operator", "value"],
+      "properties": {
+        "variable": {
+          "$ref": "#/$defs/key"
+        },
+        "operator": {
+          "enum": ["==", "!=", ">", ">=", "<", "<="]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    "conditionExpression": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/conditionComparison"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["all"],
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/conditionExpression"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["any"],
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/conditionExpression"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["not"],
+          "properties": {
+            "not": {
+              "$ref": "#/$defs/conditionExpression"
+            }
+          }
+        }
+      ]
+    },
     "node": {
       "type": "object",
       "additionalProperties": false,
@@ -150,6 +221,9 @@
             },
             "text": {
               "$ref": "#/$defs/localizedText"
+            },
+            "condition": {
+              "$ref": "#/$defs/conditionExpression"
             },
             "hostEvents": {
               "type": "array",
@@ -205,4 +279,3 @@
     }
   }
 }
-

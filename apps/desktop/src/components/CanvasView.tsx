@@ -15,6 +15,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { GitBranch, MessageCircle, Play, Square, Zap } from "lucide-react";
 import { memo, useEffect, useMemo } from "react";
+import { formatCondition } from "../model/conditions";
 import { createId } from "../model/demo";
 import type { DialogueNode, NodeType } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
@@ -86,11 +87,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
             </div>
           ))}
         {node.type === "condition" && (
-          <code>
-            {node.data.condition?.variable ?? "variable"}{" "}
-            {node.data.condition?.operator ?? "=="}{" "}
-            {String(node.data.condition?.value ?? true)}
-          </code>
+          <code>{formatCondition(node.data.condition)}</code>
         )}
         {node.type === "event" && (
           <code>{node.data.event || "选择业务事件"}</code>

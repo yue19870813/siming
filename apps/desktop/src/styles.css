@@ -2108,3 +2108,403 @@ html[data-theme="light"] .cm-editor {
     display: none;
   }
 }
+
+/* Stage 2 validation and simulation workbench */
+.workbench-panel {
+  height: min(430px, 56%);
+}
+
+.workbench-header-actions,
+.workbench-refresh {
+  display: flex;
+  align-items: center;
+}
+
+.workbench-header-actions {
+  gap: 4px;
+}
+
+.workbench-refresh {
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 7px;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 9px;
+}
+
+.workbench-refresh:hover {
+  color: var(--text);
+  background: var(--panel-raised);
+}
+
+.workbench-empty--error,
+.simulator-error {
+  color: var(--danger);
+}
+
+.diagnostics-view {
+  height: 100%;
+  overflow: auto;
+}
+
+.diagnostics-summary {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 9px;
+}
+
+.diagnostics-summary strong {
+  color: var(--danger);
+}
+
+.diagnostics-summary span {
+  color: var(--warning);
+}
+
+.diagnostics-summary code {
+  margin-left: auto;
+  color: var(--faint);
+}
+
+.diagnostic-group > header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 29px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--panel-soft);
+  font-size: 9px;
+}
+
+.diagnostic-group > header span {
+  min-width: 17px;
+  padding: 2px 4px;
+  border-radius: 8px;
+  color: var(--primary-hover);
+  background: var(--primary-soft);
+  text-align: center;
+}
+
+.diagnostic-list button {
+  grid-template-columns: 56px minmax(0, 1fr) 70px;
+}
+
+.diagnostic-list button > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.diagnostic-list button strong {
+  color: var(--text);
+  font-size: 10px;
+}
+
+.diagnostic-list button small {
+  color: var(--faint);
+  font:
+    8px ui-monospace,
+    monospace;
+}
+
+.simulator-start {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  height: 100%;
+  color: var(--muted);
+  text-align: center;
+}
+
+.simulator-start > strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.simulator-start p {
+  margin: 0;
+  font-size: 9px;
+}
+
+.simulator-start label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+}
+
+.simulator-workspace {
+  display: grid;
+  grid-template-columns: 190px minmax(280px, 1fr) minmax(250px, 0.72fr);
+  height: 100%;
+}
+
+.simulator-variables,
+.simulation-trace {
+  min-width: 0;
+  overflow: auto;
+  background: var(--panel-soft);
+}
+
+.simulator-variables {
+  border-right: 1px solid var(--border);
+}
+
+.simulation-trace {
+  border-left: 1px solid var(--border);
+}
+
+.simulator-variables > header,
+.simulation-trace > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-soft);
+  font-size: 9px;
+}
+
+.simulator-variables > header span,
+.simulation-trace > header span {
+  color: var(--faint);
+  font-size: 8px;
+}
+
+.simulator-variables > label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 82px;
+  align-items: center;
+  gap: 7px;
+  min-height: 50px;
+  padding: 6px 9px;
+  border-bottom: 1px solid var(--border);
+}
+
+.simulator-variables > label > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.simulator-variables > label strong {
+  overflow: hidden;
+  font:
+    9px ui-monospace,
+    monospace;
+  text-overflow: ellipsis;
+}
+
+.simulator-variables > label small {
+  color: var(--faint);
+  font-size: 8px;
+}
+
+.simulator-variables input,
+.simulator-variables select {
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  font-size: 9px;
+}
+
+.simulator-current {
+  display: grid;
+  grid-template-rows: 36px minmax(0, 1fr) auto auto;
+  min-width: 0;
+  padding: 0 15px 12px;
+  overflow: auto;
+}
+
+.simulator-current > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+
+.simulator-current > header select {
+  width: 120px;
+  height: 25px;
+  padding: 0 6px;
+  font-size: 9px;
+}
+
+.simulation-status {
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: var(--success);
+  background: rgb(86 203 184 / 11%);
+  font-size: 8px;
+}
+
+.status--loopGuard,
+.status--error {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.simulator-dialogue {
+  display: grid;
+  place-content: center;
+  gap: 7px;
+  padding: 18px 10px;
+  text-align: center;
+}
+
+.simulator-dialogue small {
+  color: var(--faint);
+  font:
+    8px ui-monospace,
+    monospace;
+}
+
+.simulator-dialogue strong {
+  font-size: 11px;
+}
+
+.simulator-dialogue p {
+  max-width: 540px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.locale-fallback {
+  color: var(--warning);
+  font-size: 8px;
+}
+
+.simulator-current .simulator-actions {
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.simulator-error {
+  padding: 5px;
+  font-size: 9px;
+  text-align: center;
+}
+
+.simulation-trace > div {
+  display: grid;
+}
+
+.trace-entry {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 7px;
+  min-height: 43px;
+  padding: 6px 9px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  background: transparent;
+  text-align: left;
+}
+
+.trace-entry:hover {
+  background: var(--primary-soft);
+}
+
+.trace-entry > code {
+  color: var(--faint);
+  font-size: 8px;
+}
+
+.trace-entry > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.trace-entry strong {
+  color: var(--primary-hover);
+  font-size: 8px;
+}
+
+.trace-entry small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace-entry--hostEvent strong {
+  color: #70c8e4;
+}
+
+.trace-entry--businessEvent strong {
+  color: #d68bb3;
+}
+
+.trace-entry--condition strong {
+  color: var(--warning);
+}
+
+.condition-expression {
+  display: grid;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-soft);
+}
+
+.condition-expression-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.condition-expression-head select {
+  flex: 1;
+  height: 27px;
+  padding: 0 6px;
+  font-size: 9px;
+}
+
+.condition-expression-head button {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 25px;
+  padding: 0 5px;
+  border-radius: 5px;
+  color: var(--muted);
+  background: var(--panel-raised);
+  font-size: 8px;
+}
+
+.condition-children {
+  display: grid;
+  gap: 6px;
+  padding-left: 7px;
+  border-left: 2px solid var(--primary-border);
+}
+
+@media (max-width: 1100px) {
+  .simulator-workspace {
+    grid-template-columns: 160px minmax(280px, 1fr);
+  }
+
+  .simulation-trace {
+    display: none;
+  }
+}

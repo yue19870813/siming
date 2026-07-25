@@ -1,5 +1,9 @@
 import { Copy, Plus, Search, ShieldAlert, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  conditionUsesVariable,
+  renameConditionVariable,
+} from "../model/conditions";
 import { createId } from "../model/demo";
 import type {
   Activity,
@@ -376,7 +380,10 @@ function countReferences(
     for (const node of dialogue.nodes) {
       if (resourceKey === "characters" && node.data.speakerId === key)
         count += 1;
-      if (resourceKey === "variables" && node.data.condition?.variable === key)
+      if (
+        resourceKey === "variables" &&
+        conditionUsesVariable(node.data.condition, key)
+      )
         count += 1;
       if (resourceKey === "events" && node.data.event === key) count += 1;
       if (resourceKey === "tags" && node.data.tags?.includes(key)) count += 1;
@@ -401,11 +408,8 @@ function replaceReferences(
       if (resourceKey === "characters" && node.data.speakerId === previousKey) {
         node.data.speakerId = nextKey;
       }
-      if (
-        resourceKey === "variables" &&
-        node.data.condition?.variable === previousKey
-      ) {
-        node.data.condition.variable = nextKey;
+      if (resourceKey === "variables") {
+        renameConditionVariable(node.data.condition, previousKey, nextKey);
       }
       if (resourceKey === "events" && node.data.event === previousKey) {
         node.data.event = nextKey;

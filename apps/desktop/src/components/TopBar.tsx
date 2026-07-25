@@ -10,6 +10,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { translationCompletion } from "../model/i18n";
 import type { ViewMode } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 import type { WorkbenchPanelMode } from "./WorkbenchPanel";
@@ -238,15 +239,6 @@ function localeLabel(
   const name =
     locale === "zh-CN" ? "简体中文" : locale === "en-US" ? "English" : locale;
   if (locale === project.manifest.defaultLocale) return `${name} · 默认`;
-  let total = 0;
-  let translated = 0;
-  for (const dialogue of project.dialogues) {
-    for (const node of dialogue.nodes) {
-      if (!node.data.text) continue;
-      total += 1;
-      if (node.data.text[locale]?.trim()) translated += 1;
-    }
-  }
-  const percent = total ? Math.round((translated / total) * 100) : 100;
+  const percent = translationCompletion(project, locale);
   return `${name} · ${percent}%`;
 }

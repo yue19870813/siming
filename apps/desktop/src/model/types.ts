@@ -13,15 +13,23 @@ export type ChoiceOption = {
   text: LocalizedText;
 };
 
+export type ComparisonOperator = "==" | "!=" | ">" | ">=" | "<" | "<=";
+
+export type ConditionExpression =
+  | {
+      variable: string;
+      operator: ComparisonOperator;
+      value: boolean | number | string;
+    }
+  | { all: ConditionExpression[] }
+  | { any: ConditionExpression[] }
+  | { not: ConditionExpression };
+
 export type DialogueNodeData = {
   text?: LocalizedText;
   speakerId?: string;
   choices?: ChoiceOption[];
-  condition?: {
-    variable: string;
-    operator: "==" | "!=" | ">" | ">=" | "<" | "<=";
-    value: boolean | number | string;
-  };
+  condition?: ConditionExpression;
   event?: string;
   params?: Record<string, unknown>;
   hostEvents?: HostEvent[];
@@ -139,6 +147,80 @@ export type SystemSettings = {
   autoSaveDelaySeconds: number;
   recoverySnapshotIntervalSeconds: number;
   restoreLastProject: boolean;
+};
+
+export type Diagnostic = {
+  code: string;
+  severity: "error" | "warning";
+  message: string;
+  file: string;
+  entityType?: "dialogue" | "node" | "edge" | "resource" | "locale" | null;
+  entityId?: string | null;
+  fieldPath?: string | null;
+  range?: {
+    line: number;
+    column: number;
+    endLine?: number;
+    endColumn?: number;
+  } | null;
+  related: Array<{
+    file: string;
+    entityId?: string | null;
+    fieldPath?: string | null;
+  }>;
+};
+
+export type SimulationAction =
+  | { type: "start"; startNodeId?: string; locale: string }
+  | { type: "continue" }
+  | { type: "choose"; optionId: string }
+  | {
+      type: "setVariable";
+      key: string;
+      value: boolean | number | string;
+    }
+  | { type: "setLocale"; locale: string };
+
+export type SimulationLogEntry = {
+  sequence: number;
+  kind:
+    | "node"
+    | "condition"
+    | "choice"
+    | "businessEvent"
+    | "hostEvent"
+    | "localeFallback"
+    | "variable"
+    | "system";
+  nodeId?: string | null;
+  nodeKey?: string | null;
+  message: string;
+  details: unknown;
+};
+
+export type SimulationSession = {
+  currentNodeId?: string | null;
+  status:
+    | "running"
+    | "waitingContinue"
+    | "waitingChoice"
+    | "completed"
+    | "loopGuard"
+    | "error";
+  locale: string;
+  variables: Record<string, boolean | number | string>;
+  consecutiveSteps: number;
+  visitSequence: number;
+  trace: SimulationLogEntry[];
+  error?: string | null;
+};
+
+export type SimulationRequest = {
+  manifest: ProjectSnapshot["manifest"];
+  dialogue: DialogueDocument;
+  resources: ProjectSnapshot["resources"];
+  session?: SimulationSession;
+  action: SimulationAction;
 };
 
 export type ViewMode = "canvas" | "table" | "data";

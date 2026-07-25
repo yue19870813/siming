@@ -14,6 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { dialogueHasMissingTranslation } from "../model/i18n";
 import type { Activity, NodeType } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 
@@ -105,25 +106,15 @@ function ProjectExplorer() {
     .filter(({ dialogue }, index) => {
       if (quickFilter === "recent") return index < 2;
       if (quickFilter === "translation") {
-        return dialogue?.nodes.some(
-          (node) =>
-            node.data.text &&
-            project.manifest.locales.some(
-              (language) => !node.data.text?.[language]?.trim(),
-            ),
-        );
+        return dialogue
+          ? dialogueHasMissingTranslation(dialogue, project.manifest.locales)
+          : false;
       }
       return true;
     });
 
   const translationIncomplete = project.dialogues.filter((dialogue) =>
-    dialogue.nodes.some(
-      (node) =>
-        node.data.text &&
-        project.manifest.locales.some(
-          (language) => !node.data.text?.[language]?.trim(),
-        ),
-    ),
+    dialogueHasMissingTranslation(dialogue, project.manifest.locales),
   ).length;
 
   return (

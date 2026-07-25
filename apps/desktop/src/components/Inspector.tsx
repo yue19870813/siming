@@ -1,10 +1,14 @@
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-react";
+import { createConditionLeaf } from "../model/conditions";
 import { createId } from "../model/demo";
 import type {
+  ComparisonOperator,
+  ConditionExpression,
   DialogueDocument,
   DialogueNode,
   HostEvent,
   ProjectSnapshot,
+  VariableDefinition,
 } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 
@@ -269,69 +273,18 @@ function NodeInspector({
           </>
         )}
         {node.type === "condition" && (
-          <div className="condition-grid">
-            <select
-              value={node.data.condition?.variable ?? ""}
-              onChange={(event) =>
-                update((draft) => {
-                  draft.data.condition ??= {
-                    variable: "",
-                    operator: "==",
-                    value: true,
-                  };
-                  draft.data.condition.variable = event.target.value;
-                })
-              }
-            >
-              <option value="">选择变量</option>
-              {project.resources.variables.map((variable) => (
-                <option key={variable.id} value={variable.key}>
-                  {variable.key}
-                </option>
-              ))}
-            </select>
-            <select
-              value={node.data.condition?.operator ?? "=="}
-              onChange={(event) =>
-                update((draft) => {
-                  draft.data.condition ??= {
-                    variable: "",
-                    operator: "==",
-                    value: true,
-                  };
-                  draft.data.condition.operator = event.target
-                    .value as NonNullable<
-                    DialogueNode["data"]["condition"]
-                  >["operator"];
-                })
-              }
-            >
-              {["==", "!=", ">", ">=", "<", "<="].map((operator) => (
-                <option key={operator}>{operator}</option>
-              ))}
-            </select>
-            <input
-              value={String(node.data.condition?.value ?? "")}
-              onChange={(event) =>
-                update((draft) => {
-                  draft.data.condition ??= {
-                    variable: "",
-                    operator: "==",
-                    value: true,
-                  };
-                  const raw = event.target.value;
-                  draft.data.condition.value =
-                    raw === "true"
-                      ? true
-                      : raw === "false"
-                        ? false
-                        : Number.isNaN(Number(raw))
-                          ? raw
-                          : Number(raw);
-                })
-              }
-            />
-          </div>
+          <ConditionEditor
+            expression={
+              node.data.condition ??
+              createConditionLeaf(project.resources.variables[0])
+            }
+            variables={project.resources.variables}
+            onChange={(expression) =>
+              update((draft) => {
+                draft.data.condition = expression;
+              }, "修改条件表达式")
+            }
+          />
         )}
         {node.type === "event" && (
           <>
@@ -386,6 +339,202 @@ function NodeInspector({
         </button>
       </Section>
     </>
+  );
+}
+
+function ConditionEditor({
+  expression,
+  variables,
+  onChange,
+  onDelete,
+  depth = 0,
+}: {
+  expression: ConditionExpression;
+  variables: VariableDefinition[];
+  onChange: (expression: ConditionExpression) => void;
+  onDelete?: () => void;
+  depth?: number;
+}) {
+  const kind =
+    "variable" in expression
+      ? "compare"
+      : "all" in expression
+        ? "all"
+        : "any" in expression
+          ? "any"
+          : "not";
+  const convert = (next: string) => {
+    if (next === "compare") {
+      onChange(createConditionLeaf(variables[0]));
+    } else if (next === "not") {
+      onChange({ not: createConditionLeaf(variables[0]) });
+    } else if (next === "all") {
+      onChange({ all: [createConditionLeaf(variables[0])] });
+    } else {
+      onChange({ any: [createConditionLeaf(variables[0])] });
+    }
+  };
+
+  if ("variable" in expression) {
+    const variable = variables.find((item) => item.key === expression.variable);
+    const operators: ComparisonOperator[] =
+      variable?.type === "number"
+        ? ["==", "!=", ">", ">=", "<", "<="]
+        : ["==", "!="];
+    return (
+      <div className="condition-expression" data-depth={depth}>
+        <div className="condition-expression-head">
+          <select
+            value={kind}
+            onChange={(event) => convert(event.target.value)}
+          >
+            <option value="compare">比较</option>
+            <option value="all">全部满足</option>
+            <option value="any">任一满足</option>
+            <option value="not">取反</option>
+          </select>
+          {onDelete && (
+            <button onClick={onDelete} title="删除条件">
+              <Trash2 size={12} />
+            </button>
+          )}
+        </div>
+        <div className="condition-grid">
+          <select
+            value={expression.variable}
+            onChange={(event) => {
+              const nextVariable = variables.find(
+                (item) => item.key === event.target.value,
+              );
+              onChange(createConditionLeaf(nextVariable));
+            }}
+          >
+            <option value="">选择变量</option>
+            {variables.map((item) => (
+              <option key={item.id} value={item.key}>
+                {item.key}
+              </option>
+            ))}
+          </select>
+          <select
+            value={expression.operator}
+            onChange={(event) =>
+              onChange({
+                ...expression,
+                operator: event.target.value as ComparisonOperator,
+              })
+            }
+          >
+            {operators.map((operator) => (
+              <option key={operator}>{operator}</option>
+            ))}
+          </select>
+          <ConditionValueEditor
+            variable={variable}
+            value={expression.value}
+            onChange={(value) => onChange({ ...expression, value })}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const children =
+    "all" in expression
+      ? expression.all
+      : "any" in expression
+        ? expression.any
+        : [expression.not];
+  return (
+    <div className="condition-expression condition-expression--group">
+      <div className="condition-expression-head">
+        <select value={kind} onChange={(event) => convert(event.target.value)}>
+          <option value="compare">比较</option>
+          <option value="all">全部满足</option>
+          <option value="any">任一满足</option>
+          <option value="not">取反</option>
+        </select>
+        {kind !== "not" && (
+          <button
+            onClick={() => {
+              const next = [...children, createConditionLeaf(variables[0])];
+              onChange(kind === "all" ? { all: next } : { any: next });
+            }}
+          >
+            <Plus size={12} /> 条件
+          </button>
+        )}
+        {onDelete && (
+          <button onClick={onDelete} title="删除条件组">
+            <Trash2 size={12} />
+          </button>
+        )}
+      </div>
+      <div className="condition-children">
+        {children.map((child, index) => (
+          <ConditionEditor
+            key={index}
+            expression={child}
+            variables={variables}
+            depth={depth + 1}
+            onChange={(nextChild) => {
+              if (kind === "not") {
+                onChange({ not: nextChild });
+                return;
+              }
+              const next = [...children];
+              next[index] = nextChild;
+              onChange(kind === "all" ? { all: next } : { any: next });
+            }}
+            onDelete={
+              kind === "not"
+                ? undefined
+                : () => {
+                    const next = children.filter(
+                      (_item, childIndex) => childIndex !== index,
+                    );
+                    onChange(kind === "all" ? { all: next } : { any: next });
+                  }
+            }
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConditionValueEditor({
+  variable,
+  value,
+  onChange,
+}: {
+  variable?: VariableDefinition;
+  value: boolean | number | string;
+  onChange: (value: boolean | number | string) => void;
+}) {
+  if (variable?.type === "boolean") {
+    return (
+      <select
+        value={String(value)}
+        onChange={(event) => onChange(event.target.value === "true")}
+      >
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    );
+  }
+  return (
+    <input
+      type={variable?.type === "number" ? "number" : "text"}
+      value={String(value)}
+      onChange={(event) =>
+        onChange(
+          variable?.type === "number"
+            ? Number(event.target.value)
+            : event.target.value,
+        )
+      }
+    />
   );
 }
 

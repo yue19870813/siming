@@ -33,3 +33,24 @@ test.each([
     expect(valid).toBe(true);
   },
 );
+
+test("dialogue schema accepts recursive structured conditions", () => {
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  addFormats(ajv);
+  const validate = ajv.compile(readJson("schemas/dialogue.schema.json"));
+  const dialogue = readJson("fixtures/minimal-project/dialogues/intro.json");
+  const conditionNode = structuredClone(dialogue.nodes[0]);
+  conditionNode.id = "6d069a68-4792-45db-8b38-c80b08eb254e";
+  conditionNode.key = "condition-test";
+  conditionNode.type = "condition";
+  conditionNode.data.condition = {
+    all: [
+      { variable: "favor", operator: ">=", value: 10 },
+      { not: { variable: "blocked", operator: "==", value: true } },
+    ],
+  };
+  dialogue.nodes.push(conditionNode);
+
+  expect(validate(dialogue)).toBe(true);
+  expect(validate.errors).toBeNull();
+});

@@ -1,6 +1,21 @@
-import { CheckCircle2, Play, Terminal, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import type { DialogueDocument, DialogueNode } from "../model/types";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleStop,
+  Play,
+  RotateCcw,
+  Terminal,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { simulateStep, validateProject } from "../lib/projectApi";
+import type {
+  Diagnostic,
+  DialogueDocument,
+  SimulationAction,
+  SimulationSession,
+  VariableDefinition,
+} from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 
 export type WorkbenchPanelMode = "problems" | "simulator" | "terminal";
@@ -15,10 +30,27 @@ export function WorkbenchPanel({
   onClose: () => void;
 }) {
   const project = useEditorStore((state) => state.project);
-  const dialogueId = useEditorStore((state) => state.selectedDialogueId);
-  const locale = useEditorStore((state) => state.previewLocale);
-  const dialogue = project.dialogues.find((item) => item.id === dialogueId);
-  const diagnostics = useMemo(() => collectDiagnostics(project), [project]);
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
+  const [validationState, setValidationState] = useState<
+    "idle" | "running" | "complete" | "error"
+  >("idle");
+  const [validationError, setValidationError] = useState("");
+
+  const runValidation = useCallback(async () => {
+    setValidationState("running");
+    setValidationError("");
+    try {
+      setDiagnostics(await validateProject(project));
+      setValidationState("complete");
+    } catch (error) {
+      setValidationError(errorMessage(error));
+      setValidationState("error");
+    }
+  }, [project]);
+
+  useEffect(() => {
+    if (mode === "problems") void runValidation();
+  }, [mode, runValidation]);
 
   return (
     <section className="workbench-panel" aria-label="工作面板">
@@ -44,283 +76,520 @@ export function WorkbenchPanel({
             命令行
           </button>
         </div>
-        <button className="workbench-close" onClick={onClose} title="关闭面板">
-          <X size={14} />
-        </button>
+        <div className="workbench-header-actions">
+          {mode === "problems" && (
+            <button
+              className="workbench-refresh"
+              onClick={() => void runValidation()}
+              disabled={validationState === "running"}
+            >
+              <RotateCcw size={12} />
+              {validationState === "running" ? "校验中…" : "重新校验"}
+            </button>
+          )}
+          <button
+            className="workbench-close"
+            onClick={onClose}
+            title="关闭面板"
+          >
+            <X size={14} />
+          </button>
+        </div>
       </header>
       <div className="workbench-content">
-        {mode === "problems" && <Problems diagnostics={diagnostics} />}
-        {mode === "simulator" && (
-          <Simulator dialogue={dialogue} locale={locale} />
+        {mode === "problems" && (
+          <Problems
+            diagnostics={diagnostics}
+            state={validationState}
+            error={validationError}
+          />
         )}
+        {mode === "simulator" && <Simulator />}
         {mode === "terminal" && <TerminalPanel />}
       </div>
     </section>
   );
 }
 
-type Diagnostic = {
-  severity: "error" | "warning" | "success";
-  message: string;
-  path: string;
-  dialogueId?: string;
-  nodeId?: string;
-};
-
-function Problems({ diagnostics }: { diagnostics: Diagnostic[] }) {
-  const selectDialogue = useEditorStore((state) => state.setSelectedDialogue);
-  const selectNode = useEditorStore((state) => state.setSelectedNode);
+function Problems({
+  diagnostics,
+  state,
+  error,
+}: {
+  diagnostics: Diagnostic[];
+  state: "idle" | "running" | "complete" | "error";
+  error: string;
+}) {
+  const project = useEditorStore((store) => store.project);
+  const selectDialogue = useEditorStore((store) => store.setSelectedDialogue);
+  const selectNode = useEditorStore((store) => store.setSelectedNode);
+  const setViewMode = useEditorStore((store) => store.setViewMode);
+  const setActivity = useEditorStore((store) => store.setActivity);
+  if (state === "running" || state === "idle") {
+    return <div className="workbench-empty">正在使用共享核心校验项目…</div>;
+  }
+  if (state === "error") {
+    return (
+      <div className="workbench-empty workbench-empty--error">
+        <AlertTriangle size={17} />
+        <strong>无法运行校验</strong>
+        <span>{error}</span>
+      </div>
+    );
+  }
   if (!diagnostics.length) {
     return (
       <div className="workbench-empty">
         <CheckCircle2 size={17} />
         <strong>校验通过</strong>
-        <span>当前可编辑结构未发现错误或缺失翻译。</span>
+        <span>共享核心未发现结构、引用、分支或翻译问题。</span>
       </div>
     );
   }
+  const groups = groupDiagnostics(diagnostics);
+  const errors = diagnostics.filter((item) => item.severity === "error").length;
   return (
-    <div className="diagnostic-list">
-      {diagnostics.map((diagnostic, index) => (
-        <button
-          key={`${diagnostic.path}-${index}`}
-          onClick={() => {
-            if (!diagnostic.dialogueId) return;
-            selectDialogue(diagnostic.dialogueId);
-            selectNode(diagnostic.nodeId ?? null);
-          }}
-        >
-          <span className={`severity severity--${diagnostic.severity}`}>
-            {diagnostic.severity}
-          </span>
-          <span>{diagnostic.message}</span>
-          <code>{diagnostic.path}</code>
-        </button>
+    <div className="diagnostics-view">
+      <header className="diagnostics-summary">
+        <strong>{errors} 个错误</strong>
+        <span>{diagnostics.length - errors} 个警告</span>
+        <code>共 {diagnostics.length} 项</code>
+      </header>
+      {groups.map(([file, items]) => (
+        <section className="diagnostic-group" key={file}>
+          <header>
+            <strong>{file || "项目配置"}</strong>
+            <span>{items.length}</span>
+          </header>
+          <div className="diagnostic-list">
+            {items.map((diagnostic, index) => (
+              <button
+                key={`${diagnostic.code}-${diagnostic.entityId}-${index}`}
+                onClick={() => {
+                  const dialogue = locateDiagnosticDialogue(
+                    project.dialogues,
+                    diagnostic,
+                    file,
+                  );
+                  setActivity("project");
+                  if (dialogue) selectDialogue(dialogue.id);
+                  if (diagnostic.entityType === "node" && diagnostic.entityId) {
+                    selectNode(diagnostic.entityId);
+                  } else if (
+                    diagnostic.entityType === "edge" &&
+                    diagnostic.entityId &&
+                    dialogue
+                  ) {
+                    const edge = dialogue.edges.find(
+                      (item) => item.id === diagnostic.entityId,
+                    );
+                    selectNode(edge?.sourceNodeId ?? null);
+                  } else {
+                    selectNode(null);
+                  }
+                  if (diagnostic.range) setViewMode("data");
+                }}
+              >
+                <span className={`severity severity--${diagnostic.severity}`}>
+                  {diagnostic.severity === "error" ? "错误" : "警告"}
+                </span>
+                <span>
+                  <strong>{diagnostic.message}</strong>
+                  <small>
+                    {diagnostic.code}
+                    {diagnostic.fieldPath ? ` · ${diagnostic.fieldPath}` : ""}
+                  </small>
+                </span>
+                <code>{diagnostic.entityId?.slice(0, 8) ?? "PROJECT"}</code>
+              </button>
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   );
 }
 
-function Simulator({
-  dialogue,
-  locale,
-}: {
-  dialogue?: DialogueDocument;
-  locale: string;
-}) {
-  const [nodeId, setNodeId] = useState(dialogue?.entryNodeId ?? "");
+function Simulator() {
+  const project = useEditorStore((state) => state.project);
+  const dialogueId = useEditorStore((state) => state.selectedDialogueId);
+  const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const previewLocale = useEditorStore((state) => state.previewLocale);
+  const setPreviewLocale = useEditorStore((state) => state.setPreviewLocale);
+  const dialogue = project.dialogues.find((item) => item.id === dialogueId);
+  const [session, setSession] = useState<SimulationSession>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [startAtSelection, setStartAtSelection] = useState(false);
+
   useEffect(() => {
-    setNodeId(dialogue?.entryNodeId ?? "");
-  }, [dialogue?.id, dialogue?.entryNodeId]);
+    setSession(undefined);
+    setError("");
+  }, [dialogueId]);
+
+  const runAction = async (action: SimulationAction) => {
+    if (!dialogue) return;
+    setBusy(true);
+    setError("");
+    try {
+      setSession(
+        await simulateStep({
+          manifest: project.manifest,
+          dialogue,
+          resources: project.resources,
+          session,
+          action,
+        }),
+      );
+    } catch (runError) {
+      setError(errorMessage(runError));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (!dialogue) return <div className="workbench-empty">请选择对话文件。</div>;
-  const node = dialogue.nodes.find((item) => item.id === nodeId);
-  if (!node) return <div className="workbench-empty">模拟入口节点不存在。</div>;
-  const outgoing = dialogue.edges.filter(
-    (edge) => edge.sourceNodeId === node.id,
-  );
-  const speaker =
-    node.data.speakerId ||
-    (node.type === "dialogue" ? "旁白" : node.type.toUpperCase());
-  const text =
-    node.data.text?.[locale] ??
-    Object.values(node.data.text ?? {})[0] ??
-    simulatorFallback(node);
+  if (!session) {
+    return (
+      <div className="simulator-start">
+        <Play size={22} />
+        <strong>验证当前对话的实际运行路径</strong>
+        <p>变量和事件只存在于本次内存会话，不会修改项目源数据。</p>
+        <label>
+          <input
+            type="checkbox"
+            checked={startAtSelection}
+            disabled={!selectedNodeId}
+            onChange={(event) => setStartAtSelection(event.target.checked)}
+          />
+          从当前选中节点开始
+        </label>
+        <button
+          className="button button--success"
+          disabled={busy}
+          onClick={() =>
+            void runAction({
+              type: "start",
+              startNodeId:
+                startAtSelection && selectedNodeId ? selectedNodeId : undefined,
+              locale: previewLocale,
+            })
+          }
+        >
+          <Play size={13} /> 开始模拟
+        </button>
+        {error && <span className="simulator-error">{error}</span>}
+      </div>
+    );
+  }
+
+  const node = dialogue.nodes.find((item) => item.id === session.currentNodeId);
+  const text = node ? localizedNodeText(node, project, session.locale) : null;
+  const choices =
+    node?.type === "choice"
+      ? (node.data.choices ?? []).map((choice) => ({
+          id: choice.id,
+          text: localizedValue(
+            choice.text,
+            session.locale,
+            project.manifest.defaultLocale,
+          ),
+        }))
+      : [];
 
   return (
-    <div className="simulator-panel">
-      <div className="simulator-speaker">
-        <span>{speaker.slice(0, 1)}</span>
-        <strong>{speaker}</strong>
-        <code>{node.key}</code>
-      </div>
-      <p>{text}</p>
-      {!!node.data.hostEvents?.length && (
-        <div className="host-log">
-          {node.data.hostEvents.map((event, index) => (
-            <code key={`${event.name}-${index}`}>
-              HOST {index + 1}/{node.data.hostEvents!.length} ↑ {event.name}{" "}
-              {JSON.stringify(event.payload)}
-            </code>
+    <div className="simulator-workspace">
+      <aside className="simulator-variables">
+        <header>
+          <strong>临时变量</strong>
+          <span>不回写项目</span>
+        </header>
+        {project.resources.variables.map((variable) => (
+          <VariableControl
+            key={variable.id}
+            variable={variable}
+            value={session.variables[variable.key]}
+            disabled={busy}
+            onChange={(value) =>
+              void runAction({
+                type: "setVariable",
+                key: variable.key,
+                value,
+              })
+            }
+          />
+        ))}
+      </aside>
+      <main className="simulator-current">
+        <header>
+          <span className={`simulation-status status--${session.status}`}>
+            {statusLabel(session.status)}
+          </span>
+          <select
+            aria-label="模拟语言"
+            value={session.locale}
+            disabled={busy}
+            onChange={(event) => {
+              const locale = event.target.value;
+              setPreviewLocale(locale);
+              void runAction({ type: "setLocale", locale });
+            }}
+          >
+            {project.manifest.locales.map((locale) => (
+              <option key={locale}>{locale}</option>
+            ))}
+          </select>
+        </header>
+        {node ? (
+          <div className="simulator-dialogue">
+            <small>
+              {node.type} · {node.key}
+            </small>
+            <strong>
+              {speakerName(node.data.speakerId, project, session.locale)}
+            </strong>
+            <p>{text?.value ?? simulatorFallback(node.type)}</p>
+            {text?.fallback && (
+              <span className="locale-fallback">
+                已回退到 {project.manifest.defaultLocale}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="simulator-dialogue">
+            <CircleStop size={20} />
+            <p>{session.error ?? "模拟已结束"}</p>
+          </div>
+        )}
+        <div className="simulator-actions">
+          {session.status === "waitingContinue" && (
+            <button
+              className="button button--primary"
+              disabled={busy}
+              onClick={() => void runAction({ type: "continue" })}
+            >
+              继续
+            </button>
+          )}
+          {session.status === "waitingChoice" &&
+            choices.map((choice) => (
+              <button
+                className="button button--ghost"
+                key={choice.id}
+                disabled={busy}
+                onClick={() =>
+                  void runAction({ type: "choose", optionId: choice.id })
+                }
+              >
+                {choice.text.value}
+                {choice.text.fallback ? " · 回退" : ""}
+              </button>
+            ))}
+          {["completed", "loopGuard", "error"].includes(session.status) && (
+            <button
+              className="button button--ghost"
+              disabled={busy}
+              onClick={() =>
+                void runAction({
+                  type: "start",
+                  locale: session.locale,
+                })
+              }
+            >
+              <RotateCcw size={12} /> 重新运行
+            </button>
+          )}
+        </div>
+        {error && <span className="simulator-error">{error}</span>}
+      </main>
+      <aside className="simulation-trace">
+        <header>
+          <strong>运行轨迹</strong>
+          <span>{session.trace.length}</span>
+        </header>
+        <div>
+          {session.trace.map((entry) => (
+            <button
+              key={entry.sequence}
+              className={`trace-entry trace-entry--${entry.kind}`}
+              onClick={() => {
+                if (!entry.nodeId) return;
+                useEditorStore.getState().setSelectedNode(entry.nodeId);
+              }}
+            >
+              <code>{String(entry.sequence).padStart(3, "0")}</code>
+              <span>
+                <strong>{traceKindLabel(entry.kind)}</strong>
+                <small>{entry.message}</small>
+              </span>
+            </button>
           ))}
         </div>
-      )}
-      <div className="simulator-actions">
-        {outgoing.map((edge, index) => (
-          <button
-            className="button button--ghost"
-            key={edge.id}
-            onClick={() => setNodeId(edge.targetNodeId)}
-          >
-            <Play size={12} />
-            {branchLabel(node, edge.sourcePort, index, locale)}
-          </button>
-        ))}
-        {!outgoing.length && (
-          <button
-            className="button button--ghost"
-            onClick={() => setNodeId(dialogue.entryNodeId)}
-          >
-            重新运行
-          </button>
-        )}
-      </div>
+      </aside>
     </div>
   );
 }
 
-function TerminalPanel() {
-  const project = useEditorStore((state) => state.project);
-  const [command, setCommand] = useState("siming validate . --format json");
-  const [output, setOutput] = useState(
-    "$ siming --version\nsiming 0.1.0\n\n输入命令并点击“运行”。",
+function VariableControl({
+  variable,
+  value,
+  disabled,
+  onChange,
+}: {
+  variable: VariableDefinition;
+  value: boolean | number | string | undefined;
+  disabled: boolean;
+  onChange: (value: boolean | number | string) => void;
+}) {
+  return (
+    <label>
+      <span>
+        <strong>{variable.key}</strong>
+        <small>{variable.type}</small>
+      </span>
+      {variable.type === "boolean" ? (
+        <select
+          value={String(value ?? variable.defaultValue)}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value === "true")}
+        >
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+      ) : (
+        <input
+          type={variable.type === "number" ? "number" : "text"}
+          value={String(value ?? variable.defaultValue)}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange(
+              variable.type === "number"
+                ? Number(event.target.value)
+                : event.target.value,
+            )
+          }
+        />
+      )}
+    </label>
   );
+}
 
-  const run = () => {
-    const summary = {
-      project: project.manifest.name,
-      schemaVersion: project.manifest.schemaVersion,
-      defaultLocale: project.manifest.defaultLocale,
-      locales: project.manifest.locales,
-      dialogues: project.dialogues.length,
-      nodes: project.dialogues.reduce(
-        (total, dialogue) => total + dialogue.nodes.length,
-        0,
-      ),
-    };
-    if (command.includes("info")) {
-      setOutput(
-        `$ ${command}\n${JSON.stringify(summary, null, 2)}\n\nExit code: 0`,
-      );
-      return;
-    }
-    if (command.includes("validate")) {
-      const diagnostics = collectDiagnostics(project);
-      const errors = diagnostics.filter(
-        (item) => item.severity === "error",
-      ).length;
-      setOutput(
-        `$ ${command}\n${JSON.stringify(
-          {
-            valid: errors === 0,
-            errors,
-            warnings: diagnostics.length - errors,
-          },
-          null,
-          2,
-        )}\n\nExit code: ${errors ? 1 : 0}`,
-      );
-      return;
-    }
-    setOutput(
-      `$ ${command}\n当前阶段仅支持 info 与 validate 的编辑器内预览。\n\nExit code: 2`,
-    );
-  };
-
+function TerminalPanel() {
+  const [command, setCommand] = useState("siming validate . --format json");
   return (
     <div className="terminal-panel">
       <div>
         <Terminal size={14} />
         <input
-          value={command}
           aria-label="命令"
+          value={command}
           onChange={(event) => setCommand(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") run();
-          }}
         />
-        <button className="button button--primary" onClick={run}>
+        <button className="button button--primary" disabled>
           运行
         </button>
       </div>
-      <pre>{output}</pre>
+      <pre>
+        {`$ ${command}\n\nCLI 正式子命令属于阶段 3。\n当前阶段请使用顶部“校验”和“模拟运行”调用共享 Rust 核心。`}
+      </pre>
     </div>
   );
 }
 
-function collectDiagnostics(
+function groupDiagnostics(diagnostics: Diagnostic[]) {
+  const groups = new Map<string, Diagnostic[]>();
+  for (const diagnostic of diagnostics) {
+    const list = groups.get(diagnostic.file) ?? [];
+    list.push(diagnostic);
+    groups.set(diagnostic.file, list);
+  }
+  return [...groups.entries()];
+}
+
+function locateDiagnosticDialogue(
+  dialogues: DialogueDocument[],
+  diagnostic: Diagnostic,
+  file: string,
+) {
+  if (diagnostic.entityType === "dialogue" && diagnostic.entityId) {
+    return dialogues.find((item) => item.id === diagnostic.entityId);
+  }
+  if (diagnostic.entityId) {
+    const byEntity = dialogues.find(
+      (item) =>
+        item.nodes.some((node) => node.id === diagnostic.entityId) ||
+        item.edges.some((edge) => edge.id === diagnostic.entityId),
+    );
+    if (byEntity) return byEntity;
+  }
+  return dialogues.find((item) => file.endsWith(`${item.key}.json`));
+}
+
+function localizedNodeText(
+  node: DialogueDocument["nodes"][number],
   project: ReturnType<typeof useEditorStore.getState>["project"],
-): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  for (const dialogue of project.dialogues) {
-    const ids = new Set(dialogue.nodes.map((node) => node.id));
-    const keys = new Set<string>();
-    for (const node of dialogue.nodes) {
-      if (keys.has(node.key)) {
-        diagnostics.push({
-          severity: "error",
-          message: "同一对话内存在重复节点 Key",
-          path: `${dialogue.name} · ${node.key}`,
-          dialogueId: dialogue.id,
-          nodeId: node.id,
-        });
-      }
-      keys.add(node.key);
-      if (
-        node.data.text &&
-        project.manifest.locales.some(
-          (locale) => !node.data.text?.[locale]?.trim(),
-        )
-      ) {
-        diagnostics.push({
-          severity: "warning",
-          message: "节点存在缺失翻译，将回退到默认语言",
-          path: `${dialogue.name} · ${node.key}`,
-          dialogueId: dialogue.id,
-          nodeId: node.id,
-        });
-      }
-    }
-    if (!ids.has(dialogue.entryNodeId)) {
-      diagnostics.push({
-        severity: "error",
-        message: "对话入口节点不存在",
-        path: dialogue.name,
-        dialogueId: dialogue.id,
-      });
-    }
-    for (const edge of dialogue.edges) {
-      if (!ids.has(edge.sourceNodeId) || !ids.has(edge.targetNodeId)) {
-        diagnostics.push({
-          severity: "error",
-          message: "连线引用了不存在的节点",
-          path: `${dialogue.name} · ${edge.id.slice(0, 8)}`,
-          dialogueId: dialogue.id,
-        });
-      }
-    }
-  }
-  return diagnostics;
-}
-
-function simulatorFallback(node: DialogueNode) {
-  if (node.type === "start") return "对话入口";
-  if (node.type === "end") return "对话结束";
-  if (node.type === "choice") return "请选择一个分支";
-  if (node.type === "condition") {
-    const condition = node.data.condition;
-    return condition
-      ? `${condition.variable} ${condition.operator} ${String(condition.value)}`
-      : "条件未配置";
-  }
-  if (node.type === "event") return node.data.event || "业务事件未配置";
-  return "继续";
-}
-
-function branchLabel(
-  node: DialogueNode,
-  sourcePort: string,
-  index: number,
   locale: string,
 ) {
-  if (node.type === "condition") return sourcePort.toUpperCase();
-  if (node.type === "choice") {
-    const choice = node.data.choices?.find((item) => item.id === sourcePort);
-    return (
-      choice?.text[locale] ??
-      Object.values(choice?.text ?? {})[0] ??
-      `选项 ${index + 1}`
-    );
-  }
+  if (!node.data.text) return null;
+  return localizedValue(node.data.text, locale, project.manifest.defaultLocale);
+}
+
+function localizedValue(
+  text: Record<string, string>,
+  locale: string,
+  defaultLocale: string,
+) {
+  if (text[locale]?.trim()) return { value: text[locale], fallback: false };
+  if (text[defaultLocale]?.trim())
+    return { value: text[defaultLocale], fallback: true };
+  return { value: "缺失文本", fallback: true };
+}
+
+function speakerName(
+  speakerId: string | undefined,
+  project: ReturnType<typeof useEditorStore.getState>["project"],
+  locale: string,
+) {
+  if (!speakerId) return "旁白";
+  const character = project.resources.characters.find(
+    (item) => item.key === speakerId,
+  );
+  if (!character) return speakerId;
+  return localizedValue(character.name, locale, project.manifest.defaultLocale)
+    .value;
+}
+
+function statusLabel(status: SimulationSession["status"]) {
+  if (status === "waitingContinue") return "等待继续";
+  if (status === "waitingChoice") return "等待选择";
+  if (status === "completed") return "已结束";
+  if (status === "loopGuard") return "循环保护";
+  if (status === "error") return "运行错误";
+  return "运行中";
+}
+
+function traceKindLabel(kind: SimulationSession["trace"][number]["kind"]) {
+  if (kind === "hostEvent") return "HOST";
+  if (kind === "businessEvent") return "EVENT";
+  if (kind === "localeFallback") return "I18N";
+  if (kind === "condition") return "COND";
+  if (kind === "choice") return "CHOICE";
+  if (kind === "variable") return "VAR";
+  return kind.toUpperCase();
+}
+
+function simulatorFallback(type: DialogueDocument["nodes"][number]["type"]) {
+  if (type === "start") return "对话入口";
+  if (type === "choice") return "请选择一个分支";
+  if (type === "condition") return "正在计算条件";
+  if (type === "event") return "业务事件";
+  if (type === "end") return "对话结束";
   return "继续";
+}
+
+function errorMessage(error: unknown) {
+  if (error && typeof error === "object" && "message" in error) {
+    return String(error.message);
+  }
+  return String(error);
 }
