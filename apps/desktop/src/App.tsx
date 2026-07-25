@@ -8,21 +8,28 @@ import { Sidebar } from "./components/Sidebar";
 import { TableView } from "./components/TableView";
 import { TopBar } from "./components/TopBar";
 import {
+  WorkbenchPanel,
+  type WorkbenchPanelMode,
+} from "./components/WorkbenchPanel";
+import {
   chooseProjectDirectory,
   createProject,
   openProject,
-  readUserSettings,
+  readSystemSettings,
   saveProject,
-  writeUserSettings,
+  writeSystemSettings,
 } from "./lib/projectApi";
-import type { UserSettings } from "./model/types";
+import type { SystemSettings } from "./model/types";
 import { useEditorStore } from "./store/editorStore";
 
-const defaultSettings: UserSettings = {
+const defaultSettings: SystemSettings = {
   schemaVersion: 1,
   theme: "dark",
   defaultProjectDirectory: null,
+  interfaceLocale: "zh-CN",
   editorFontSize: 13,
+  keymap: "system",
+  autoSaveDelaySeconds: 30,
   recoverySnapshotIntervalSeconds: 60,
   restoreLastProject: true,
 };
@@ -41,9 +48,11 @@ export default function App() {
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
   const [settings, setSettings] = useState(defaultSettings);
+  const [workbenchPanel, setWorkbenchPanel] =
+    useState<WorkbenchPanelMode | null>(null);
 
   useEffect(() => {
-    readUserSettings()
+    readSystemSettings()
       .then(setSettings)
       .catch(() => setSettings(defaultSettings));
   }, []);
@@ -79,6 +88,10 @@ export default function App() {
       ) {
         event.preventDefault();
         redo();
+      }
+      if (event.key.toLowerCase() === "v" && event.shiftKey) {
+        event.preventDefault();
+        setWorkbenchPanel("problems");
       }
     };
     window.addEventListener("beforeunload", beforeUnload);
@@ -151,13 +164,13 @@ export default function App() {
     }
   }
 
-  async function handleSettingsChange(next: UserSettings) {
+  async function handleSettingsChange(next: SystemSettings) {
     setSettings(next);
     try {
-      await writeUserSettings(next);
-      setNotice("用户设置已保存在本机。");
+      await writeSystemSettings(next);
+      setNotice("系统设置已保存在本机。");
     } catch (error) {
-      setNotice(`用户设置保存失败：${errorMessage(error)}`);
+      setNotice(`系统设置保存失败：${errorMessage(error)}`);
     }
   }
 
@@ -171,7 +184,12 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <TopBar onNew={handleNew} onOpen={handleOpen} onSave={handleSave} />
+      <TopBar
+        onNew={handleNew}
+        onOpen={handleOpen}
+        onSave={handleSave}
+        onPanelOpen={setWorkbenchPanel}
+      />
       <div className="app-body">
         <Sidebar />
         <section
@@ -190,6 +208,13 @@ export default function App() {
             <SettingsView
               settings={settings}
               onSettingsChange={handleSettingsChange}
+            />
+          )}
+          {workbenchPanel && (
+            <WorkbenchPanel
+              mode={workbenchPanel}
+              onModeChange={setWorkbenchPanel}
+              onClose={() => setWorkbenchPanel(null)}
             />
           )}
         </section>

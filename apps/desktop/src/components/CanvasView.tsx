@@ -5,14 +5,16 @@ import {
   EdgeChange,
   Handle,
   MiniMap,
+  Node,
   NodeProps,
   Position,
   ReactFlow,
   applyEdgeChanges,
+  useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { GitBranch, MessageCircle, Play, Square, Zap } from "lucide-react";
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo } from "react";
 import { createId } from "../model/demo";
 import type { DialogueNode, NodeType } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
@@ -33,6 +35,8 @@ type CanvasNodeData = {
   node: DialogueNode;
   locale: string;
 };
+
+type CanvasFlowNode = Node<CanvasNodeData, "siming">;
 
 const DialogueNodeCard = memo(function DialogueNodeCard({
   data,
@@ -77,7 +81,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
                 type="source"
                 position={Position.Right}
                 id={choice.id}
-                style={{ top: 54 + index * 30 }}
+                style={{ top: "50%" }}
               />
             </div>
           ))}
@@ -133,7 +137,7 @@ export function CanvasView() {
   const commit = useEditorStore((state) => state.commit);
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
 
-  const nodes = useMemo(
+  const derivedNodes = useMemo<CanvasFlowNode[]>(
     () =>
       (dialogue?.nodes ?? []).map((node) => ({
         id: node.id,
@@ -144,6 +148,13 @@ export function CanvasView() {
       })),
     [dialogue, locale, selectedNodeId],
   );
+  const [nodes, setNodes, onNodesChange] =
+    useNodesState<CanvasFlowNode>(derivedNodes);
+
+  useEffect(() => {
+    setNodes(derivedNodes);
+  }, [derivedNodes, setNodes]);
+
   const edges = useMemo(
     () =>
       (dialogue?.edges ?? []).map((edge) => ({
@@ -200,18 +211,26 @@ export function CanvasView() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
         onConnect={connect}
         onEdgesChange={edgesChange}
         onNodeClick={(_event, node) => setSelectedNode(node.id)}
         onPaneClick={() => setSelectedNode(null)}
-        onNodeDragStop={(_event, moved) =>
+        onNodeDragStop={(_event, moved) => {
+          const previous = dialogue.nodes.find((node) => node.id === moved.id);
+          if (
+            previous &&
+            previous.position.x === moved.position.x &&
+            previous.position.y === moved.position.y
+          )
+            return;
           commit("移动节点", (draft) => {
             const node = draft.dialogues
               .find((item) => item.id === dialogueId)
               ?.nodes.find((item) => item.id === moved.id);
             if (node) node.position = moved.position;
-          })
-        }
+          });
+        }}
         fitView
         minZoom={0.2}
         maxZoom={2}

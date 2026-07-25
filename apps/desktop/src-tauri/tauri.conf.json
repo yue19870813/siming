@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "司命（Siming）",
-        "width": 1180,
-        "height": 760,
+        "width": 1920,
+        "height": 1080,
         "minWidth": 960,
         "minHeight": 640,
         "resizable": true

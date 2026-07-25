@@ -29,26 +29,48 @@ impl From<siming_storage::StorageError> for CommandError {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct UserSettings {
+struct SystemSettings {
     schema_version: u32,
     theme: Theme,
+    #[serde(default)]
     default_project_directory: Option<String>,
+    #[serde(default = "default_interface_locale")]
+    interface_locale: String,
     editor_font_size: u8,
+    #[serde(default = "default_keymap")]
+    keymap: String,
+    #[serde(default = "default_auto_save_delay")]
+    auto_save_delay_seconds: u32,
     recovery_snapshot_interval_seconds: u32,
     restore_last_project: bool,
 }
 
-impl Default for UserSettings {
+impl Default for SystemSettings {
     fn default() -> Self {
         Self {
             schema_version: 1,
             theme: Theme::Dark,
             default_project_directory: None,
+            interface_locale: default_interface_locale(),
             editor_font_size: 13,
+            keymap: default_keymap(),
+            auto_save_delay_seconds: default_auto_save_delay(),
             recovery_snapshot_interval_seconds: 60,
             restore_last_project: true,
         }
     }
+}
+
+fn default_interface_locale() -> String {
+    "zh-CN".to_owned()
+}
+
+fn default_keymap() -> String {
+    "system".to_owned()
+}
+
+fn default_auto_save_delay() -> u32 {
+    30
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -87,36 +109,54 @@ fn save_project(snapshot: ProjectSnapshot) -> Result<(), CommandError> {
 }
 
 #[tauri::command]
-fn read_user_settings(app: tauri::AppHandle) -> Result<UserSettings, CommandError> {
-    let path = settings_path(&app)?;
+fn read_system_settings(app: tauri::AppHandle) -> Result<SystemSettings, CommandError> {
+    let path = system_settings_path(&app)?;
     if !path.exists() {
-        return Ok(UserSettings::default());
+        let legacy_path = legacy_user_settings_path(&app)?;
+        if !legacy_path.exists() {
+            return Ok(SystemSettings::default());
+        }
+        return read_system_settings_file(&legacy_path);
     }
-    let source = fs::read(&path)
-        .map_err(|error| CommandError::new("USER_SETTINGS_READ_FAILED", error, true))?;
+    read_system_settings_file(&path)
+}
+
+fn read_system_settings_file(path: &Path) -> Result<SystemSettings, CommandError> {
+    let source = fs::read(path)
+        .map_err(|error| CommandError::new("SYSTEM_SETTINGS_READ_FAILED", error, true))?;
     serde_json::from_slice(&source)
-        .map_err(|error| CommandError::new("USER_SETTINGS_INVALID", error, true))
+        .map_err(|error| CommandError::new("SYSTEM_SETTINGS_INVALID", error, true))
 }
 
 #[tauri::command]
-fn write_user_settings(app: tauri::AppHandle, settings: UserSettings) -> Result<(), CommandError> {
-    let path = settings_path(&app)?;
+fn write_system_settings(
+    app: tauri::AppHandle,
+    settings: SystemSettings,
+) -> Result<(), CommandError> {
+    let path = system_settings_path(&app)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
-            .map_err(|error| CommandError::new("USER_SETTINGS_WRITE_FAILED", error, true))?;
+            .map_err(|error| CommandError::new("SYSTEM_SETTINGS_WRITE_FAILED", error, true))?;
     }
     let mut bytes = serde_json::to_vec_pretty(&settings)
-        .map_err(|error| CommandError::new("USER_SETTINGS_INVALID", error, true))?;
+        .map_err(|error| CommandError::new("SYSTEM_SETTINGS_INVALID", error, true))?;
     bytes.push(b'\n');
     fs::write(path, bytes)
-        .map_err(|error| CommandError::new("USER_SETTINGS_WRITE_FAILED", error, true))
+        .map_err(|error| CommandError::new("SYSTEM_SETTINGS_WRITE_FAILED", error, true))
 }
 
-fn settings_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, CommandError> {
+fn system_settings_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, CommandError> {
+    app.path()
+        .app_config_dir()
+        .map(|path| path.join("system-settings.json"))
+        .map_err(|error| CommandError::new("SYSTEM_SETTINGS_PATH_FAILED", error, false))
+}
+
+fn legacy_user_settings_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, CommandError> {
     app.path()
         .app_config_dir()
         .map(|path| path.join("user-settings.json"))
-        .map_err(|error| CommandError::new("USER_SETTINGS_PATH_FAILED", error, false))
+        .map_err(|error| CommandError::new("SYSTEM_SETTINGS_PATH_FAILED", error, false))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -128,8 +168,8 @@ pub fn run() {
             create_project,
             open_project,
             save_project,
-            read_user_settings,
-            write_user_settings
+            read_system_settings,
+            write_system_settings
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Siming desktop application");
@@ -145,7 +185,7 @@ mod tests {
     #[test]
     fn default_theme_is_dark() {
         assert!(matches!(
-            super::UserSettings::default().theme,
+            super::SystemSettings::default().theme,
             super::Theme::Dark
         ));
     }

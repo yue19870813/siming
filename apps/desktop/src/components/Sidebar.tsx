@@ -331,7 +331,7 @@ function ActivitySummary({ activity }: { activity: Activity }) {
       <strong>{item.label}</strong>
       <p>
         {activity === "settings"
-          ? "项目设置与用户设置使用不同的持久化边界。"
+          ? "项目设置与系统设置使用不同的持久化边界。"
           : "在主工作区维护定义、查看引用并保护稳定 ID。"}
       </p>
     </div>

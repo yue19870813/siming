@@ -129,11 +129,14 @@ export type ProjectSnapshot = {
   };
 };
 
-export type UserSettings = {
+export type SystemSettings = {
   schemaVersion: number;
   theme: "dark" | "light";
   defaultProjectDirectory: string | null;
+  interfaceLocale: "zh-CN" | "en-US";
   editorFontSize: number;
+  keymap: "system" | "macos" | "windows";
+  autoSaveDelaySeconds: number;
   recoverySnapshotIntervalSeconds: number;
   restoreLastProject: boolean;
 };
