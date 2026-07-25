@@ -1,5 +1,7 @@
 # 司命（Siming）
 
+<img src="./docs/assets/brand/siming-logo-light.png" width="420" alt="司命（Siming）Logo">
+
 掌管命运与叙事走向的剧情对话编辑器。
 这是一个剧情对话编辑器。帮助你快速配置生产带有分支和条件判断的剧情对话。
 

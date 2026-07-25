@@ -53,6 +53,22 @@ test("top-right actions open the matching workbench and export menu", async () =
   );
 });
 
+test("project title opens the project menu", async () => {
+  render(<App />);
+
+  const trigger = screen.getByRole("button", { name: /司命演示项目/ });
+  expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+  fireEvent.click(trigger);
+
+  expect(trigger).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("button", { name: "新建项目" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "打开项目" })).toBeVisible();
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});
+
 test("project and system settings are separate pages", async () => {
   render(<App />);
 
