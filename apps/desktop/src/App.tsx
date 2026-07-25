@@ -7,6 +7,7 @@ import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { TableView } from "./components/TableView";
 import { TopBar } from "./components/TopBar";
+import { WelcomeView } from "./components/WelcomeView";
 import {
   WorkbenchPanel,
   type WorkbenchPanelMode,
@@ -43,6 +44,7 @@ const defaultSettings: SystemSettings = {
 
 export default function App() {
   const project = useEditorStore((state) => state.project);
+  const projectLoaded = useEditorStore((state) => state.projectLoaded);
   const activity = useEditorStore((state) => state.activity);
   const viewMode = useEditorStore((state) => state.viewMode);
   const dirty = useEditorStore((state) => state.dirty);
@@ -53,6 +55,8 @@ export default function App() {
   const sourceDraft = useEditorStore((state) => state.sourceDraft);
   const notice = useEditorStore((state) => state.notice);
   const setProject = useEditorStore((state) => state.setProject);
+  const setActivity = useEditorStore((state) => state.setActivity);
+  const busy = useEditorStore((state) => state.busy);
   const setBusy = useEditorStore((state) => state.setBusy);
   const setNotice = useEditorStore((state) => state.setNotice);
   const markSaved = useEditorStore((state) => state.markSaved);
@@ -95,7 +99,7 @@ export default function App() {
   }, [dirty, project, sourceDraft, sourceDraftDialogueId, sourceDraftDirty]);
 
   useEffect(() => {
-    if (!isTauri() || !project.rootPath) return;
+    if (!projectLoaded || !isTauri() || !project.rootPath) return;
     const interval = window.setInterval(
       () => {
         const state = recoveryState.current;
@@ -116,6 +120,7 @@ export default function App() {
   }, [
     project.manifest.projectId,
     project.rootPath,
+    projectLoaded,
     settings.recoverySnapshotIntervalSeconds,
   ]);
 
@@ -130,22 +135,22 @@ export default function App() {
       if (!command) return;
       if (event.key.toLowerCase() === "s") {
         event.preventDefault();
-        void handleSave();
+        if (projectLoaded) void handleSave();
       }
       if (event.key.toLowerCase() === "z" && !event.shiftKey) {
         event.preventDefault();
-        undo();
+        if (projectLoaded) undo();
       }
       if (
         (event.key.toLowerCase() === "z" && event.shiftKey) ||
         event.key.toLowerCase() === "y"
       ) {
         event.preventDefault();
-        redo();
+        if (projectLoaded) redo();
       }
       if (event.key.toLowerCase() === "v" && event.shiftKey) {
         event.preventDefault();
-        setWorkbenchPanel("problems");
+        if (projectLoaded) setWorkbenchPanel("problems");
       }
     };
     window.addEventListener("beforeunload", beforeUnload);
@@ -158,6 +163,7 @@ export default function App() {
 
   async function handleNew() {
     if (
+      projectLoaded &&
       (dirty || sourceDraftDirty) &&
       !window.confirm("当前项目有未保存修改或源数据草稿，仍要新建项目吗？")
     )
@@ -180,6 +186,7 @@ export default function App() {
 
   async function handleOpen() {
     if (
+      projectLoaded &&
       (dirty || sourceDraftDirty) &&
       !window.confirm("当前项目有未保存修改或源数据草稿，仍要打开其他项目吗？")
     )
@@ -220,12 +227,16 @@ export default function App() {
   }
 
   async function handleSave() {
+    if (!projectLoaded) {
+      setNotice("请先新建或打开项目。");
+      return;
+    }
     if (sourceDraftDirty) {
       setNotice("请先应用或放弃源 JSON 草稿，再保存项目。");
       return;
     }
     if (!project.rootPath) {
-      setNotice("演示项目不能直接保存，请先新建真实项目。");
+      setNotice("当前项目缺少有效的项目目录。");
       return;
     }
     try {
@@ -245,12 +256,16 @@ export default function App() {
   }
 
   async function handleExport() {
+    if (!projectLoaded) {
+      setNotice("请先新建或打开项目，再导出运行时数据。");
+      return;
+    }
     if (sourceDraftDirty) {
       setNotice("请先应用或放弃源 JSON 草稿，再导出运行时数据。");
       return;
     }
     if (!project.rootPath) {
-      setNotice("演示项目不能导出，请先新建或打开真实项目。");
+      setNotice("当前项目缺少有效的项目目录，无法导出。");
       return;
     }
     if (
@@ -273,8 +288,12 @@ export default function App() {
   }
 
   async function handleMigration() {
+    if (!projectLoaded) {
+      setNotice("请先打开需要检查的项目。");
+      return;
+    }
     if (!project.rootPath) {
-      setNotice("演示项目不需要迁移。");
+      setNotice("当前项目缺少有效的项目目录。");
       return;
     }
     if (
@@ -328,17 +347,40 @@ export default function App() {
     "tags",
   ].includes(activity);
 
+  if (!projectLoaded) {
+    return (
+      <main className="welcome-shell">
+        <WelcomeView
+          notice={notice}
+          busy={busy}
+          onNew={handleNew}
+          onOpen={handleOpen}
+        />
+      </main>
+    );
+  }
+
   return (
-    <main className="app-shell">
-      <TopBar
-        onNew={handleNew}
-        onOpen={handleOpen}
-        onSave={handleSave}
-        onExport={handleExport}
-        onMigration={handleMigration}
-        onPanelOpen={setWorkbenchPanel}
-      />
-      <div className="app-body">
+    <main
+      className={`app-shell ${
+        activity === "welcome" ? "app-shell--welcome" : ""
+      }`}
+    >
+      {activity !== "welcome" && (
+        <TopBar
+          onNew={handleNew}
+          onOpen={handleOpen}
+          onSave={handleSave}
+          onExport={handleExport}
+          onMigration={handleMigration}
+          onPanelOpen={setWorkbenchPanel}
+        />
+      )}
+      <div
+        className={`app-body ${
+          activity === "welcome" ? "app-body--welcome" : ""
+        }`}
+      >
         <Sidebar />
         <section
           className={`workspace ${editorActivity ? "workspace--editor" : ""}`}
@@ -358,7 +400,17 @@ export default function App() {
               onSettingsChange={handleSettingsChange}
             />
           )}
-          {workbenchPanel && (
+          {activity === "welcome" && (
+            <WelcomeView
+              projectName={project.manifest.name}
+              notice={notice}
+              busy={busy}
+              onNew={handleNew}
+              onOpen={handleOpen}
+              onReturn={() => setActivity("project")}
+            />
+          )}
+          {activity !== "welcome" && workbenchPanel && (
             <WorkbenchPanel
               mode={workbenchPanel}
               onModeChange={setWorkbenchPanel}

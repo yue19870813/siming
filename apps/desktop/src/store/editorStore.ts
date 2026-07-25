@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createDemoProject, createId, createNode } from "../model/demo";
+import { createId, createNode } from "../model/demo";
 import type {
   Activity,
   DialogueDocument,
@@ -15,6 +15,7 @@ type HistoryEntry = {
 
 type EditorState = {
   project: ProjectSnapshot;
+  projectLoaded: boolean;
   selectedDialogueId: string;
   selectedNodeId: string | null;
   viewMode: ViewMode;
@@ -50,33 +51,61 @@ type EditorState = {
   addNode: (type: NodeType) => void;
   addDialogue: (folder?: string) => void;
   deleteDialogue: (id: string) => void;
+  closeProject: () => void;
 };
 
-const demo = createDemoProject();
+const emptyProject = (): ProjectSnapshot => ({
+  rootPath: "",
+  manifest: {
+    schemaVersion: 1,
+    projectId: "",
+    name: "",
+    paths: {
+      dialogues: "dialogues/",
+      exports: "exports/runtime/",
+    },
+    defaultExportFormat: "json",
+    defaultLocale: "zh-CN",
+    locales: ["zh-CN"],
+    dialogues: [],
+  },
+  dialogues: [],
+  resources: {
+    characters: [],
+    variables: [],
+    events: [],
+    tags: [],
+  },
+});
+
+const initialProject = emptyProject();
 const fingerprint = (project: ProjectSnapshot) => JSON.stringify(project);
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  project: demo,
-  selectedDialogueId: demo.dialogues[0].id,
+  project: initialProject,
+  projectLoaded: false,
+  selectedDialogueId: "",
   selectedNodeId: null,
   viewMode: "canvas",
-  activity: "project",
-  previewLocale: demo.manifest.defaultLocale,
+  activity: "welcome",
+  previewLocale: initialProject.manifest.defaultLocale,
   dirty: false,
-  savedProjectFingerprint: fingerprint(demo),
+  savedProjectFingerprint: fingerprint(initialProject),
   sourceDraftDialogueId: null,
   sourceDraft: "",
   sourceDraftDirty: false,
   busy: false,
-  notice: "演示项目尚未写入磁盘，可新建或打开真实项目。",
+  notice: "欢迎使用司命。",
   past: [],
   future: [],
 
   setProject: (project, dirty = false) =>
     set({
       project,
+      projectLoaded: true,
       selectedDialogueId: project.dialogues[0]?.id ?? "",
       selectedNodeId: null,
+      viewMode: "canvas",
       previewLocale: project.manifest.defaultLocale,
       dirty,
       savedProjectFingerprint: dirty ? "" : fingerprint(project),
@@ -85,6 +114,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       sourceDraftDirty: false,
       past: [],
       future: [],
+      activity: "project",
     }),
   setSelectedDialogue: (selectedDialogueId) => {
     const state = get();
@@ -272,6 +302,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
     const next = get().project.dialogues[0]?.id ?? "";
     set({ selectedDialogueId: next, selectedNodeId: null });
+  },
+  closeProject: () => {
+    const project = emptyProject();
+    set({
+      project,
+      projectLoaded: false,
+      selectedDialogueId: "",
+      selectedNodeId: null,
+      viewMode: "canvas",
+      activity: "welcome",
+      previewLocale: project.manifest.defaultLocale,
+      dirty: false,
+      savedProjectFingerprint: fingerprint(project),
+      sourceDraftDialogueId: null,
+      sourceDraft: "",
+      sourceDraftDirty: false,
+      notice: "欢迎使用司命。",
+      past: [],
+      future: [],
+    });
   },
 }));
 

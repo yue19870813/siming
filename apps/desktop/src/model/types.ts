@@ -261,6 +261,7 @@ export type SimulationRequest = {
 
 export type ViewMode = "canvas" | "table" | "data";
 export type Activity =
+  | "welcome"
   | "project"
   | "search"
   | "characters"

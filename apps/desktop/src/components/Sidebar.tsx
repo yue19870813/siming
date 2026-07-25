@@ -50,9 +50,22 @@ export function Sidebar() {
   const activity = useEditorStore((state) => state.activity);
   const setActivity = useEditorStore((state) => state.setActivity);
   return (
-    <aside className="sidebar-shell">
+    <aside
+      className={`sidebar-shell ${
+        activity === "welcome" ? "sidebar-shell--rail-only" : ""
+      }`}
+    >
       <nav className="activity-rail" aria-label="主导航">
-        <div className="activity-brand">司</div>
+        <button
+          className={`activity-brand ${
+            activity === "welcome" ? "is-active" : ""
+          }`}
+          title="欢迎页"
+          aria-label="欢迎页"
+          onClick={() => setActivity("welcome")}
+        >
+          司
+        </button>
         {activities.map((item) => {
           const Icon = item.icon;
           return (
@@ -68,13 +81,15 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="sidebar-panel">
-        {activity === "project" && <ProjectExplorer />}
-        {activity === "search" && <SearchPanel />}
-        {activity !== "project" && activity !== "search" && (
-          <ActivitySummary activity={activity} />
-        )}
-      </div>
+      {activity !== "welcome" && (
+        <div className="sidebar-panel">
+          {activity === "project" && <ProjectExplorer />}
+          {activity === "search" && <SearchPanel />}
+          {activity !== "project" && activity !== "search" && (
+            <ActivitySummary activity={activity} />
+          )}
+        </div>
+      )}
     </aside>
   );
 }

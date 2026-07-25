@@ -138,7 +138,7 @@ export function SettingsView({
                 >
                   <div className="settings-control-with-button">
                     <input
-                      value={project.rootPath || "演示项目尚未选择磁盘目录"}
+                      value={project.rootPath || "尚未选择项目目录"}
                       readOnly
                     />
                     <button

@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
+import { createDemoProject } from "./model/demo";
+import { useEditorStore } from "./store/editorStore";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -14,15 +16,25 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
   localStorage.clear();
+  useEditorStore.getState().closeProject();
 });
 
-test("renders the editable demo workspace", async () => {
+function openTestProject() {
+  useEditorStore.getState().setProject(createDemoProject());
+}
+
+test("starts on the welcome page without a demo project", async () => {
   render(<App />);
 
-  expect(screen.getByText("司命演示项目")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "画布" })).toBeInTheDocument();
-  expect(screen.getAllByText("序章 · 雨夜来客")).not.toHaveLength(0);
-  expect(screen.getByText(/演示项目尚未写入磁盘/)).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "让每一条剧情分支清晰可见" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "新建项目" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "打开项目" })).toBeInTheDocument();
+  expect(screen.queryByText("司命演示项目")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "画布" }),
+  ).not.toBeInTheDocument();
   await waitFor(() =>
     expect(document.documentElement.dataset.theme).toBe("dark"),
   );
@@ -31,11 +43,12 @@ test("renders the editable demo workspace", async () => {
 test("uses dark as the default browser theme", async () => {
   render(<App />);
 
-  await screen.findByText("项目内容");
+  await screen.findByRole("heading", { name: "让每一条剧情分支清晰可见" });
   expect(document.documentElement.dataset.theme).toBe("dark");
 });
 
 test("top-right actions open the matching workbench and export menu", async () => {
+  openTestProject();
   render(<App />);
 
   fireEvent.click(screen.getByRole("button", { name: "命令行" }));
@@ -54,6 +67,7 @@ test("top-right actions open the matching workbench and export menu", async () =
 });
 
 test("project title opens the project menu", async () => {
+  openTestProject();
   render(<App />);
 
   const trigger = screen.getByRole("button", { name: /司命演示项目/ });
@@ -70,6 +84,7 @@ test("project title opens the project menu", async () => {
 });
 
 test("project and system settings are separate pages", async () => {
+  openTestProject();
   render(<App />);
 
   fireEvent.click(screen.getByRole("button", { name: "设置" }));
@@ -83,4 +98,23 @@ test("project and system settings are separate pages", async () => {
   await waitFor(() =>
     expect(document.documentElement.dataset.theme).toBe("dark"),
   );
+});
+
+test("an open project can visit the welcome page and return", async () => {
+  openTestProject();
+  render(<App />);
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "欢迎页" }));
+  expect(
+    screen.getByRole("heading", { name: "让每一条剧情分支清晰可见" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: /返回“司命演示项目”/ }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /返回“司命演示项目”/ }));
+  expect(screen.getByRole("button", { name: "画布" })).toBeInTheDocument();
 });
