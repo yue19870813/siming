@@ -1,5 +1,16 @@
 {
   "schemaVersion": 1,
-  "characters": []
+  "characters": [
+    {
+      "id": "f0303244-602a-4ebc-bc70-97b463740999",
+      "key": "narrator",
+      "name": {
+        "zh-CN": "旁白",
+        "en-US": "Narrator"
+      },
+      "color": "#8b7cf6",
+      "description": "示例项目旁白。",
+      "tags": []
+    }
+  ]
 }
-

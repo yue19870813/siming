@@ -33,6 +33,12 @@ impl From<siming_core::SimulationError> for CommandError {
     }
 }
 
+impl From<siming_storage::DeliveryError> for CommandError {
+    fn from(error: siming_storage::DeliveryError) -> Self {
+        Self::new("PROJECT_DELIVERY_ERROR", error, true)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SystemSettings {
@@ -127,6 +133,67 @@ fn simulate_step(
 }
 
 #[tauri::command]
+fn export_project(
+    snapshot: ProjectSnapshot,
+    output_path: Option<String>,
+    pretty: bool,
+) -> Result<siming_storage::ExportResult, CommandError> {
+    Ok(siming_storage::export_project(
+        &snapshot,
+        output_path.as_deref().map(Path::new),
+        pretty,
+    )?)
+}
+
+#[tauri::command]
+fn check_migration(root_path: String) -> Result<siming_storage::MigrationReport, CommandError> {
+    Ok(siming_storage::check_migration(Path::new(&root_path))?)
+}
+
+#[tauri::command]
+fn migrate_project(
+    root_path: String,
+    backup_directory: Option<String>,
+) -> Result<siming_storage::MigrationReport, CommandError> {
+    Ok(siming_storage::migrate_project(
+        Path::new(&root_path),
+        backup_directory.as_deref().map(Path::new),
+    )?)
+}
+
+#[tauri::command]
+fn write_recovery_snapshot(
+    app: tauri::AppHandle,
+    project: ProjectSnapshot,
+    source_draft: Option<siming_storage::RecoverySourceDraft>,
+) -> Result<siming_storage::RecoverySnapshot, CommandError> {
+    Ok(siming_storage::write_recovery_snapshot(
+        &recovery_root(&app)?,
+        project,
+        source_draft,
+    )?)
+}
+
+#[tauri::command]
+fn read_recovery_snapshot(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<Option<siming_storage::RecoverySnapshot>, CommandError> {
+    Ok(siming_storage::read_recovery_snapshot(
+        &recovery_root(&app)?,
+        &project_id,
+    )?)
+}
+
+#[tauri::command]
+fn clear_recovery_snapshot(app: tauri::AppHandle, project_id: String) -> Result<(), CommandError> {
+    Ok(siming_storage::clear_recovery_snapshot(
+        &recovery_root(&app)?,
+        &project_id,
+    )?)
+}
+
+#[tauri::command]
 fn read_system_settings(app: tauri::AppHandle) -> Result<SystemSettings, CommandError> {
     let path = system_settings_path(&app)?;
     if !path.exists() {
@@ -177,6 +244,12 @@ fn legacy_user_settings_path(app: &tauri::AppHandle) -> Result<std::path::PathBu
         .map_err(|error| CommandError::new("SYSTEM_SETTINGS_PATH_FAILED", error, false))
 }
 
+fn recovery_root(app: &tauri::AppHandle) -> Result<std::path::PathBuf, CommandError> {
+    app.path()
+        .app_config_dir()
+        .map_err(|error| CommandError::new("RECOVERY_PATH_FAILED", error, false))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -188,6 +261,12 @@ pub fn run() {
             save_project,
             validate_project,
             simulate_step,
+            export_project,
+            check_migration,
+            migrate_project,
+            write_recovery_snapshot,
+            read_recovery_snapshot,
+            clear_recovery_snapshot,
             read_system_settings,
             write_system_settings
         ])

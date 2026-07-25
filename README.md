@@ -12,6 +12,7 @@ crates/siming-storage/ 安全文件存储边界
 crates/siming-cli/     独立命令行程序
 schemas/               版本化 JSON Schema
 fixtures/              GUI、CLI 和迁移共用固定样例
+examples/              引擎无关的运行时读取示例
 prototype/             产品交互稿与私有在线预览
 ```
 
@@ -42,6 +43,8 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo run -p siming-cli -- --version
+cargo run -p siming-cli -- validate fixtures/minimal-project
+cargo run -p siming-cli -- export fixtures/minimal-project --output /tmp/siming-runtime
 
 cd apps/desktop
 npm run format:check
@@ -56,3 +59,4 @@ npm run tauri -- build --no-bundle
 
 - [产品需求文档](./docs/产品需求文档.md)
 - [技术方案](./docs/技术方案.md)
+- [运行时格式与宿主接入](./docs/运行时格式.md)

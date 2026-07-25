@@ -6,6 +6,9 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use thiserror::Error;
 use uuid::Uuid;
 
+mod runtime;
+pub use runtime::*;
+
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub type LocalizedText = BTreeMap<String, String>;
 
@@ -656,17 +659,6 @@ pub fn validate_project(
                 .entry(edge.target_node_id.as_str())
                 .or_default()
                 .push(edge);
-            if Uuid::parse_str(&edge.id).is_err() {
-                diagnostics.push(diagnostic(
-                    "EDGE_INVALID_ID",
-                    DiagnosticSeverity::Error,
-                    "连线 ID 不是有效 UUID",
-                    &file,
-                    Some(DiagnosticEntityType::Edge),
-                    Some(edge.id.clone()),
-                    Some("/edges".to_owned()),
-                ));
-            }
             if edge.target_port != "in" {
                 diagnostics.push(diagnostic(
                     "EDGE_INVALID_TARGET_PORT",
@@ -1597,11 +1589,11 @@ fn validate_localized_node_text(
             if !choice
                 .get("id")
                 .and_then(Value::as_str)
-                .is_some_and(|id| Uuid::parse_str(id).is_ok())
+                .is_some_and(|id| !id.trim().is_empty())
             {
                 diagnostics.push(node_error(
                     "CHOICE_INVALID_ID",
-                    "选项 ID 不是有效 UUID",
+                    "选项 ID 不能为空",
                     file,
                     node,
                     format!("{field_base}/data/choices/{index}/id"),
@@ -2063,8 +2055,8 @@ mod tests {
         let dialogue =
             parse_dialogue_document(source).expect("fixture should satisfy the contract");
 
-        assert_eq!(dialogue.nodes.len(), 2);
-        assert_eq!(dialogue.edges.len(), 1);
+        assert_eq!(dialogue.nodes.len(), 3);
+        assert_eq!(dialogue.edges.len(), 2);
         assert_eq!(dialogue.entry_node_id, dialogue.nodes[0].id);
     }
 

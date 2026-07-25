@@ -149,6 +149,42 @@ export type SystemSettings = {
   restoreLastProject: boolean;
 };
 
+export type ExportResult = {
+  outputDirectory: string;
+  files: Array<{
+    path: string;
+    sha256: string;
+    bytes: number;
+  }>;
+};
+
+export type MigrationReport = {
+  currentSchemaVersion: number;
+  targetSchemaVersion: number;
+  required: boolean;
+  changes: Array<{
+    file: string;
+    description: string;
+  }>;
+  backupDirectory?: string;
+};
+
+export type RecoverySourceDraft = {
+  dialogueId: string;
+  source: string;
+};
+
+export type RecoverySnapshot = {
+  schemaVersion: number;
+  projectId: string;
+  projectRoot: string;
+  savedFingerprint: string;
+  project: ProjectSnapshot;
+  sourceDraft?: RecoverySourceDraft;
+  createdAtUnixMs: number;
+  appVersion: string;
+};
+
 export type Diagnostic = {
   code: string;
   severity: "error" | "warning";

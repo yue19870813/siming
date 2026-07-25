@@ -54,3 +54,31 @@ test("dialogue schema accepts recursive structured conditions", () => {
   expect(validate(dialogue)).toBe(true);
   expect(validate.errors).toBeNull();
 });
+
+test("runtime schema accepts compiled editor-free nodes", () => {
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  addFormats(ajv);
+  const validate = ajv.compile(readJson("schemas/runtime.schema.json"));
+  const startId = "3f0e9d88-5ec4-4cf5-9a83-9ad4ee9f7451";
+  const endId = "b4aa0f79-bd0e-45cd-8a6e-094e6f50ccfd";
+  const dialogueId = "2fd88ddc-aa3b-466f-92a2-48785adce71e";
+  const runtime = {
+    schemaVersion: 1,
+    defaultLocale: "zh-CN",
+    locales: ["zh-CN", "en-US"],
+    resources: { characters: {}, variables: {}, events: {} },
+    dialogues: {
+      [dialogueId]: {
+        key: "intro",
+        entryNodeId: startId,
+        nodes: {
+          [startId]: { key: "start", type: "start", next: endId },
+          [endId]: { key: "end", type: "end" },
+        },
+      },
+    },
+  };
+
+  expect(validate(runtime), JSON.stringify(validate.errors)).toBe(true);
+  expect(JSON.stringify(runtime)).not.toContain("position");
+});

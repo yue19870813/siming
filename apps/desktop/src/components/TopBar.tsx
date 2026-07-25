@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Play,
   Redo2,
+  RefreshCw,
   Save,
   Terminal,
   Undo2,
@@ -19,11 +20,15 @@ export function TopBar({
   onNew,
   onOpen,
   onSave,
+  onExport,
+  onMigration,
   onPanelOpen,
 }: {
   onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
+  onExport: () => void;
+  onMigration: () => void;
   onPanelOpen: (mode: WorkbenchPanelMode) => void;
 }) {
   const project = useEditorStore((state) => state.project);
@@ -62,13 +67,13 @@ export function TopBar({
     };
   }, []);
 
-  const exportNotice = (format: "json" | "xml" | "binary") => {
+  const exportFormat = (format: "json" | "xml" | "binary") => {
     setExportMenuOpen(false);
-    setNotice(
-      format === "json"
-        ? "运行时 JSON 导出将在阶段 3 接入；当前项目源数据可正常保存。"
-        : `${format === "xml" ? "XML" : "二进制"}导出属于后续格式扩展。`,
-    );
+    if (format === "json") {
+      onExport();
+      return;
+    }
+    setNotice(`${format === "xml" ? "XML" : "二进制"}导出属于后续格式扩展。`);
   };
 
   return (
@@ -115,6 +120,15 @@ export function TopBar({
             >
               <Save size={14} /> {busy ? "保存中…" : "保存项目"}
               <kbd>⌘S</kbd>
+            </button>
+            <button
+              disabled={busy || !project.rootPath}
+              onClick={() => {
+                setProjectMenuOpen(false);
+                onMigration();
+              }}
+            >
+              <RefreshCw size={14} /> 检查项目迁移
             </button>
           </div>
         )}
@@ -185,7 +199,8 @@ export function TopBar({
         <div className="export-control">
           <button
             className="button button--primary export-main"
-            onClick={() => exportNotice("json")}
+            disabled={busy}
+            onClick={() => exportFormat("json")}
           >
             导出 JSON
           </button>
@@ -203,21 +218,21 @@ export function TopBar({
           </button>
           {exportMenuOpen && (
             <div className="export-menu" role="menu" aria-label="导出格式">
-              <button role="menuitem" onClick={() => exportNotice("json")}>
+              <button role="menuitem" onClick={() => exportFormat("json")}>
                 <span>{"{ }"}</span>
                 <span>
                   <strong>运行时 JSON</strong>
                   <small>结构数据与多语言资源</small>
                 </span>
               </button>
-              <button role="menuitem" onClick={() => exportNotice("xml")}>
+              <button role="menuitem" onClick={() => exportFormat("xml")}>
                 <span>{"</>"}</span>
                 <span>
                   <strong>XML</strong>
                   <small>后续格式扩展</small>
                 </span>
               </button>
-              <button role="menuitem" onClick={() => exportNotice("binary")}>
+              <button role="menuitem" onClick={() => exportFormat("binary")}>
                 <span>BIN</span>
                 <span>
                   <strong>二进制包</strong>

@@ -2832,6 +2832,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "serde_json",
  "siming-core",
  "siming-storage",
 ]
@@ -2865,6 +2866,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sha2",
  "siming-core",
  "thiserror 2.0.19",
  "uuid",

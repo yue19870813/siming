@@ -14,6 +14,9 @@ use std::{
 use thiserror::Error;
 use uuid::Uuid;
 
+mod delivery;
+pub use delivery::*;
+
 const PROJECT_FILE: &str = ".siming/project.json";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

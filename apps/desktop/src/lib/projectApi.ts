@@ -2,7 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type {
   Diagnostic,
+  ExportResult,
+  MigrationReport,
   ProjectSnapshot,
+  RecoverySnapshot,
+  RecoverySourceDraft,
   SimulationRequest,
   SimulationSession,
   SystemSettings,
@@ -40,6 +44,58 @@ export async function openProject(rootPath: string) {
 
 export async function saveProject(snapshot: ProjectSnapshot) {
   return invoke<void>("save_project", { snapshot });
+}
+
+export async function exportProject(
+  snapshot: ProjectSnapshot,
+  outputPath?: string,
+  pretty = false,
+) {
+  requireTauri("运行时导出");
+  return invoke<ExportResult>("export_project", {
+    snapshot,
+    outputPath: outputPath ?? null,
+    pretty,
+  });
+}
+
+export async function checkMigration(rootPath: string) {
+  requireTauri("迁移检查");
+  return invoke<MigrationReport>("check_migration", { rootPath });
+}
+
+export async function migrateProject(
+  rootPath: string,
+  backupDirectory?: string,
+) {
+  requireTauri("项目迁移");
+  return invoke<MigrationReport>("migrate_project", {
+    rootPath,
+    backupDirectory: backupDirectory ?? null,
+  });
+}
+
+export async function writeRecoverySnapshot(
+  project: ProjectSnapshot,
+  sourceDraft?: RecoverySourceDraft,
+) {
+  requireTauri("恢复快照");
+  return invoke<RecoverySnapshot>("write_recovery_snapshot", {
+    project,
+    sourceDraft: sourceDraft ?? null,
+  });
+}
+
+export async function readRecoverySnapshot(projectId: string) {
+  requireTauri("恢复快照");
+  return invoke<RecoverySnapshot | null>("read_recovery_snapshot", {
+    projectId,
+  });
+}
+
+export async function clearRecoverySnapshot(projectId: string) {
+  requireTauri("恢复快照");
+  return invoke<void>("clear_recovery_snapshot", { projectId });
 }
 
 export async function validateProject(snapshot: ProjectSnapshot) {
@@ -80,4 +136,10 @@ export async function writeSystemSettings(settings: SystemSettings) {
     return;
   }
   await invoke("write_system_settings", { settings });
+}
+
+function requireTauri(feature: string) {
+  if (!isTauri()) {
+    throw new Error(`${feature}需要在 Tauri dev 模式中运行。`);
+  }
 }

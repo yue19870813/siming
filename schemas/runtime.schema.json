@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://siming.dev/schemas/runtime.schema.json",
+  "title": "Siming Runtime Project",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "defaultLocale", "locales", "resources", "dialogues"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "defaultLocale": { "$ref": "#/$defs/locale" },
+    "locales": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/locale" }
+    },
+    "resources": { "$ref": "#/$defs/resources" },
+    "dialogues": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/dialogue" }
+    }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "key": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+    },
+    "hostEvents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "payload"],
+        "properties": {
+          "name": { "$ref": "#/$defs/key" },
+          "payload": { "type": "object" }
+        }
+      }
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["variable", "operator", "value"],
+          "properties": {
+            "variable": { "$ref": "#/$defs/key" },
+            "operator": { "enum": ["==", "!=", ">", ">=", "<", "<="] },
+            "value": {
+              "anyOf": [
+                { "type": "boolean" },
+                { "type": "number" },
+                { "type": "string" }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["all"],
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/condition" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["any"],
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/condition" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["not"],
+          "properties": {
+            "not": { "$ref": "#/$defs/condition" }
+          }
+        }
+      ]
+    },
+    "baseNode": {
+      "type": "object",
+      "required": ["key", "type"],
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "type": {
+          "enum": ["start", "dialogue", "choice", "condition", "event", "end"]
+        },
+        "hostEvents": { "$ref": "#/$defs/hostEvents" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "type": { "const": "start" },
+                "next": { "$ref": "#/$defs/uuid" }
+              },
+              "required": ["next"]
+            },
+            {
+              "properties": {
+                "type": { "const": "dialogue" },
+                "speakerId": { "$ref": "#/$defs/key" },
+                "textKey": { "type": "string", "minLength": 1 },
+                "next": { "$ref": "#/$defs/uuid" },
+                "advancePolicy": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["mode"],
+                      "properties": { "mode": { "const": "manual" } }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["mode", "delayMs"],
+                      "properties": {
+                        "mode": { "const": "auto" },
+                        "delayMs": { "type": "integer", "minimum": 0 }
+                      }
+                    }
+                  ]
+                }
+              },
+              "required": ["textKey", "next"]
+            },
+            {
+              "properties": {
+                "type": { "const": "choice" },
+                "choices": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "textKey", "next"],
+                    "properties": {
+                      "id": { "type": "string", "minLength": 1 },
+                      "textKey": { "type": "string", "minLength": 1 },
+                      "next": { "$ref": "#/$defs/uuid" }
+                    }
+                  }
+                }
+              },
+              "required": ["choices"]
+            },
+            {
+              "properties": {
+                "type": { "const": "condition" },
+                "condition": { "$ref": "#/$defs/condition" },
+                "branches": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["true", "false"],
+                  "properties": {
+                    "true": { "$ref": "#/$defs/uuid" },
+                    "false": { "$ref": "#/$defs/uuid" }
+                  }
+                }
+              },
+              "required": ["condition", "branches"]
+            },
+            {
+              "properties": {
+                "type": { "const": "event" },
+                "event": { "$ref": "#/$defs/key" },
+                "params": { "type": "object" },
+                "next": { "$ref": "#/$defs/uuid" }
+              },
+              "required": ["event", "params", "next"]
+            },
+            {
+              "properties": { "type": { "const": "end" } }
+            }
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "dialogue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "entryNodeId", "nodes"],
+      "properties": {
+        "key": { "$ref": "#/$defs/key" },
+        "entryNodeId": { "$ref": "#/$defs/uuid" },
+        "nodes": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/node" }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["characters", "variables", "events"],
+      "properties": {
+        "characters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "nameKey"],
+            "properties": {
+              "key": { "$ref": "#/$defs/key" },
+              "nameKey": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "variables": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "type", "defaultValue"],
+            "properties": {
+              "key": { "$ref": "#/$defs/key" },
+              "type": { "enum": ["boolean", "number", "string"] },
+              "defaultValue": {
+                "anyOf": [
+                  { "type": "boolean" },
+                  { "type": "number" },
+                  { "type": "string" }
+                ]
+              }
+            }
+          }
+        },
+        "events": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "params"],
+            "properties": {
+              "key": { "$ref": "#/$defs/key" },
+              "params": { "type": "array" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

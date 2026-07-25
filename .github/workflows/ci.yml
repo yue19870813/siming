@@ -55,6 +55,13 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - run: cargo run -p siming-cli -- --version
+      - name: CLI delivery smoke test
+        run: |
+          cargo run -p siming-cli -- validate fixtures/minimal-project --format json
+          cargo run -p siming-cli -- export fixtures/minimal-project --output /tmp/siming-runtime-a
+          cargo run -p siming-cli -- export fixtures/minimal-project --output /tmp/siming-runtime-b
+          diff -r /tmp/siming-runtime-a /tmp/siming-runtime-b
+          node examples/runtime-reader/index.mjs /tmp/siming-runtime-a intro zh-CN
 
   desktop:
     name: Desktop build (${{ matrix.os }})
@@ -89,6 +96,21 @@ jobs:
             wget
       - run: npm ci
         working-directory: apps/desktop
-      - run: npm run tauri -- build --no-bundle
+      - run: npm run tauri -- build
         working-directory: apps/desktop
-      - run: cargo run -p siming-cli -- --version
+      - run: cargo build --release -p siming-cli
+      - run: cargo run -p siming-cli -- validate fixtures/minimal-project
+      - name: Upload desktop installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: siming-desktop-${{ runner.os }}
+          path: target/release/bundle/**
+          if-no-files-found: error
+      - name: Upload standalone CLI
+        uses: actions/upload-artifact@v4
+        with:
+          name: siming-cli-${{ runner.os }}
+          path: |
+            target/release/siming
+            target/release/siming.exe
+          if-no-files-found: ignore

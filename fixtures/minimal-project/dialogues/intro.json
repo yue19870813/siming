@@ -20,11 +20,28 @@
       }
     },
     {
+      "id": "7aa254b1-2b75-4445-8f09-87b9af718dd7",
+      "key": "welcome",
+      "type": "dialogue",
+      "position": {
+        "x": 300,
+        "y": 160
+      },
+      "data": {
+        "speakerId": "narrator",
+        "text": {
+          "zh-CN": "欢迎使用司命。",
+          "en-US": "Welcome to Siming."
+        },
+        "hostEvents": []
+      }
+    },
+    {
       "id": "b4aa0f79-bd0e-45cd-8a6e-094e6f50ccfd",
       "key": "end",
       "type": "end",
       "position": {
-        "x": 360,
+        "x": 540,
         "y": 160
       },
       "data": {
@@ -34,12 +51,18 @@
   ],
   "edges": [
     {
-      "id": "edge-start-end",
+      "id": "edge-start-welcome",
       "sourceNodeId": "3f0e9d88-5ec4-4cf5-9a83-9ad4ee9f7451",
+      "sourcePort": "next",
+      "targetNodeId": "7aa254b1-2b75-4445-8f09-87b9af718dd7",
+      "targetPort": "in"
+    },
+    {
+      "id": "edge-welcome-end",
+      "sourceNodeId": "7aa254b1-2b75-4445-8f09-87b9af718dd7",
       "sourcePort": "next",
       "targetNodeId": "b4aa0f79-bd0e-45cd-8a6e-094e6f50ccfd",
       "targetPort": "in"
     }
   ]
 }
-
