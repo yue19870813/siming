@@ -7,6 +7,7 @@ import {
   Terminal,
   X,
 } from "lucide-react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { simulateStep, validateProject } from "../lib/projectApi";
 import type {
@@ -22,12 +23,18 @@ export type WorkbenchPanelMode = "problems" | "simulator" | "terminal";
 
 export function WorkbenchPanel({
   mode,
+  height,
   onModeChange,
   onClose,
+  onResizeStart,
+  onResizeBy,
 }: {
   mode: WorkbenchPanelMode;
+  height: number;
   onModeChange: (mode: WorkbenchPanelMode) => void;
   onClose: () => void;
+  onResizeStart: (event: ReactPointerEvent<HTMLElement>) => void;
+  onResizeBy: (delta: number) => void;
 }) {
   const project = useEditorStore((state) => state.project);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
@@ -53,7 +60,25 @@ export function WorkbenchPanel({
   }, [mode, runValidation]);
 
   return (
-    <section className="workbench-panel" aria-label="工作面板">
+    <section
+      className="workbench-panel"
+      aria-label="工作面板"
+      style={{ height }}
+    >
+      <div
+        className="panel-resize-handle panel-resize-handle--bottom"
+        role="separator"
+        aria-label="调整底部面板高度"
+        aria-orientation="horizontal"
+        aria-valuemin={120}
+        aria-valuenow={Math.round(height)}
+        tabIndex={0}
+        onPointerDown={onResizeStart}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowUp") onResizeBy(12);
+          if (event.key === "ArrowDown") onResizeBy(-12);
+        }}
+      />
       <header>
         <div className="workbench-tabs">
           <button

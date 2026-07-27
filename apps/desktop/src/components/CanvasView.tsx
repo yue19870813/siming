@@ -5,7 +5,7 @@ import {
   EdgeChange,
   Handle,
   MiniMap,
-  Node,
+  type Node as FlowNode,
   NodeProps,
   Position,
   ReactFlow,
@@ -14,10 +14,26 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { GitBranch, MessageCircle, Play, Square, Zap } from "lucide-react";
-import { memo, useEffect, useMemo } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  centeredNodePosition,
+  nodePositionAtPoint,
+} from "./canvasGeometry";
 import { formatCondition } from "../model/conditions";
 import { createId } from "../model/demo";
 import type { DialogueNode, NodeType } from "../model/types";
+import {
+  nodeDragCancelEvent,
+  type NodeDragDetail,
+  nodeDragMoveEvent,
+  nodeDropEvent,
+} from "../lib/nodeDrag";
 import { useEditorStore } from "../store/editorStore";
 
 const typeMeta: Record<
@@ -37,7 +53,7 @@ type CanvasNodeData = {
   locale: string;
 };
 
-type CanvasFlowNode = Node<CanvasNodeData, "siming">;
+type CanvasFlowNode = FlowNode<CanvasNodeData, "siming">;
 
 const DialogueNodeCard = memo(function DialogueNodeCard({
   data,
@@ -126,11 +142,24 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
 const nodeTypes = { siming: DialogueNodeCard };
 
 export function CanvasView() {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const flowInstanceRef = useRef<{
+    screenToFlowPosition: (position: { x: number; y: number }) => {
+      x: number;
+      y: number;
+    };
+  } | null>(null);
+  const viewportRef = useRef({ x: 0, y: 0, zoom: 1 });
+  const [nodeDragOver, setNodeDragOver] = useState(false);
   const project = useEditorStore((state) => state.project);
   const dialogueId = useEditorStore((state) => state.selectedDialogueId);
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const locale = useEditorStore((state) => state.previewLocale);
   const setSelectedNode = useEditorStore((state) => state.setSelectedNode);
+  const setCanvasInsertionPosition = useEditorStore(
+    (state) => state.setCanvasInsertionPosition,
+  );
+  const addNode = useEditorStore((state) => state.addNode);
   const commit = useEditorStore((state) => state.commit);
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
 
@@ -151,6 +180,54 @@ export function CanvasView() {
   useEffect(() => {
     setNodes(derivedNodes);
   }, [derivedNodes, setNodes]);
+
+  useEffect(() => {
+    const insideCanvas = (detail: NodeDragDetail) => {
+      const bounds = canvasRef.current?.getBoundingClientRect();
+      return Boolean(
+        bounds &&
+          detail.clientX >= bounds.left &&
+          detail.clientX <= bounds.right &&
+          detail.clientY >= bounds.top &&
+          detail.clientY <= bounds.bottom,
+      );
+    };
+    const move = (event: Event) => {
+      const detail = (event as CustomEvent<NodeDragDetail>).detail;
+      setNodeDragOver(insideCanvas(detail));
+    };
+    const drop = (event: Event) => {
+      const detail = (event as CustomEvent<NodeDragDetail>).detail;
+      setNodeDragOver(false);
+      if (!insideCanvas(detail)) return;
+
+      const instance = flowInstanceRef.current;
+      const bounds = canvasRef.current?.getBoundingClientRect();
+      const viewport = viewportRef.current;
+      const point = instance
+        ? instance.screenToFlowPosition({
+            x: detail.clientX,
+            y: detail.clientY,
+          })
+        : bounds
+          ? {
+              x: (detail.clientX - bounds.left - viewport.x) / viewport.zoom,
+              y: (detail.clientY - bounds.top - viewport.y) / viewport.zoom,
+            }
+          : null;
+      if (point) addNode(detail.type, nodePositionAtPoint(point));
+    };
+    const cancel = () => setNodeDragOver(false);
+
+    window.addEventListener(nodeDragMoveEvent, move);
+    window.addEventListener(nodeDropEvent, drop);
+    window.addEventListener(nodeDragCancelEvent, cancel);
+    return () => {
+      window.removeEventListener(nodeDragMoveEvent, move);
+      window.removeEventListener(nodeDropEvent, drop);
+      window.removeEventListener(nodeDragCancelEvent, cancel);
+    };
+  }, [addNode]);
 
   const edges = useMemo(
     () =>
@@ -203,16 +280,33 @@ export function CanvasView() {
   };
 
   return (
-    <div className="canvas-view">
+    <div
+      className={`canvas-view ${nodeDragOver ? "is-node-drop-target" : ""}`}
+      ref={canvasRef}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        onInit={(instance) => {
+          flowInstanceRef.current = instance;
+        }}
         onNodesChange={onNodesChange}
         onConnect={connect}
         onEdgesChange={edgesChange}
         onNodeClick={(_event, node) => setSelectedNode(node.id)}
         onPaneClick={() => setSelectedNode(null)}
+        onMoveEnd={(_event, viewport) => {
+          viewportRef.current = viewport;
+          const bounds = canvasRef.current?.getBoundingClientRect();
+          if (!bounds) return;
+          setCanvasInsertionPosition(
+            centeredNodePosition(viewport, {
+              width: bounds.width,
+              height: bounds.height,
+            }),
+          );
+        }}
         onNodeDragStop={(_event, moved) => {
           const previous = dialogue.nodes.find((node) => node.id === moved.id);
           if (

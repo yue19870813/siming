@@ -13,7 +13,12 @@ import {
   Variable,
   Zap,
 } from "lucide-react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useMemo, useState } from "react";
+import {
+  beginNodePointerDrag,
+  consumeSuppressedPaletteClick,
+} from "../lib/nodeDrag";
 import { dialogueHasMissingTranslation } from "../model/i18n";
 import type { Activity, NodeType } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
@@ -46,7 +51,15 @@ const nodePalette: Array<{
   { type: "end", label: "结束", hint: "流程终点", color: "#858b9d" },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  width,
+  onResizeStart,
+  onResizeBy,
+}: {
+  width: number;
+  onResizeStart: (event: ReactPointerEvent<HTMLElement>) => void;
+  onResizeBy: (delta: number) => void;
+}) {
   const activity = useEditorStore((state) => state.activity);
   const setActivity = useEditorStore((state) => state.setActivity);
   return (
@@ -89,6 +102,23 @@ export function Sidebar() {
             <ActivitySummary activity={activity} />
           )}
         </div>
+      )}
+      {activity !== "welcome" && (
+        <div
+          className="panel-resize-handle panel-resize-handle--left"
+          role="separator"
+          aria-label="调整左侧面板宽度"
+          aria-orientation="vertical"
+          aria-valuemin={220}
+          aria-valuemax={480}
+          aria-valuenow={Math.round(width)}
+          tabIndex={0}
+          onPointerDown={onResizeStart}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") onResizeBy(-12);
+            if (event.key === "ArrowRight") onResizeBy(12);
+          }}
+        />
       )}
     </aside>
   );
@@ -226,7 +256,20 @@ function ProjectExplorer() {
         </div>
         <div className="node-palette-grid">
           {nodePalette.map((item) => (
-            <button key={item.type} onClick={() => addNode(item.type)}>
+            <button
+              key={item.type}
+              title="点击添加，或拖拽到画布"
+              onClick={() => {
+                if (!consumeSuppressedPaletteClick()) addNode(item.type);
+              }}
+              onPointerDown={(event) =>
+                beginNodePointerDrag(
+                  event,
+                  item.type,
+                  item.label,
+                )
+              }
+            >
               <i style={{ background: item.color }} />
               <span>
                 <strong>{item.label}</strong>

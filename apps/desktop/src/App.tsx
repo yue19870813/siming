@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { CanvasView } from "./components/CanvasView";
 import { DataView } from "./components/DataView";
 import { Inspector } from "./components/Inspector";
@@ -27,6 +33,7 @@ import {
   writeRecoverySnapshot,
   writeSystemSettings,
 } from "./lib/projectApi";
+import { beginPanelResize, clampPanelSize } from "./lib/panelResize";
 import type { SystemSettings } from "./model/types";
 import { useEditorStore } from "./store/editorStore";
 
@@ -40,6 +47,11 @@ const defaultSettings: SystemSettings = {
   autoSaveDelaySeconds: 30,
   recoverySnapshotIntervalSeconds: 60,
   restoreLastProject: true,
+};
+
+type PanelLayoutStyle = CSSProperties & {
+  "--sidebar-width": string;
+  "--inspector-width": string;
 };
 
 export default function App() {
@@ -63,12 +75,19 @@ export default function App() {
   const setSourceDraft = useEditorStore((state) => state.setSourceDraft);
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
+  const copySelectedNode = useEditorStore((state) => state.copySelectedNode);
+  const pasteCopiedNode = useEditorStore((state) => state.pasteCopiedNode);
   const [settings, setSettings] = useState(defaultSettings);
   const [newProjectRootPath, setNewProjectRootPath] = useState<string | null>(
     null,
   );
+  const [sidebarWidth, setSidebarWidth] = useState(306);
+  const [inspectorWidth, setInspectorWidth] = useState(314);
+  const [workbenchHeight, setWorkbenchHeight] = useState(430);
   const [workbenchPanel, setWorkbenchPanel] =
     useState<WorkbenchPanelMode | null>(null);
+  const appBodyRef = useRef<HTMLDivElement>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
   const recoveryState = useRef({
     project,
     dirty,
@@ -136,6 +155,24 @@ export default function App() {
     const keydown = (event: KeyboardEvent) => {
       const command = event.metaKey || event.ctrlKey;
       if (!command) return;
+      const target = event.target;
+      const editingText =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+      if (!editingText && event.key.toLowerCase() === "c" && projectLoaded) {
+        event.preventDefault();
+        copySelectedNode();
+      }
+      if (
+        !editingText &&
+        event.key.toLowerCase() === "v" &&
+        !event.shiftKey &&
+        projectLoaded
+      ) {
+        event.preventDefault();
+        pasteCopiedNode();
+      }
       if (event.key.toLowerCase() === "s") {
         event.preventDefault();
         if (projectLoaded) void handleSave();
@@ -151,7 +188,11 @@ export default function App() {
         event.preventDefault();
         if (projectLoaded) redo();
       }
-      if (event.key.toLowerCase() === "v" && event.shiftKey) {
+      if (
+        !editingText &&
+        event.key.toLowerCase() === "v" &&
+        event.shiftKey
+      ) {
         event.preventDefault();
         if (projectLoaded) setWorkbenchPanel("problems");
       }
@@ -399,12 +440,38 @@ export default function App() {
         />
       )}
       <div
+        ref={appBodyRef}
         className={`app-body ${
           activity === "welcome" ? "app-body--welcome" : ""
         }`}
+        style={
+          {
+            "--sidebar-width": `${sidebarWidth}px`,
+            "--inspector-width": editorActivity
+              ? `${inspectorWidth}px`
+              : "0px",
+          } as PanelLayoutStyle
+        }
       >
-        <Sidebar />
+        <Sidebar
+          width={sidebarWidth}
+          onResizeStart={(event) => {
+            const bodyWidth = appBodyRef.current?.clientWidth ?? window.innerWidth;
+            beginPanelResize(event, {
+              axis: "x",
+              initialSize: sidebarWidth,
+              direction: 1,
+              min: 220,
+              max: bodyWidth - inspectorWidth - 420,
+              onResize: setSidebarWidth,
+            });
+          }}
+          onResizeBy={(delta) =>
+            setSidebarWidth((width) => clampPanelSize(width + delta, 220, 480))
+          }
+        />
         <section
+          ref={workspaceRef}
           className={`workspace ${editorActivity ? "workspace--editor" : ""}`}
         >
           {editorActivity &&
@@ -441,12 +508,53 @@ export default function App() {
           {activity !== "welcome" && workbenchPanel && (
             <WorkbenchPanel
               mode={workbenchPanel}
+              height={workbenchHeight}
               onModeChange={setWorkbenchPanel}
               onClose={() => setWorkbenchPanel(null)}
+              onResizeStart={(event) => {
+                const workspaceHeight =
+                  workspaceRef.current?.clientHeight ?? window.innerHeight;
+                beginPanelResize(event, {
+                  axis: "y",
+                  initialSize: workbenchHeight,
+                  direction: -1,
+                  min: 120,
+                  max: workspaceHeight - 120,
+                  onResize: setWorkbenchHeight,
+                });
+              }}
+              onResizeBy={(delta) => {
+                const workspaceHeight =
+                  workspaceRef.current?.clientHeight ?? window.innerHeight;
+                setWorkbenchHeight((height) =>
+                  clampPanelSize(height + delta, 120, workspaceHeight - 120),
+                );
+              }}
             />
           )}
         </section>
-        {editorActivity && <Inspector />}
+        {editorActivity && (
+          <Inspector
+            width={inspectorWidth}
+            onResizeStart={(event: ReactPointerEvent<HTMLElement>) => {
+              const bodyWidth =
+                appBodyRef.current?.clientWidth ?? window.innerWidth;
+              beginPanelResize(event, {
+                axis: "x",
+                initialSize: inspectorWidth,
+                direction: -1,
+                min: 260,
+                max: bodyWidth - sidebarWidth - 420,
+                onResize: setInspectorWidth,
+              });
+            }}
+            onResizeBy={(delta) =>
+              setInspectorWidth((width) =>
+                clampPanelSize(width + delta, 260, 520),
+              )
+            }
+          />
+        )}
       </div>
       <footer className="statusbar">
         <span>{notice}</span>

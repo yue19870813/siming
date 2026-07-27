@@ -15,6 +15,52 @@ test("undoing to the saved snapshot clears dirty state", () => {
   expect(useEditorStore.getState().dirty).toBe(false);
 });
 
+test("a new node uses the current canvas center and is selected", () => {
+  const insertionPosition = { x: 640, y: 360 };
+  useEditorStore.getState().setCanvasInsertionPosition(insertionPosition);
+  useEditorStore.getState().addNode("dialogue");
+
+  const state = useEditorStore.getState();
+  const dialogue = state.project.dialogues.find(
+    (item) => item.id === state.selectedDialogueId,
+  );
+  const node = dialogue?.nodes.find(
+    (item) => item.id === state.selectedNodeId,
+  );
+
+  expect(node?.position).toEqual(insertionPosition);
+  expect(state.selectedNodeId).toBe(node?.id);
+});
+
+test("copy and paste duplicates a selected node with new identities", () => {
+  const originalState = useEditorStore.getState();
+  const dialogue = originalState.project.dialogues[0];
+  const original = dialogue.nodes.find((node) => node.type === "choice");
+  expect(original).toBeDefined();
+  originalState.setSelectedNode(original!.id);
+
+  useEditorStore.getState().copySelectedNode();
+  useEditorStore.getState().pasteCopiedNode();
+
+  const state = useEditorStore.getState();
+  const updatedDialogue = state.project.dialogues[0];
+  const pasted = updatedDialogue.nodes.find(
+    (node) => node.id === state.selectedNodeId,
+  );
+
+  expect(pasted).toBeDefined();
+  expect(pasted?.id).not.toBe(original?.id);
+  expect(pasted?.key).toBe(`${original?.key}-copy`);
+  expect(pasted?.position).toEqual({
+    x: original!.position.x + 32,
+    y: original!.position.y + 32,
+  });
+  expect(pasted?.data.choices?.map((choice) => choice.id)).not.toEqual(
+    original?.data.choices?.map((choice) => choice.id),
+  );
+  expect(state.notice).toBe(`已粘贴节点：${pasted?.key}`);
+});
+
 test("markSaved establishes a new clean history point", () => {
   useEditorStore.getState().commit("rename", (draft) => {
     draft.manifest.name = "已保存名称";

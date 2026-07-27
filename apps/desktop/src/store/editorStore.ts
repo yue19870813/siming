@@ -3,6 +3,7 @@ import { createId, createNode } from "../model/demo";
 import type {
   Activity,
   DialogueDocument,
+  DialogueNode,
   NodeType,
   ProjectSnapshot,
   ViewMode,
@@ -18,6 +19,9 @@ type EditorState = {
   projectLoaded: boolean;
   selectedDialogueId: string;
   selectedNodeId: string | null;
+  copiedNode: DialogueNode | null;
+  clipboardPasteCount: number;
+  canvasInsertionPosition: { x: number; y: number };
   viewMode: ViewMode;
   activity: Activity;
   previewLocale: string;
@@ -33,6 +37,7 @@ type EditorState = {
   setProject: (project: ProjectSnapshot, dirty?: boolean) => void;
   setSelectedDialogue: (id: string) => void;
   setSelectedNode: (id: string | null) => void;
+  setCanvasInsertionPosition: (position: { x: number; y: number }) => void;
   setViewMode: (mode: ViewMode) => void;
   setActivity: (activity: Activity) => void;
   setPreviewLocale: (locale: string) => void;
@@ -48,7 +53,9 @@ type EditorState = {
   commit: (label: string, recipe: (draft: ProjectSnapshot) => void) => void;
   undo: () => void;
   redo: () => void;
-  addNode: (type: NodeType) => void;
+  copySelectedNode: () => void;
+  pasteCopiedNode: () => void;
+  addNode: (type: NodeType, position?: { x: number; y: number }) => void;
   addDialogue: (folder?: string) => void;
   deleteDialogue: (id: string) => void;
   closeProject: () => void;
@@ -81,11 +88,23 @@ const emptyProject = (): ProjectSnapshot => ({
 const initialProject = emptyProject();
 const fingerprint = (project: ProjectSnapshot) => JSON.stringify(project);
 
+function copiedNodeKey(sourceKey: string, dialogue: DialogueDocument) {
+  const keys = new Set(dialogue.nodes.map((node) => node.key));
+  const base = `${sourceKey}-copy`;
+  if (!keys.has(base)) return base;
+  let sequence = 2;
+  while (keys.has(`${base}-${sequence}`)) sequence += 1;
+  return `${base}-${sequence}`;
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   project: initialProject,
   projectLoaded: false,
   selectedDialogueId: "",
   selectedNodeId: null,
+  copiedNode: null,
+  clipboardPasteCount: 0,
+  canvasInsertionPosition: { x: 180, y: 120 },
   viewMode: "canvas",
   activity: "welcome",
   previewLocale: initialProject.manifest.defaultLocale,
@@ -105,6 +124,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       projectLoaded: true,
       selectedDialogueId: project.dialogues[0]?.id ?? "",
       selectedNodeId: null,
+      canvasInsertionPosition: { x: 180, y: 120 },
       viewMode: "canvas",
       previewLocale: project.manifest.defaultLocale,
       dirty,
@@ -133,6 +153,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   setSelectedNode: (selectedNodeId) => set({ selectedNodeId }),
+  setCanvasInsertionPosition: (canvasInsertionPosition) =>
+    set({ canvasInsertionPosition }),
   setViewMode: (viewMode) => {
     const state = get();
     if (
@@ -235,15 +257,59 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       notice: `已重做：${entry.label}`,
     });
   },
-  addNode: (type) => {
-    const { selectedDialogueId, previewLocale, commit } = get();
-    const dialogue = get().project.dialogues.find(
-      (item) => item.id === selectedDialogueId,
+  copySelectedNode: () => {
+    const state = get();
+    const node = state.project.dialogues
+      .find((dialogue) => dialogue.id === state.selectedDialogueId)
+      ?.nodes.find((item) => item.id === state.selectedNodeId);
+    if (!node) return;
+    set({
+      copiedNode: structuredClone(node),
+      clipboardPasteCount: 0,
+      notice: `已复制节点：${node.key}`,
+    });
+  },
+  pasteCopiedNode: () => {
+    const state = get();
+    const dialogue = state.project.dialogues.find(
+      (item) => item.id === state.selectedDialogueId,
     );
-    const offset = dialogue?.nodes.length ?? 0;
+    if (!state.copiedNode || !dialogue) return;
+    const pasteCount = state.clipboardPasteCount + 1;
+    const node = structuredClone(state.copiedNode);
+    node.id = createId();
+    node.key = copiedNodeKey(node.key, dialogue);
+    node.position = {
+      x: node.position.x + pasteCount * 32,
+      y: node.position.y + pasteCount * 32,
+    };
+    if (node.data.choices) {
+      node.data.choices = node.data.choices.map((choice) => ({
+        ...choice,
+        id: createId(),
+      }));
+    }
+    state.commit(`粘贴${node.type}节点`, (draft) => {
+      draft.dialogues
+        .find((item) => item.id === state.selectedDialogueId)
+        ?.nodes.push(node);
+    });
+    set({
+      selectedNodeId: node.id,
+      clipboardPasteCount: pasteCount,
+      notice: `已粘贴节点：${node.key}`,
+    });
+  },
+  addNode: (type, position) => {
+    const {
+      selectedDialogueId,
+      previewLocale,
+      canvasInsertionPosition,
+      commit,
+    } = get();
     const node = createNode(
       type,
-      { x: 180 + (offset % 4) * 250, y: 120 + Math.floor(offset / 4) * 180 },
+      position ?? canvasInsertionPosition,
       previewLocale,
     );
     commit(`新增${type}节点`, (draft) => {

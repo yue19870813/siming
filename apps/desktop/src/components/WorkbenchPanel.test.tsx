@@ -36,7 +36,14 @@ test("shared diagnostics locate their node", async () => {
   ]);
 
   render(
-    <WorkbenchPanel mode="problems" onModeChange={vi.fn()} onClose={vi.fn()} />,
+    <WorkbenchPanel
+      mode="problems"
+      height={430}
+      onModeChange={vi.fn()}
+      onClose={vi.fn()}
+      onResizeStart={vi.fn()}
+      onResizeBy={vi.fn()}
+    />,
   );
   fireEvent.click(await screen.findByText("非默认语言文本缺失"));
   expect(useEditorStore.getState().selectedDialogueId).toBe(dialogue.id);
@@ -78,8 +85,11 @@ test("simulator starts from shared IPC and submits player choices", async () => 
   render(
     <WorkbenchPanel
       mode="simulator"
+      height={430}
       onModeChange={vi.fn()}
       onClose={vi.fn()}
+      onResizeStart={vi.fn()}
+      onResizeBy={vi.fn()}
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: /开始模拟/ }));

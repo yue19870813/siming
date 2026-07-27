@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { WelcomeView } from "./components/WelcomeView";
@@ -165,4 +165,26 @@ test("an open project can visit the welcome page and return", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: /返回“司命演示项目”/ }));
   expect(screen.getByRole("button", { name: "画布" })).toBeInTheDocument();
+});
+
+test("command copy and paste duplicates the selected canvas node", async () => {
+  openTestProject();
+  render(<App />);
+  const initial = useEditorStore.getState();
+  const dialogue = initial.project.dialogues[0];
+  const selected = dialogue.nodes[1];
+  act(() => initial.setSelectedNode(selected.id));
+  const initialCount = dialogue.nodes.length;
+
+  fireEvent.keyDown(window, { key: "c", metaKey: true });
+  fireEvent.keyDown(window, { key: "v", metaKey: true });
+
+  await waitFor(() =>
+    expect(
+      useEditorStore.getState().project.dialogues[0].nodes,
+    ).toHaveLength(initialCount + 1),
+  );
+  const state = useEditorStore.getState();
+  expect(state.selectedNodeId).not.toBe(selected.id);
+  expect(state.notice).toMatch(/^已粘贴节点：/);
 });

@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { createConditionLeaf } from "../model/conditions";
 import { createId } from "../model/demo";
 import type {
@@ -12,7 +13,15 @@ import type {
 } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 
-export function Inspector() {
+export function Inspector({
+  width,
+  onResizeStart,
+  onResizeBy,
+}: {
+  width: number;
+  onResizeStart: (event: ReactPointerEvent<HTMLElement>) => void;
+  onResizeBy: (delta: number) => void;
+}) {
   const project = useEditorStore((state) => state.project);
   const dialogueId = useEditorStore((state) => state.selectedDialogueId);
   const nodeId = useEditorStore((state) => state.selectedNodeId);
@@ -43,6 +52,21 @@ export function Inspector() {
 
   return (
     <aside className="inspector">
+      <div
+        className="panel-resize-handle panel-resize-handle--right"
+        role="separator"
+        aria-label="调整右侧面板宽度"
+        aria-orientation="vertical"
+        aria-valuemin={260}
+        aria-valuemax={520}
+        aria-valuenow={Math.round(width)}
+        tabIndex={0}
+        onPointerDown={onResizeStart}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft") onResizeBy(12);
+          if (event.key === "ArrowRight") onResizeBy(-12);
+        }}
+      />
       <header className="inspector-heading">
         <div>
           <small>{node ? "节点属性" : "对话文件属性"}</small>

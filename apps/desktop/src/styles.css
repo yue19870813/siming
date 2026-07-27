@@ -486,7 +486,10 @@ textarea {
 
 .app-body {
   display: grid;
-  grid-template-columns: 306px minmax(0, 1fr) auto;
+  grid-template-columns:
+    var(--sidebar-width, 306px)
+    minmax(0, 1fr)
+    var(--inspector-width, 314px);
   min-height: 0;
   overflow: hidden;
 }
@@ -496,6 +499,7 @@ textarea {
 }
 
 .sidebar-shell {
+  position: relative;
   z-index: 10;
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
@@ -770,11 +774,16 @@ textarea {
   color: var(--text);
   background: var(--panel-soft);
   text-align: left;
+  cursor: grab;
 }
 
 .node-palette-grid button:hover {
   border-color: var(--primary-border);
   background: var(--primary-soft);
+}
+
+.node-palette-grid button:active {
+  cursor: grabbing;
 }
 
 .node-palette-grid i {
@@ -1226,6 +1235,99 @@ textarea {
   box-shadow: 0 -12px 32px rgb(0 0 0 / 18%);
 }
 
+.panel-resize-handle {
+  position: absolute;
+  z-index: 40;
+  touch-action: none;
+}
+
+.panel-resize-handle::after {
+  position: absolute;
+  border-radius: 2px;
+  background: transparent;
+  content: "";
+  transition: background 0.15s ease;
+}
+
+.panel-resize-handle:hover::after,
+.panel-resize-handle:focus-visible::after {
+  background: var(--primary);
+}
+
+.panel-resize-handle--left {
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.panel-resize-handle--left::after,
+.panel-resize-handle--right::after {
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+}
+
+.panel-resize-handle--right {
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.panel-resize-handle--bottom {
+  top: -5px;
+  right: 0;
+  left: 0;
+  height: 10px;
+  cursor: row-resize;
+}
+
+.panel-resize-handle--bottom::after {
+  top: 4px;
+  right: 0;
+  left: 0;
+  height: 2px;
+}
+
+html.is-resizing-columns,
+html.is-resizing-columns * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+html.is-resizing-rows,
+html.is-resizing-rows * {
+  cursor: row-resize !important;
+  user-select: none !important;
+}
+
+html.is-dragging-node,
+html.is-dragging-node * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.node-drag-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  padding: 7px 11px;
+  border: 1px solid var(--primary-border);
+  border-radius: 7px;
+  color: var(--text);
+  background: var(--panel-raised);
+  box-shadow: var(--shadow);
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+  will-change: transform;
+}
+
 .workbench-panel > header {
   display: flex;
   align-items: center;
@@ -1467,6 +1569,21 @@ textarea {
 .react-flow {
   width: 100%;
   height: 100%;
+}
+
+.canvas-view {
+  position: relative;
+}
+
+.canvas-view.is-node-drop-target::after {
+  position: absolute;
+  inset: 8px;
+  z-index: 12;
+  border: 1px dashed var(--primary);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+  pointer-events: none;
+  content: "";
 }
 
 .react-flow {
@@ -1776,8 +1893,9 @@ textarea {
 }
 
 .inspector {
-  width: 314px;
-  min-width: 314px;
+  position: relative;
+  width: 100%;
+  min-width: 0;
   overflow: auto;
   border-left: 1px solid var(--border);
   background: var(--panel);
@@ -2448,15 +2566,6 @@ html[data-theme="light"] .cm-editor {
   .topbar {
     grid-template-columns: minmax(150px, 1fr) auto minmax(535px, 1fr);
     gap: 8px;
-  }
-
-  .app-body {
-    grid-template-columns: 286px minmax(0, 1fr) auto;
-  }
-
-  .inspector {
-    width: 286px;
-    min-width: 286px;
   }
 
   .topbar-actions .button--ghost {
