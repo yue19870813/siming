@@ -126,6 +126,7 @@ export function DataView() {
       </div>
       {error && <div className="inline-error">{error}</div>}
       <CodeMirror
+        className="data-editor"
         value={draft}
         height="100%"
         theme={
