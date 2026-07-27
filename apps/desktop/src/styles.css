@@ -22,6 +22,16 @@ html[data-theme="dark"] {
   --success: #56cbb8;
   --warning: #dfa05f;
   --shadow: 0 14px 36px rgb(0 0 0 / 28%);
+  --ui-font-8: 8px;
+  --ui-font-9: 9px;
+  --ui-font-10: 10px;
+  --ui-font-11: 11px;
+  --ui-font-12: 12px;
+  --ui-font-13: 13px;
+  --ui-font-14: 14px;
+  --ui-font-16: 16px;
+  --ui-font-20: 20px;
+  --ui-font-22: 22px;
   font-family:
     Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", ui-sans-serif,
     system-ui, sans-serif;
@@ -29,6 +39,45 @@ html[data-theme="dark"] {
   background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+html[data-ui-font-size="small"] {
+  --ui-font-8: 7.2px;
+  --ui-font-9: 8.1px;
+  --ui-font-10: 9px;
+  --ui-font-11: 9.9px;
+  --ui-font-12: 10.8px;
+  --ui-font-13: 11.7px;
+  --ui-font-14: 12.6px;
+  --ui-font-16: 14.4px;
+  --ui-font-20: 18px;
+  --ui-font-22: 19.8px;
+}
+
+html[data-ui-font-size="medium"] {
+  --ui-font-8: 8px;
+  --ui-font-9: 9px;
+  --ui-font-10: 10px;
+  --ui-font-11: 11px;
+  --ui-font-12: 12px;
+  --ui-font-13: 13px;
+  --ui-font-14: 14px;
+  --ui-font-16: 16px;
+  --ui-font-20: 20px;
+  --ui-font-22: 22px;
+}
+
+html[data-ui-font-size="large"] {
+  --ui-font-8: 9.12px;
+  --ui-font-9: 10.26px;
+  --ui-font-10: 11.4px;
+  --ui-font-11: 12.54px;
+  --ui-font-12: 13.68px;
+  --ui-font-13: 14.82px;
+  --ui-font-14: 15.96px;
+  --ui-font-16: 18.24px;
+  --ui-font-20: 22.8px;
+  --ui-font-22: 25.08px;
 }
 
 html[data-theme="light"] {
@@ -147,7 +196,7 @@ textarea {
   gap: 8px;
   min-width: 0;
   overflow: visible;
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
   white-space: nowrap;
 }
 
@@ -215,7 +264,7 @@ textarea {
   border-radius: 6px;
   color: var(--muted);
   background: transparent;
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
   text-align: left;
 }
 
@@ -227,7 +276,7 @@ textarea {
 .project-menu kbd {
   margin-left: auto;
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .topbar-center {
@@ -275,7 +324,7 @@ textarea {
   border-radius: 5px;
   color: var(--muted);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
 }
 
 .view-switch button.is-active,
@@ -327,7 +376,7 @@ textarea {
   border: 1px solid transparent;
   border-radius: 7px;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
   font-weight: 650;
 }
 
@@ -365,7 +414,7 @@ textarea {
 .kbd {
   margin-left: 1px;
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   font-weight: 500;
 }
 
@@ -377,7 +426,7 @@ textarea {
   border-radius: 7px;
   color: var(--text);
   background: var(--panel-raised);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .export-control {
@@ -440,9 +489,8 @@ textarea {
   border-radius: 6px;
   color: var(--primary-hover);
   background: var(--panel-soft);
-  font:
-    8px ui-monospace,
-    monospace;
+  font-family: ui-monospace, monospace;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .export-menu > button > span:last-child {
@@ -451,12 +499,12 @@ textarea {
 }
 
 .export-menu strong {
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .export-menu small {
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .button--danger {
@@ -481,7 +529,7 @@ textarea {
   width: 74px;
   border: 0;
   background: transparent;
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .app-body {
@@ -582,7 +630,7 @@ textarea {
   height: 43px;
   padding: 0 12px;
   border-bottom: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--ui-font-13, 13px);
 }
 
 .search-field {
@@ -608,7 +656,7 @@ textarea {
   border: 0;
   background: transparent;
   box-shadow: none;
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
 }
 
 .quick-section,
@@ -623,7 +671,7 @@ textarea {
   display: block;
   margin: 13px 2px 6px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .quick-item,
@@ -637,7 +685,7 @@ textarea {
   border-radius: 6px;
   color: var(--muted);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
   text-align: left;
 }
 
@@ -656,7 +704,7 @@ textarea {
 .resource-links button span {
   margin-left: auto;
   color: var(--faint);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .section-label {
@@ -664,7 +712,7 @@ textarea {
   justify-content: space-between;
   margin: 10px 2px 7px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .tree-file-group {
@@ -690,7 +738,7 @@ textarea {
   padding: 3px 4px;
   overflow: hidden;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .tree-folder span {
@@ -728,13 +776,13 @@ textarea {
 
 .tree-file strong {
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
 }
 
 .tree-file small {
   margin-top: 2px;
   color: var(--faint);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .tree-file:hover {
@@ -799,13 +847,13 @@ textarea {
 }
 
 .node-palette-grid strong {
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .node-palette-grid small {
   margin-top: 2px;
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .resource-links {
@@ -823,7 +871,7 @@ textarea {
 .section-empty {
   margin: 12px 2px;
   color: var(--faint);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
   line-height: 1.6;
 }
 
@@ -849,16 +897,16 @@ textarea {
   border-radius: 4px;
   color: var(--primary-hover);
   background: var(--primary-soft);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .search-results button strong {
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .search-results button small {
   color: var(--faint);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .activity-summary {
@@ -875,7 +923,7 @@ textarea {
 }
 
 .activity-summary p {
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
   line-height: 1.7;
 }
 
@@ -964,13 +1012,13 @@ textarea {
 }
 
 .welcome-header strong {
-  font-size: 20px;
+  font-size: var(--ui-font-20, 20px);
   letter-spacing: 0.08em;
 }
 
 .welcome-header span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   letter-spacing: 0.24em;
 }
 
@@ -980,7 +1028,7 @@ textarea {
 
 .welcome-kicker {
   color: var(--primary-hover);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
   font-weight: 700;
   letter-spacing: 0.18em;
 }
@@ -996,7 +1044,7 @@ textarea {
   max-width: 620px;
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--ui-font-14, 14px);
   line-height: 1.9;
 }
 
@@ -1015,7 +1063,7 @@ textarea {
   height: 38px;
   padding: 0 17px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
   font-weight: 650;
 }
 
@@ -1054,7 +1102,7 @@ textarea {
 
 .welcome-return span {
   color: var(--primary-hover);
-  font-size: 16px;
+  font-size: var(--ui-font-16, 16px);
 }
 
 .welcome-features {
@@ -1080,14 +1128,14 @@ textarea {
 }
 
 .welcome-features strong {
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
 }
 
 .welcome-features p {
   grid-column: 1 / -1;
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
   line-height: 1.65;
 }
 
@@ -1097,7 +1145,7 @@ textarea {
   gap: 6px;
   margin-top: 20px;
   color: var(--faint);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .welcome-footer svg {
@@ -1141,20 +1189,20 @@ textarea {
 
 .welcome-modal h2 {
   margin: 6px 0 4px;
-  font-size: 20px;
+  font-size: var(--ui-font-20, 20px);
 }
 
 .welcome-modal p {
   margin: 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .welcome-modal label {
   display: grid;
   gap: 7px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .welcome-modal input {
@@ -1177,7 +1225,7 @@ textarea {
   display: grid;
   gap: 6px;
   color: var(--faint);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .welcome-modal-path code {
@@ -1322,7 +1370,7 @@ html.is-dragging-node * {
   color: var(--text);
   background: var(--panel-raised);
   box-shadow: var(--shadow);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
   font-weight: 700;
   pointer-events: none;
   will-change: transform;
@@ -1348,7 +1396,7 @@ html.is-dragging-node * {
   padding: 0 13px;
   color: var(--muted);
   background: transparent;
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .workbench-tabs button.is-active {
@@ -1375,7 +1423,7 @@ html.is-dragging-node * {
   border-radius: 8px;
   color: var(--primary-hover);
   background: var(--primary-soft);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .workbench-close {
@@ -1406,7 +1454,7 @@ html.is-dragging-node * {
   gap: 8px;
   height: 100%;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .workbench-empty svg {
@@ -1427,7 +1475,7 @@ html.is-dragging-node * {
   border-bottom: 1px solid var(--border);
   color: var(--muted);
   background: transparent;
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
   text-align: left;
 }
 
@@ -1438,7 +1486,7 @@ html.is-dragging-node * {
 .diagnostic-list code {
   overflow: hidden;
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1447,7 +1495,7 @@ html.is-dragging-node * {
   width: max-content;
   padding: 3px 5px;
   border-radius: 4px;
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -1494,12 +1542,12 @@ html.is-dragging-node * {
 }
 
 .simulator-speaker strong {
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .simulator-speaker code {
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .simulator-panel > p {
@@ -1509,7 +1557,7 @@ html.is-dragging-node * {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel-soft);
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
   line-height: 1.6;
 }
 
@@ -1517,7 +1565,7 @@ html.is-dragging-node * {
   display: grid;
   gap: 3px;
   color: var(--success);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .simulator-actions {
@@ -1545,9 +1593,8 @@ html.is-dragging-node * {
   width: 100%;
   height: 29px;
   padding: 0 9px;
-  font:
-    10px ui-monospace,
-    monospace;
+  font-family: ui-monospace, monospace;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .terminal-panel pre {
@@ -1556,9 +1603,9 @@ html.is-dragging-node * {
   overflow: auto;
   color: #aeb1c2;
   background: #0b0c11;
-  font:
-    10px/1.6 ui-monospace,
-    monospace;
+  font-family: ui-monospace, monospace;
+  font-size: var(--ui-font-10, 10px);
+  line-height: 1.6;
 }
 
 .workspace--editor {
@@ -1642,7 +1689,7 @@ html.is-dragging-node * {
   padding: 0 9px;
   border-bottom: 1px solid var(--border);
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
   font-weight: 700;
 }
 
@@ -1668,12 +1715,12 @@ html.is-dragging-node * {
 .flow-node-content {
   min-height: 53px;
   padding: 10px;
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .flow-node-content strong {
   color: var(--node-color);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .flow-node-content p {
@@ -1695,7 +1742,7 @@ html.is-dragging-node * {
   padding: 5px 9px;
   border-top: 1px solid var(--border);
   color: var(--primary-hover);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   font-weight: 800;
 }
 
@@ -1722,7 +1769,7 @@ html.is-dragging-node * {
   border-radius: 5px;
   color: var(--success);
   background: rgb(78 198 184 / 12%);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   font-weight: 800;
 }
 
@@ -1737,7 +1784,7 @@ html.is-dragging-node * {
   position: absolute;
   right: 11px;
   color: var(--muted);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
   font-weight: 800;
 }
 
@@ -1765,7 +1812,7 @@ html.is-dragging-node * {
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--panel);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .table-view th {
@@ -1777,7 +1824,7 @@ html.is-dragging-node * {
   border-bottom: 1px solid var(--border);
   color: var(--muted);
   background: var(--panel-raised);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
   text-align: left;
 }
 
@@ -1809,7 +1856,7 @@ html.is-dragging-node * {
   border-radius: 5px;
   color: var(--muted);
   background: var(--panel-raised);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   font-weight: 700;
 }
 
@@ -1832,7 +1879,7 @@ html.is-dragging-node * {
 
 .tree-indent strong {
   color: var(--text);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .tree-indent small {
@@ -1872,12 +1919,12 @@ html.is-dragging-node * {
 }
 
 .data-toolbar strong {
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .data-toolbar span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .toolbar-actions {
@@ -1891,7 +1938,7 @@ html.is-dragging-node * {
   border-bottom: 1px solid rgb(239 114 130 / 30%);
   color: var(--danger);
   background: var(--danger-soft);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .data-editor {
@@ -1901,7 +1948,9 @@ html.is-dragging-node * {
 }
 
 .cm-editor,
-.cm-scroller {
+.cm-scroller,
+.cm-content,
+.cm-gutters {
   min-height: 0;
   font-size: var(--editor-font-size, 13px);
 }
@@ -1944,13 +1993,13 @@ html.is-dragging-node * {
 
 .inspector-heading small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .inspector-heading strong {
   margin-top: 3px;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1973,7 +2022,7 @@ html.is-dragging-node * {
 
 .inspector-section > header > strong {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
   letter-spacing: 0.04em;
 }
 
@@ -1981,7 +2030,7 @@ html.is-dragging-node * {
   width: auto;
   padding: 0 7px;
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .inspector-field,
@@ -1990,7 +2039,7 @@ html.is-dragging-node * {
   gap: 6px;
   margin-bottom: 10px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .inspector-field input,
@@ -2005,7 +2054,7 @@ html.is-dragging-node * {
   width: 100%;
   padding: 7px 8px;
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .inspector-field input,
@@ -2037,7 +2086,7 @@ html.is-dragging-node * {
   border-radius: 5px;
   color: var(--muted);
   background: transparent;
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .tag-picker button.is-active {
@@ -2056,7 +2105,7 @@ html.is-dragging-node * {
   display: flex;
   justify-content: space-between;
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .condition-grid {
@@ -2069,7 +2118,7 @@ html.is-dragging-node * {
   width: 100%;
   height: 31px;
   padding: 5px;
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .choice-editor {
@@ -2092,7 +2141,7 @@ html.is-dragging-node * {
   border-radius: 5px;
   color: var(--success);
   background: rgb(78 198 184 / 12%);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   font-weight: 800;
 }
 
@@ -2113,7 +2162,7 @@ html.is-dragging-node * {
 
 .host-event-card header strong {
   color: var(--text);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .host-event-card header span {
@@ -2122,7 +2171,7 @@ html.is-dragging-node * {
   border-radius: 4px;
   color: var(--primary-hover);
   background: var(--primary-soft);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
   font-weight: 800;
 }
 
@@ -2150,21 +2199,21 @@ html.is-dragging-node * {
 
 .workspace-heading small {
   color: var(--primary-hover);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 
 .workspace-heading h2 {
   margin: 4px 0 5px;
-  font-size: 22px;
+  font-size: var(--ui-font-22, 22px);
   letter-spacing: -0.02em;
 }
 
 .workspace-heading p {
   margin: 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .resource-layout {
@@ -2212,12 +2261,12 @@ html.is-dragging-node * {
 
 .resource-list-items strong {
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .resource-list-items small {
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .resource-editor {
@@ -2232,7 +2281,7 @@ html.is-dragging-node * {
 }
 
 .editor-section-title strong {
-  font-size: 13px;
+  font-size: var(--ui-font-13, 13px);
 }
 
 .reference-banner {
@@ -2242,7 +2291,7 @@ html.is-dragging-node * {
   border-radius: 6px;
   color: var(--muted);
   background: var(--primary-soft);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .form-grid {
@@ -2294,12 +2343,12 @@ html.is-dragging-node * {
 
 .settings-card > header strong {
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
 }
 
 .settings-card > header small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .settings-hub {
@@ -2321,12 +2370,12 @@ html.is-dragging-node * {
 }
 
 .settings-header strong {
-  font-size: 14px;
+  font-size: var(--ui-font-14, 14px);
 }
 
 .settings-header span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .settings-body {
@@ -2345,7 +2394,7 @@ html.is-dragging-node * {
   display: block;
   margin: 0 8px 8px;
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .settings-scope-nav button {
@@ -2359,7 +2408,7 @@ html.is-dragging-node * {
   border-radius: 7px;
   color: var(--muted);
   background: transparent;
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
   text-align: left;
 }
 
@@ -2389,13 +2438,13 @@ html.is-dragging-node * {
 
 .settings-page-heading h2 {
   margin: 0 0 4px;
-  font-size: 16px;
+  font-size: var(--ui-font-16, 16px);
 }
 
 .settings-page-heading p {
   margin: 0;
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   line-height: 1.5;
 }
 
@@ -2413,7 +2462,7 @@ html.is-dragging-node * {
   height: 38px;
   padding: 0 12px;
   border-bottom: 1px solid var(--border);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
   font-weight: 700;
 }
 
@@ -2437,12 +2486,12 @@ html.is-dragging-node * {
 }
 
 .settings-row > span strong {
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .settings-row > span small {
   color: var(--faint);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
   line-height: 1.45;
 }
 
@@ -2458,7 +2507,7 @@ html.is-dragging-node * {
   height: 32px;
   padding: 0 10px;
   color: var(--text);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .settings-row input[readonly],
@@ -2490,9 +2539,8 @@ html.is-dragging-node * {
 .path-resolution {
   overflow: hidden;
   color: var(--faint);
-  font:
-    8px ui-monospace,
-    monospace;
+  font-family: ui-monospace, monospace;
+  font-size: var(--ui-font-8, 8px);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2508,12 +2556,12 @@ html.is-dragging-node * {
 .settings-actions > span {
   margin-right: auto;
   color: var(--faint);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .form-grid label > small {
   color: var(--faint);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .resolved-path {
@@ -2524,7 +2572,7 @@ html.is-dragging-node * {
   border: 1px dashed var(--border);
   border-radius: 7px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .resolved-path code {
@@ -2550,7 +2598,7 @@ html.is-dragging-node * {
   height: 100%;
   min-height: 240px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
 }
 
 .statusbar {
@@ -2563,7 +2611,7 @@ html.is-dragging-node * {
   border-top: 1px solid var(--border);
   color: var(--muted);
   background: var(--panel);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   white-space: nowrap;
 }
 
@@ -2617,7 +2665,7 @@ html[data-theme="light"] .cm-editor {
   border-radius: 5px;
   color: var(--muted);
   background: transparent;
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .workbench-refresh:hover {
@@ -2646,7 +2694,7 @@ html[data-theme="light"] .cm-editor {
   padding: 0 12px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .diagnostics-summary strong {
@@ -2671,7 +2719,7 @@ html[data-theme="light"] .cm-editor {
   border-bottom: 1px solid var(--border);
   color: var(--muted);
   background: var(--panel-soft);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .diagnostic-group > header span {
@@ -2694,14 +2742,13 @@ html[data-theme="light"] .cm-editor {
 
 .diagnostic-list button strong {
   color: var(--text);
-  font-size: 10px;
+  font-size: var(--ui-font-10, 10px);
 }
 
 .diagnostic-list button small {
   color: var(--faint);
-  font:
-    8px ui-monospace,
-    monospace;
+  font-family: ui-monospace, monospace;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .simulator-start {
@@ -2716,19 +2763,19 @@ html[data-theme="light"] .cm-editor {
 
 .simulator-start > strong {
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--ui-font-12, 12px);
 }
 
 .simulator-start p {
   margin: 0;
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .simulator-start label {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .simulator-workspace {
@@ -2764,13 +2811,13 @@ html[data-theme="light"] .cm-editor {
   padding: 0 10px;
   border-bottom: 1px solid var(--border);
   background: var(--panel-soft);
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .simulator-variables > header span,
 .simulation-trace > header span {
   color: var(--faint);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .simulator-variables > label {
@@ -2791,15 +2838,14 @@ html[data-theme="light"] .cm-editor {
 
 .simulator-variables > label strong {
   overflow: hidden;
-  font:
-    9px ui-monospace,
-    monospace;
+  font-family: ui-monospace, monospace;
+  font-size: var(--ui-font-9, 9px);
   text-overflow: ellipsis;
 }
 
 .simulator-variables > label small {
   color: var(--faint);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .simulator-variables input,
@@ -2807,7 +2853,7 @@ html[data-theme="light"] .cm-editor {
   width: 100%;
   height: 28px;
   padding: 0 6px;
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .simulator-current {
@@ -2829,7 +2875,7 @@ html[data-theme="light"] .cm-editor {
   width: 120px;
   height: 25px;
   padding: 0 6px;
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .simulation-status {
@@ -2837,7 +2883,7 @@ html[data-theme="light"] .cm-editor {
   border-radius: 5px;
   color: var(--success);
   background: rgb(86 203 184 / 11%);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .status--loopGuard,
@@ -2856,25 +2902,24 @@ html[data-theme="light"] .cm-editor {
 
 .simulator-dialogue small {
   color: var(--faint);
-  font:
-    8px ui-monospace,
-    monospace;
+  font-family: ui-monospace, monospace;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .simulator-dialogue strong {
-  font-size: 11px;
+  font-size: var(--ui-font-11, 11px);
 }
 
 .simulator-dialogue p {
   max-width: 540px;
   margin: 0;
-  font-size: 13px;
+  font-size: var(--ui-font-13, 13px);
   line-height: 1.7;
 }
 
 .locale-fallback {
   color: var(--warning);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .simulator-current .simulator-actions {
@@ -2884,7 +2929,7 @@ html[data-theme="light"] .cm-editor {
 
 .simulator-error {
   padding: 5px;
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
   text-align: center;
 }
 
@@ -2910,7 +2955,7 @@ html[data-theme="light"] .cm-editor {
 
 .trace-entry > code {
   color: var(--faint);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .trace-entry > span {
@@ -2921,13 +2966,13 @@ html[data-theme="light"] .cm-editor {
 
 .trace-entry strong {
   color: var(--primary-hover);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .trace-entry small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2963,7 +3008,7 @@ html[data-theme="light"] .cm-editor {
   flex: 1;
   height: 27px;
   padding: 0 6px;
-  font-size: 9px;
+  font-size: var(--ui-font-9, 9px);
 }
 
 .condition-expression-head button {
@@ -2975,7 +3020,7 @@ html[data-theme="light"] .cm-editor {
   border-radius: 5px;
   color: var(--muted);
   background: var(--panel-raised);
-  font-size: 8px;
+  font-size: var(--ui-font-8, 8px);
 }
 
 .condition-children {

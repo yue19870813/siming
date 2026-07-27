@@ -14,14 +14,14 @@ import type {
 
 export const isTauri = () => "__TAURI_INTERNALS__" in window;
 
-export async function chooseProjectDirectory() {
+export async function chooseProjectDirectory(title = "选择司命项目目录") {
   if (!isTauri()) {
     throw new Error("浏览器预览模式不能访问本地目录，请使用 Tauri dev 模式。");
   }
   const selected = await open({
     directory: true,
     multiple: false,
-    title: "选择司命项目目录",
+    title,
   });
   return typeof selected === "string" ? selected : null;
 }
@@ -114,18 +114,28 @@ export async function simulateStep(request: SimulationRequest) {
 
 export async function readSystemSettings(): Promise<SystemSettings> {
   if (!isTauri()) {
+    const source = localStorage.getItem("siming.system-settings");
+    if (source) {
+      try {
+        const saved = JSON.parse(source) as Partial<SystemSettings>;
+        const defaults = browserSystemSettings(
+          saved.theme === "light" ? "light" : "dark",
+        );
+        return {
+          ...defaults,
+          ...saved,
+          uiFontSize: ["small", "medium", "large"].includes(
+            saved.uiFontSize ?? "",
+          )
+            ? saved.uiFontSize!
+            : "medium",
+        };
+      } catch {
+        localStorage.removeItem("siming.system-settings");
+      }
+    }
     const theme = localStorage.getItem("siming.theme");
-    return {
-      schemaVersion: 1,
-      theme: theme === "light" ? "light" : "dark",
-      defaultProjectDirectory: null,
-      interfaceLocale: "zh-CN",
-      editorFontSize: 13,
-      keymap: "system",
-      autoSaveDelaySeconds: 30,
-      recoverySnapshotIntervalSeconds: 60,
-      restoreLastProject: true,
-    };
+    return browserSystemSettings(theme === "light" ? "light" : "dark");
   }
   return invoke<SystemSettings>("read_system_settings");
 }
@@ -133,9 +143,26 @@ export async function readSystemSettings(): Promise<SystemSettings> {
 export async function writeSystemSettings(settings: SystemSettings) {
   if (!isTauri()) {
     localStorage.setItem("siming.theme", settings.theme);
+    localStorage.setItem("siming.system-settings", JSON.stringify(settings));
     return;
   }
   await invoke("write_system_settings", { settings });
+}
+
+function browserSystemSettings(theme: SystemSettings["theme"]): SystemSettings {
+  return {
+    schemaVersion: 1,
+    theme,
+    defaultProjectDirectory: null,
+    interfaceLocale: "zh-CN",
+    uiFontSize: "medium",
+    editorFontSize: 13,
+    keymap: "system",
+    autoSaveDelaySeconds: 30,
+    recoverySnapshotIntervalSeconds: 60,
+    restoreLastProject: true,
+    projectExportDirectories: {},
+  };
 }
 
 function requireTauri(feature: string) {

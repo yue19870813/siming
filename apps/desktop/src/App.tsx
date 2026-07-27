@@ -33,6 +33,7 @@ import {
   writeRecoverySnapshot,
   writeSystemSettings,
 } from "./lib/projectApi";
+import { InterfaceLocaleEffect } from "./lib/interfaceLocale";
 import { beginPanelResize, clampPanelSize } from "./lib/panelResize";
 import type { SystemSettings } from "./model/types";
 import { useEditorStore } from "./store/editorStore";
@@ -42,11 +43,13 @@ const defaultSettings: SystemSettings = {
   theme: "dark",
   defaultProjectDirectory: null,
   interfaceLocale: "zh-CN",
+  uiFontSize: "medium",
   editorFontSize: 13,
   keymap: "system",
   autoSaveDelaySeconds: 30,
   recoverySnapshotIntervalSeconds: 60,
   restoreLastProject: true,
+  projectExportDirectories: {},
 };
 
 type PanelLayoutStyle = CSSProperties & {
@@ -104,11 +107,18 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
+    document.documentElement.dataset.uiFontSize = settings.uiFontSize;
+    document.documentElement.lang = settings.interfaceLocale;
     document.documentElement.style.setProperty(
       "--editor-font-size",
       `${settings.editorFontSize}px`,
     );
-  }, [settings.editorFontSize, settings.theme]);
+  }, [
+    settings.editorFontSize,
+    settings.interfaceLocale,
+    settings.theme,
+    settings.uiFontSize,
+  ]);
 
   useEffect(() => {
     recoveryState.current = {
@@ -188,11 +198,7 @@ export default function App() {
         event.preventDefault();
         if (projectLoaded) redo();
       }
-      if (
-        !editingText &&
-        event.key.toLowerCase() === "v" &&
-        event.shiftKey
-      ) {
+      if (!editingText && event.key.toLowerCase() === "v" && event.shiftKey) {
         event.preventDefault();
         if (projectLoaded) setWorkbenchPanel("problems");
       }
@@ -226,11 +232,7 @@ export default function App() {
     if (!newProjectRootPath) return;
     try {
       setBusy(true);
-      const snapshot = await createProject(
-        newProjectRootPath,
-        name,
-        "zh-CN",
-      );
+      const snapshot = await createProject(newProjectRootPath, name, "zh-CN");
       setNewProjectRootPath(null);
       setProject(snapshot);
       setNotice(`已创建项目：${snapshot.rootPath}`);
@@ -249,7 +251,9 @@ export default function App() {
     )
       return;
     try {
-      const rootPath = await chooseProjectDirectory();
+      const rootPath = await chooseProjectDirectory(
+        "选择包含 .siming 文件的司命项目目录",
+      );
       if (!rootPath) return;
       setBusy(true);
       const snapshot = await openProject(rootPath);
@@ -331,8 +335,28 @@ export default function App() {
     )
       return;
     try {
+      let configuredPath =
+        settings.projectExportDirectories[project.manifest.projectId]?.trim() ??
+        "";
+      let nextSettings = settings;
+      if (!configuredPath) {
+        const selected = await chooseProjectDirectory("选择导出文件位置");
+        if (!selected) return;
+        configuredPath = selected;
+        nextSettings = {
+          ...settings,
+          projectExportDirectories: {
+            ...settings.projectExportDirectories,
+            [project.manifest.projectId]: selected,
+          },
+        };
+        await handleSettingsChange(nextSettings, false);
+      }
       setBusy(true);
-      const result = await exportProject(project);
+      const result = await exportProject(
+        project,
+        isAbsolutePath(configuredPath) ? configuredPath : undefined,
+      );
       setNotice(
         `已导出 ${result.files.length} 个文件：${result.outputDirectory}`,
       );
@@ -386,11 +410,11 @@ export default function App() {
     }
   }
 
-  async function handleSettingsChange(next: SystemSettings) {
+  async function handleSettingsChange(next: SystemSettings, showNotice = true) {
     setSettings(next);
     try {
       await writeSystemSettings(next);
-      setNotice("系统设置已保存在本机。");
+      if (showNotice) setNotice("系统设置已保存在本机。");
     } catch (error) {
       setNotice(`系统设置保存失败：${errorMessage(error)}`);
     }
@@ -407,6 +431,7 @@ export default function App() {
   if (!projectLoaded) {
     return (
       <main className="welcome-shell">
+        <InterfaceLocaleEffect locale={settings.interfaceLocale} />
         <WelcomeView
           notice={notice}
           busy={busy}
@@ -429,6 +454,7 @@ export default function App() {
         activity === "welcome" ? "app-shell--welcome" : ""
       }`}
     >
+      <InterfaceLocaleEffect locale={settings.interfaceLocale} />
       {activity !== "welcome" && (
         <TopBar
           onNew={handleNew}
@@ -447,16 +473,15 @@ export default function App() {
         style={
           {
             "--sidebar-width": `${sidebarWidth}px`,
-            "--inspector-width": editorActivity
-              ? `${inspectorWidth}px`
-              : "0px",
+            "--inspector-width": editorActivity ? `${inspectorWidth}px` : "0px",
           } as PanelLayoutStyle
         }
       >
         <Sidebar
           width={sidebarWidth}
           onResizeStart={(event) => {
-            const bodyWidth = appBodyRef.current?.clientWidth ?? window.innerWidth;
+            const bodyWidth =
+              appBodyRef.current?.clientWidth ?? window.innerWidth;
             beginPanelResize(event, {
               axis: "x",
               initialSize: sidebarWidth,
@@ -573,4 +598,13 @@ function errorMessage(error: unknown) {
     return String(error.message);
   }
   return "发生未知错误";
+}
+
+function isAbsolutePath(value: string) {
+  const normalized = value.trim().replaceAll("\\", "/");
+  return (
+    normalized.startsWith("/") ||
+    normalized.startsWith("//") ||
+    /^[A-Za-z]:\//.test(normalized)
+  );
 }

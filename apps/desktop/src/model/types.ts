@@ -142,11 +142,13 @@ export type SystemSettings = {
   theme: "dark" | "light";
   defaultProjectDirectory: string | null;
   interfaceLocale: "zh-CN" | "en-US";
+  uiFontSize: "small" | "medium" | "large";
   editorFontSize: number;
   keymap: "system" | "macos" | "windows";
   autoSaveDelaySeconds: number;
   recoverySnapshotIntervalSeconds: number;
   restoreLastProject: boolean;
+  projectExportDirectories: Record<string, string>;
 };
 
 export type ExportResult = {

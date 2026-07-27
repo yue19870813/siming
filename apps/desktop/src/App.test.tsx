@@ -1,5 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { open } from "@tauri-apps/plugin-dialog";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { WelcomeView } from "./components/WelcomeView";
@@ -24,7 +31,9 @@ vi.mock("@tauri-apps/plugin-opener", () => ({
 
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
+  vi.mocked(open).mockReset();
   openUrl.mockReset();
+  Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
   localStorage.clear();
   useEditorStore.getState().closeProject();
 });
@@ -49,9 +58,7 @@ test("starts on the welcome page without a demo project", async () => {
     "https://github.com/yue19870813/siming",
   );
   fireEvent.click(repositoryLink);
-  expect(openUrl).toHaveBeenCalledWith(
-    "https://github.com/yue19870813/siming",
-  );
+  expect(openUrl).toHaveBeenCalledWith("https://github.com/yue19870813/siming");
   expect(screen.queryByText("司命演示项目")).not.toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "画布" }),
@@ -83,9 +90,7 @@ test("new project details are confirmed in an in-app dialog", () => {
     />,
   );
 
-  expect(
-    screen.getByRole("form", { name: "新建项目" }),
-  ).toBeInTheDocument();
+  expect(screen.getByRole("form", { name: "新建项目" })).toBeInTheDocument();
   expect(screen.getByText("/tmp/siming-story")).toBeInTheDocument();
 
   const nameInput = screen.getByRole("textbox", { name: "项目名称" });
@@ -148,6 +153,153 @@ test("project and system settings are separate pages", async () => {
   );
 });
 
+test("project export path can switch between relative and absolute modes", async () => {
+  openTestProject();
+  render(<App />);
+  await act(async () => undefined);
+  const projectId = useEditorStore.getState().project.manifest.projectId;
+
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.click(screen.getByRole("button", { name: "绝对路径" }));
+  const exportPath = screen.getByRole("textbox", {
+    name: /导出文件位置/,
+  });
+  fireEvent.change(exportPath, {
+    target: { value: "/tmp/siming-runtime" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "应用项目设置" }));
+
+  await waitFor(() =>
+    expect(
+      JSON.parse(localStorage.getItem("siming.system-settings") ?? "{}")
+        .projectExportDirectories,
+    ).toEqual({ [projectId]: "/tmp/siming-runtime" }),
+  );
+  expect(
+    screen.getByText("绝对路径仅保存在当前设备，不会写入项目配置。"),
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "相对路径" }));
+  expect(exportPath).toHaveValue("");
+  fireEvent.click(screen.getByRole("button", { name: "应用项目设置" }));
+  await waitFor(() =>
+    expect(
+      JSON.parse(localStorage.getItem("siming.system-settings") ?? "{}")
+        .projectExportDirectories,
+    ).toEqual({}),
+  );
+});
+
+test("first export asks for a directory and reuses it afterwards", async () => {
+  const project = createDemoProject();
+  project.rootPath = "/tmp/siming-project";
+  useEditorStore.getState().setProject(project);
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    configurable: true,
+    value: {},
+  });
+  vi.mocked(open).mockResolvedValue("/tmp/siming-export");
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === "read_system_settings") {
+      return {
+        schemaVersion: 1,
+        theme: "dark",
+        defaultProjectDirectory: null,
+        interfaceLocale: "zh-CN",
+        uiFontSize: "medium",
+        editorFontSize: 13,
+        keymap: "system",
+        autoSaveDelaySeconds: 30,
+        recoverySnapshotIntervalSeconds: 60,
+        restoreLastProject: true,
+        projectExportDirectories: {},
+      } as never;
+    }
+    if (command === "export_project") {
+      return {
+        outputDirectory: "/tmp/siming-export",
+        files: [],
+      } as never;
+    }
+    return undefined as never;
+  });
+  render(<App />);
+  await act(async () => undefined);
+
+  fireEvent.click(screen.getByRole("button", { name: "导出 JSON" }));
+
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith(
+      "export_project",
+      expect.objectContaining({ outputPath: "/tmp/siming-export" }),
+    ),
+  );
+  expect(open).toHaveBeenCalledWith(
+    expect.objectContaining({
+      directory: true,
+      title: "选择导出文件位置",
+    }),
+  );
+  expect(invoke).toHaveBeenCalledWith(
+    "write_system_settings",
+    expect.objectContaining({
+      settings: expect.objectContaining({
+        projectExportDirectories: {
+          [project.manifest.projectId]: "/tmp/siming-export",
+        },
+      }),
+    }),
+  );
+
+  vi.mocked(open).mockClear();
+  fireEvent.click(screen.getByRole("button", { name: "导出 JSON" }));
+  await waitFor(() =>
+    expect(
+      vi
+        .mocked(invoke)
+        .mock.calls.filter(([command]) => command === "export_project"),
+    ).toHaveLength(2),
+  );
+  expect(open).not.toHaveBeenCalled();
+});
+
+test("system language and editor font size settings are applied", async () => {
+  openTestProject();
+  render(<App />);
+  await act(async () => undefined);
+
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.click(screen.getByRole("button", { name: "系统设置" }));
+  fireEvent.change(screen.getByRole("combobox", { name: /界面语言/ }), {
+    target: { value: "en-US" },
+  });
+  fireEvent.change(screen.getByRole("combobox", { name: /^编辑器字号/ }), {
+    target: { value: "large" },
+  });
+  fireEvent.change(screen.getByRole("combobox", { name: /数据编辑器字号/ }), {
+    target: { value: "18" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存系统设置" }));
+
+  await waitFor(() => {
+    expect(document.documentElement.lang).toBe("en-US");
+    expect(document.documentElement.dataset.uiFontSize).toBe("large");
+    expect(
+      document.documentElement.style.getPropertyValue("--editor-font-size"),
+    ).toBe("18px");
+    expect(
+      screen.getByRole("heading", { name: "System Settings" }),
+    ).toBeInTheDocument();
+  });
+  expect(
+    JSON.parse(localStorage.getItem("siming.system-settings") ?? "{}"),
+  ).toMatchObject({
+    interfaceLocale: "en-US",
+    uiFontSize: "large",
+    editorFontSize: 18,
+  });
+});
+
 test("an open project can visit the welcome page and return", async () => {
   openTestProject();
   render(<App />);
@@ -180,9 +332,9 @@ test("command copy and paste duplicates the selected canvas node", async () => {
   fireEvent.keyDown(window, { key: "v", metaKey: true });
 
   await waitFor(() =>
-    expect(
-      useEditorStore.getState().project.dialogues[0].nodes,
-    ).toHaveLength(initialCount + 1),
+    expect(useEditorStore.getState().project.dialogues[0].nodes).toHaveLength(
+      initialCount + 1,
+    ),
   );
   const state = useEditorStore.getState();
   expect(state.selectedNodeId).not.toBe(selected.id);

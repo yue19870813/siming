@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use siming_storage::ProjectSnapshot;
-use std::{fs, path::Path};
+use std::{collections::BTreeMap, fs, path::Path};
 use tauri::Manager;
 
 #[derive(Debug, Serialize)]
@@ -48,6 +48,8 @@ struct SystemSettings {
     default_project_directory: Option<String>,
     #[serde(default = "default_interface_locale")]
     interface_locale: String,
+    #[serde(default = "default_ui_font_size")]
+    ui_font_size: String,
     editor_font_size: u8,
     #[serde(default = "default_keymap")]
     keymap: String,
@@ -55,6 +57,8 @@ struct SystemSettings {
     auto_save_delay_seconds: u32,
     recovery_snapshot_interval_seconds: u32,
     restore_last_project: bool,
+    #[serde(default)]
+    project_export_directories: BTreeMap<String, String>,
 }
 
 impl Default for SystemSettings {
@@ -64,17 +68,23 @@ impl Default for SystemSettings {
             theme: Theme::Dark,
             default_project_directory: None,
             interface_locale: default_interface_locale(),
+            ui_font_size: default_ui_font_size(),
             editor_font_size: 13,
             keymap: default_keymap(),
             auto_save_delay_seconds: default_auto_save_delay(),
             recovery_snapshot_interval_seconds: 60,
             restore_last_project: true,
+            project_export_directories: BTreeMap::new(),
         }
     }
 }
 
 fn default_interface_locale() -> String {
     "zh-CN".to_owned()
+}
+
+fn default_ui_font_size() -> String {
+    "medium".to_owned()
 }
 
 fn default_keymap() -> String {

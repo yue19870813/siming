@@ -11,11 +11,13 @@ const systemDefaults: SystemSettings = {
   theme: "dark",
   defaultProjectDirectory: null,
   interfaceLocale: "zh-CN",
+  uiFontSize: "medium",
   editorFontSize: 13,
   keymap: "system",
   autoSaveDelaySeconds: 30,
   recoverySnapshotIntervalSeconds: 60,
   restoreLastProject: true,
+  projectExportDirectories: {},
 };
 
 export function SettingsView({
@@ -23,7 +25,7 @@ export function SettingsView({
   onSettingsChange,
 }: {
   settings: SystemSettings;
-  onSettingsChange: (settings: SystemSettings) => void;
+  onSettingsChange: (settings: SystemSettings, showNotice?: boolean) => void;
 }) {
   const project = useEditorStore((state) => state.project);
   const commit = useEditorStore((state) => state.commit);
@@ -32,7 +34,13 @@ export function SettingsView({
   const [projectDraft, setProjectDraft] = useState(() => ({
     name: project.manifest.name,
     dialogues: project.manifest.paths.dialogues,
-    exports: project.manifest.paths.exports,
+    exports:
+      settings.projectExportDirectories[project.manifest.projectId] ?? "",
+    exportPathMode: isAbsolutePath(
+      settings.projectExportDirectories[project.manifest.projectId] ?? "",
+    )
+      ? ("absolute" as const)
+      : ("relative" as const),
     defaultLocale: project.manifest.defaultLocale,
     locales: project.manifest.locales.join(", "),
   }));
@@ -42,7 +50,13 @@ export function SettingsView({
     setProjectDraft({
       name: project.manifest.name,
       dialogues: project.manifest.paths.dialogues,
-      exports: project.manifest.paths.exports,
+      exports:
+        settings.projectExportDirectories[project.manifest.projectId] ?? "",
+      exportPathMode: isAbsolutePath(
+        settings.projectExportDirectories[project.manifest.projectId] ?? "",
+      )
+        ? "absolute"
+        : "relative",
       defaultLocale: project.manifest.defaultLocale,
       locales: project.manifest.locales.join(", "),
     });
@@ -53,6 +67,7 @@ export function SettingsView({
     project.manifest.paths.dialogues,
     project.manifest.paths.exports,
     project.manifest.projectId,
+    settings.projectExportDirectories,
   ]);
 
   useEffect(() => {
@@ -79,11 +94,24 @@ export function SettingsView({
       setNotice("默认语言必须包含在支持语言列表中。");
       return;
     }
+    if (!isRelativeProjectPath(projectDraft.dialogues)) {
+      setNotice("对话目录必须是项目内的相对路径。");
+      return;
+    }
     if (
-      !isRelativeProjectPath(projectDraft.dialogues) ||
+      projectDraft.exportPathMode === "relative" &&
+      projectDraft.exports.trim() &&
       !isRelativeProjectPath(projectDraft.exports)
     ) {
-      setNotice("对话目录和导出目录必须是项目内的相对路径。");
+      setNotice("相对导出目录必须是项目内且不能包含 ..。");
+      return;
+    }
+    if (
+      projectDraft.exportPathMode === "absolute" &&
+      projectDraft.exports.trim() &&
+      !isAbsolutePath(projectDraft.exports)
+    ) {
+      setNotice("绝对导出目录必须是完整的本机路径。");
       return;
     }
     commit("应用项目设置", (draft) => {
@@ -91,11 +119,32 @@ export function SettingsView({
       draft.manifest.paths.dialogues = normalizeDirectory(
         projectDraft.dialogues,
       );
-      draft.manifest.paths.exports = normalizeDirectory(projectDraft.exports);
+      if (
+        projectDraft.exportPathMode === "relative" &&
+        projectDraft.exports.trim()
+      ) {
+        draft.manifest.paths.exports = normalizeDirectory(projectDraft.exports);
+      }
       draft.manifest.defaultLocale = projectDraft.defaultLocale;
       draft.manifest.locales = locales;
     });
-    setNotice("项目设置已应用，保存项目后写入 .siming/project.json。");
+    const projectExportDirectories = {
+      ...settings.projectExportDirectories,
+    };
+    if (projectDraft.exports.trim()) {
+      projectExportDirectories[project.manifest.projectId] =
+        projectDraft.exportPathMode === "absolute"
+          ? normalizeAbsoluteDirectory(projectDraft.exports)
+          : normalizeDirectory(projectDraft.exports);
+    } else {
+      delete projectExportDirectories[project.manifest.projectId];
+    }
+    onSettingsChange({ ...settings, projectExportDirectories }, false);
+    setNotice(
+      projectDraft.exportPathMode === "absolute"
+        ? "项目设置已应用；绝对导出目录仅保存在本机。"
+        : "项目设置已应用，保存项目后写入 .siming/project.json。",
+    );
   };
 
   return (
@@ -196,10 +245,43 @@ export function SettingsView({
                   help="团队项目推荐使用相对于项目根目录的路径。"
                 >
                   <div className="segmented settings-segmented">
-                    <button className="is-active">相对路径</button>
                     <button
-                      disabled
-                      title="绝对导出路径将在后续版本作为本机覆盖项提供"
+                      aria-label="相对路径"
+                      aria-pressed={projectDraft.exportPathMode === "relative"}
+                      className={
+                        projectDraft.exportPathMode === "relative"
+                          ? "is-active"
+                          : undefined
+                      }
+                      onClick={() =>
+                        setProjectDraft({
+                          ...projectDraft,
+                          exportPathMode: "relative",
+                          exports: isAbsolutePath(projectDraft.exports)
+                            ? ""
+                            : projectDraft.exports,
+                        })
+                      }
+                    >
+                      相对路径
+                    </button>
+                    <button
+                      aria-label="绝对路径"
+                      aria-pressed={projectDraft.exportPathMode === "absolute"}
+                      className={
+                        projectDraft.exportPathMode === "absolute"
+                          ? "is-active"
+                          : undefined
+                      }
+                      onClick={() =>
+                        setProjectDraft({
+                          ...projectDraft,
+                          exportPathMode: "absolute",
+                          exports: isAbsolutePath(projectDraft.exports)
+                            ? projectDraft.exports
+                            : "",
+                        })
+                      }
                     >
                       绝对路径
                     </button>
@@ -207,20 +289,57 @@ export function SettingsView({
                 </SettingsRow>
                 <SettingsRow
                   title="导出文件位置"
-                  help="桌面端与 CLI 默认输出到同一目录。"
+                  help={
+                    projectDraft.exportPathMode === "relative"
+                      ? "桌面端与 CLI 默认输出到同一目录。"
+                      : "绝对路径仅用于当前设备的桌面端导出。"
+                  }
                 >
-                  <input
-                    value={projectDraft.exports}
-                    onChange={(event) =>
-                      setProjectDraft({
-                        ...projectDraft,
-                        exports: event.target.value,
-                      })
-                    }
-                  />
+                  <div className="settings-control-with-button">
+                    <input
+                      value={projectDraft.exports}
+                      onChange={(event) =>
+                        setProjectDraft({
+                          ...projectDraft,
+                          exports: event.target.value,
+                        })
+                      }
+                    />
+                    {projectDraft.exportPathMode === "absolute" && (
+                      <button
+                        className="button button--ghost"
+                        onClick={async () => {
+                          try {
+                            const path =
+                              await chooseProjectDirectory("选择导出目录");
+                            if (path) {
+                              setProjectDraft({
+                                ...projectDraft,
+                                exports: path,
+                              });
+                            }
+                          } catch (error) {
+                            setNotice(
+                              error instanceof Error
+                                ? error.message
+                                : "无法选择导出目录",
+                            );
+                          }
+                        }}
+                      >
+                        选择…
+                      </button>
+                    )}
+                  </div>
                   <small className="path-resolution">
-                    解析为：
-                    {resolvePath(project.rootPath, projectDraft.exports)}
+                    {!projectDraft.exports.trim()
+                      ? "未设置，首次导出时选择目录。"
+                      : projectDraft.exportPathMode === "relative"
+                        ? `解析为：${resolvePath(
+                            project.rootPath,
+                            projectDraft.exports,
+                          )}`
+                        : "绝对路径仅保存在当前设备，不会写入项目配置。"}
                   </small>
                 </SettingsRow>
                 <SettingsRow
@@ -279,7 +398,8 @@ export function SettingsView({
                   setProjectDraft({
                     name: project.manifest.name,
                     dialogues: "dialogues/",
-                    exports: "exports/runtime/",
+                    exports: "",
+                    exportPathMode: "relative",
                     defaultLocale: "zh-CN",
                     locales: "zh-CN, en-US",
                   })
@@ -366,6 +486,25 @@ export function SettingsView({
                   >
                     <option value="dark">深色</option>
                     <option value="light">浅色</option>
+                  </select>
+                </SettingsRow>
+                <SettingsRow
+                  title="编辑器字号"
+                  help="影响编辑器界面的常规文字大小。"
+                >
+                  <select
+                    value={systemDraft.uiFontSize}
+                    onChange={(event) =>
+                      setSystemDraft({
+                        ...systemDraft,
+                        uiFontSize: event.target
+                          .value as SystemSettings["uiFontSize"],
+                      })
+                    }
+                  >
+                    <option value="small">小</option>
+                    <option value="medium">中</option>
+                    <option value="large">大</option>
                   </select>
                 </SettingsRow>
                 <SettingsRow
@@ -552,6 +691,19 @@ function isRelativeProjectPath(value: string) {
     !/^[A-Za-z]:\//.test(normalized) &&
     !normalized.split("/").includes("..")
   );
+}
+
+function isAbsolutePath(value: string) {
+  const normalized = value.trim().replaceAll("\\", "/");
+  return (
+    (normalized.startsWith("/") && normalized !== "/") ||
+    (normalized.startsWith("//") && normalized.length > 2) ||
+    (/^[A-Za-z]:\//.test(normalized) && !/^[A-Za-z]:\/$/.test(normalized))
+  );
+}
+
+function normalizeAbsoluteDirectory(value: string) {
+  return value.trim().replaceAll("\\", "/").replace(/\/+$/, "");
 }
 
 function resolvePath(root: string, relative: string) {
