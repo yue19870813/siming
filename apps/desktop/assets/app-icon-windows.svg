@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
-  <title id="title">司命 macOS 与 iOS 应用图标</title>
+  <title id="title">司命 Windows 应用图标</title>
   <defs>
     <linearGradient id="background" x1="72" y1="48" x2="448" y2="472" gradientUnits="userSpaceOnUse">
       <stop stop-color="#937DFA"/>
       <stop offset="1" stop-color="#6242D1"/>
     </linearGradient>
   </defs>
-  <!-- Tauri's macOS development window renders the raster icon directly. -->
-  <rect width="512" height="512" rx="116" fill="url(#background)"/>
-  <g transform="translate(108.5 108.5) scale(12.29)" fill="none" stroke="#F8F7FF" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4">
+  <!-- Windows 48 px grid: a 44 px silhouette with a 2 px exterior corner radius. -->
+  <rect x="21.333" y="21.333" width="469.334" height="469.334" rx="21.333" fill="url(#background)"/>
+  <g transform="translate(120.6 120.6) scale(11.28)" fill="none" stroke="#F8F7FF" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4">
     <path d="M6 3v12"/>
     <circle cx="18" cy="6" r="3"/>
     <circle cx="6" cy="18" r="3"/>
