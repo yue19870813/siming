@@ -4,10 +4,7 @@ import { createDemoProject } from "../model/demo";
 import { nodeDropEvent } from "../lib/nodeDrag";
 import { useEditorStore } from "../store/editorStore";
 import { CanvasView } from "./CanvasView";
-import {
-  centeredNodePosition,
-  nodePositionAtPoint,
-} from "./canvasGeometry";
+import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 
 describe("centeredNodePosition", () => {
   test("accounts for the current pan and zoom", () => {

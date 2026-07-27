@@ -6,6 +6,7 @@ import {
   Handle,
   MiniMap,
   type Node as FlowNode,
+  type NodeChange,
   NodeProps,
   Position,
   ReactFlow,
@@ -14,17 +15,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { GitBranch, MessageCircle, Play, Square, Zap } from "lucide-react";
-import {
-  memo,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  centeredNodePosition,
-  nodePositionAtPoint,
-} from "./canvasGeometry";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 import { formatCondition } from "../model/conditions";
 import { createId } from "../model/demo";
 import type { DialogueNode, NodeType } from "../model/types";
@@ -160,6 +152,7 @@ export function CanvasView() {
     (state) => state.setCanvasInsertionPosition,
   );
   const addNode = useEditorStore((state) => state.addNode);
+  const deleteNodes = useEditorStore((state) => state.deleteNodes);
   const commit = useEditorStore((state) => state.commit);
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
 
@@ -186,10 +179,10 @@ export function CanvasView() {
       const bounds = canvasRef.current?.getBoundingClientRect();
       return Boolean(
         bounds &&
-          detail.clientX >= bounds.left &&
-          detail.clientX <= bounds.right &&
-          detail.clientY >= bounds.top &&
-          detail.clientY <= bounds.bottom,
+        detail.clientX >= bounds.left &&
+        detail.clientX <= bounds.right &&
+        detail.clientY >= bounds.top &&
+        detail.clientY <= bounds.bottom,
       );
     };
     const move = (event: Event) => {
@@ -279,6 +272,19 @@ export function CanvasView() {
     });
   };
 
+  const nodesChange = (changes: NodeChange<CanvasFlowNode>[]) => {
+    const removedIds = changes
+      .filter((change) => change.type === "remove")
+      .map((change) => change.id);
+    const localChanges = changes.filter(
+      (change) =>
+        change.type !== "remove" || change.id !== dialogue.entryNodeId,
+    );
+
+    onNodesChange(localChanges);
+    if (removedIds.length > 0) deleteNodes(removedIds);
+  };
+
   return (
     <div
       className={`canvas-view ${nodeDragOver ? "is-node-drop-target" : ""}`}
@@ -291,7 +297,7 @@ export function CanvasView() {
         onInit={(instance) => {
           flowInstanceRef.current = instance;
         }}
-        onNodesChange={onNodesChange}
+        onNodesChange={nodesChange}
         onConnect={connect}
         onEdgesChange={edgesChange}
         onNodeClick={(_event, node) => setSelectedNode(node.id)}

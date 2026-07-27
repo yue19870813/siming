@@ -56,6 +56,7 @@ type EditorState = {
   copySelectedNode: () => void;
   pasteCopiedNode: () => void;
   addNode: (type: NodeType, position?: { x: number; y: number }) => void;
+  deleteNodes: (ids: string[]) => void;
   addDialogue: (folder?: string) => void;
   deleteDialogue: (id: string) => void;
   closeProject: () => void;
@@ -318,6 +319,48 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ?.nodes.push(node);
     });
     set({ selectedNodeId: node.id });
+  },
+  deleteNodes: (ids) => {
+    const state = get();
+    const dialogue = state.project.dialogues.find(
+      (item) => item.id === state.selectedDialogueId,
+    );
+    if (!dialogue) return;
+
+    const requestedIds = new Set(ids);
+    const deletedIds = new Set(
+      dialogue.nodes
+        .filter(
+          (node) =>
+            requestedIds.has(node.id) && node.id !== dialogue.entryNodeId,
+        )
+        .map((node) => node.id),
+    );
+    if (deletedIds.size === 0) {
+      if (requestedIds.has(dialogue.entryNodeId)) {
+        set({ notice: "入口节点不能直接删除，请先修改对话入口。" });
+      }
+      return;
+    }
+
+    state.commit(
+      deletedIds.size === 1 ? "删除节点" : `删除 ${deletedIds.size} 个节点`,
+      (draft) => {
+        const target = draft.dialogues.find(
+          (item) => item.id === state.selectedDialogueId,
+        );
+        if (!target) return;
+        target.nodes = target.nodes.filter((node) => !deletedIds.has(node.id));
+        target.edges = target.edges.filter(
+          (edge) =>
+            !deletedIds.has(edge.sourceNodeId) &&
+            !deletedIds.has(edge.targetNodeId),
+        );
+      },
+    );
+    if (state.selectedNodeId !== null && deletedIds.has(state.selectedNodeId)) {
+      set({ selectedNodeId: null });
+    }
   },
   addDialogue: (folder = "dialogues") => {
     const state = get();

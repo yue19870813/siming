@@ -24,9 +24,7 @@ test("a new node uses the current canvas center and is selected", () => {
   const dialogue = state.project.dialogues.find(
     (item) => item.id === state.selectedDialogueId,
   );
-  const node = dialogue?.nodes.find(
-    (item) => item.id === state.selectedNodeId,
-  );
+  const node = dialogue?.nodes.find((item) => item.id === state.selectedNodeId);
 
   expect(node?.position).toEqual(insertionPosition);
   expect(state.selectedNodeId).toBe(node?.id);
@@ -59,6 +57,56 @@ test("copy and paste duplicates a selected node with new identities", () => {
     original?.data.choices?.map((choice) => choice.id),
   );
   expect(state.notice).toBe(`已粘贴节点：${pasted?.key}`);
+});
+
+test("deleting a node persists when another node is moved", () => {
+  const initialState = useEditorStore.getState();
+  const dialogue = initialState.project.dialogues[0];
+  const deleted = dialogue.nodes.find(
+    (node) => node.id !== dialogue.entryNodeId,
+  );
+  const moved = dialogue.nodes.find(
+    (node) => node.id !== dialogue.entryNodeId && node.id !== deleted?.id,
+  );
+  expect(deleted).toBeDefined();
+  expect(moved).toBeDefined();
+  initialState.setSelectedNode(deleted!.id);
+
+  useEditorStore.getState().deleteNodes([deleted!.id]);
+  useEditorStore.getState().commit("移动节点", (draft) => {
+    const node = draft.dialogues[0].nodes.find((item) => item.id === moved!.id);
+    if (node) node.position = { x: 777, y: 555 };
+  });
+
+  const state = useEditorStore.getState();
+  const updatedDialogue = state.project.dialogues[0];
+  expect(updatedDialogue.nodes.some((node) => node.id === deleted!.id)).toBe(
+    false,
+  );
+  expect(
+    updatedDialogue.edges.some(
+      (edge) =>
+        edge.sourceNodeId === deleted!.id || edge.targetNodeId === deleted!.id,
+    ),
+  ).toBe(false);
+  expect(state.selectedNodeId).toBeNull();
+  expect(
+    updatedDialogue.nodes.find((node) => node.id === moved!.id)?.position,
+  ).toEqual({ x: 777, y: 555 });
+});
+
+test("the dialogue entry node cannot be deleted", () => {
+  const dialogue = useEditorStore.getState().project.dialogues[0];
+
+  useEditorStore.getState().deleteNodes([dialogue.entryNodeId]);
+
+  const state = useEditorStore.getState();
+  expect(
+    state.project.dialogues[0].nodes.some(
+      (node) => node.id === dialogue.entryNodeId,
+    ),
+  ).toBe(true);
+  expect(state.notice).toBe("入口节点不能直接删除，请先修改对话入口。");
 });
 
 test("markSaved establishes a new clean history point", () => {
