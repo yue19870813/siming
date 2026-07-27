@@ -23,6 +23,8 @@ import { dialogueHasMissingTranslation } from "../model/i18n";
 import type { Activity, NodeType } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 
+const appIconUrl = new URL("../../assets/app-icon.svg", import.meta.url).href;
+
 const activities: Array<{
   id: Activity;
   label: string;
@@ -77,7 +79,7 @@ export function Sidebar({
           aria-label="欢迎页"
           onClick={() => setActivity("welcome")}
         >
-          司
+          <img src={appIconUrl} alt="" />
         </button>
         {activities.map((item) => {
           const Icon = item.icon;

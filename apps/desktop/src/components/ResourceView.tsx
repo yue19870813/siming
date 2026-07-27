@@ -28,6 +28,9 @@ const metadata: Record<
   tags: { title: "标签", singular: "标签", placeholder: "搜索标签…" },
 };
 
+const RESOURCE_KEY_MAX_LENGTH = 64;
+const RESOURCE_NAME_MAX_LENGTH = 50;
+
 function keyFromActivity(activity: Activity): ResourceKey {
   return activity as ResourceKey;
 }
@@ -137,6 +140,12 @@ export function ResourceView({ activity }: { activity: Activity }) {
                 />
                 <span>
                   <strong>{resourceName(item, locale)}</strong>
+                  <span
+                    className="resource-identity-separator"
+                    aria-hidden="true"
+                  >
+                    ·
+                  </span>
                   <small>{item.key}</small>
                 </span>
                 <em>{countReferences(project, resourceKey, item.key)} 引用</em>
@@ -153,6 +162,12 @@ export function ResourceView({ activity }: { activity: Activity }) {
               <div className="editor-section-title">
                 <div>
                   <strong>{resourceName(selected, locale)}</strong>
+                  <span
+                    className="resource-identity-separator"
+                    aria-hidden="true"
+                  >
+                    ·
+                  </span>
                   <small>{selected.id}</small>
                 </div>
                 <div>
@@ -199,6 +214,8 @@ export function ResourceView({ activity }: { activity: Activity }) {
                   <span>Key</span>
                   <input
                     value={selected.key}
+                    maxLength={RESOURCE_KEY_MAX_LENGTH}
+                    title={`最多 ${RESOURCE_KEY_MAX_LENGTH} 个字符`}
                     onChange={(event) => renameKey(event.target.value)}
                   />
                 </label>
@@ -207,6 +224,8 @@ export function ResourceView({ activity }: { activity: Activity }) {
                     <span>显示名称 · {locale}</span>
                     <input
                       value={selected.name[locale] ?? ""}
+                      maxLength={RESOURCE_NAME_MAX_LENGTH}
+                      title={`最多 ${RESOURCE_NAME_MAX_LENGTH} 个字符`}
                       onChange={(event) =>
                         update((item) => {
                           if ("name" in item && typeof item.name !== "string") {
@@ -222,6 +241,8 @@ export function ResourceView({ activity }: { activity: Activity }) {
                     <span>显示名称</span>
                     <input
                       value={selected.name}
+                      maxLength={RESOURCE_NAME_MAX_LENGTH}
+                      title={`最多 ${RESOURCE_NAME_MAX_LENGTH} 个字符`}
                       onChange={(event) =>
                         update((item) => {
                           if ("name" in item && typeof item.name === "string") {
