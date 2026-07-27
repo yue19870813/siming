@@ -2,8 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
+import { WelcomeView } from "./components/WelcomeView";
 import { createDemoProject } from "./model/demo";
 import { useEditorStore } from "./store/editorStore";
+
+const { openUrl } = vi.hoisted(() => ({
+  openUrl: vi.fn(),
+}));
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -13,8 +18,13 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl,
+}));
+
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
+  openUrl.mockReset();
   localStorage.clear();
   useEditorStore.getState().closeProject();
 });
@@ -31,6 +41,17 @@ test("starts on the welcome page without a demo project", async () => {
   ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "新建项目" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "打开项目" })).toBeInTheDocument();
+  const repositoryLink = screen.getByRole("link", {
+    name: "欢迎使用司命。",
+  });
+  expect(repositoryLink).toHaveAttribute(
+    "href",
+    "https://github.com/yue19870813/siming",
+  );
+  fireEvent.click(repositoryLink);
+  expect(openUrl).toHaveBeenCalledWith(
+    "https://github.com/yue19870813/siming",
+  );
   expect(screen.queryByText("司命演示项目")).not.toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "画布" }),
@@ -45,6 +66,33 @@ test("uses dark as the default browser theme", async () => {
 
   await screen.findByRole("heading", { name: "让每一条剧情分支清晰可见" });
   expect(document.documentElement.dataset.theme).toBe("dark");
+});
+
+test("new project details are confirmed in an in-app dialog", () => {
+  const onCreateNew = vi.fn();
+
+  render(
+    <WelcomeView
+      notice="请填写项目名称。"
+      busy={false}
+      onNew={vi.fn()}
+      onOpen={vi.fn()}
+      newProjectRootPath="/tmp/siming-story"
+      onCreateNew={onCreateNew}
+      onCancelNew={vi.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByRole("form", { name: "新建项目" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("/tmp/siming-story")).toBeInTheDocument();
+
+  const nameInput = screen.getByRole("textbox", { name: "项目名称" });
+  fireEvent.change(nameInput, { target: { value: "长安夜话" } });
+  fireEvent.click(screen.getByRole("button", { name: "创建项目" }));
+
+  expect(onCreateNew).toHaveBeenCalledWith("长安夜话");
 });
 
 test("top-right actions open the matching workbench and export menu", async () => {

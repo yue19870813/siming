@@ -3,5 +3,12 @@
   "identifier": "default",
   "description": "Default permissions for the main Siming window.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:default"]
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/yue19870813/siming" }]
+    }
+  ]
 }

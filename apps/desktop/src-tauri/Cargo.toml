@@ -21,3 +21,4 @@ siming-core.workspace = true
 siming-storage.workspace = true
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"

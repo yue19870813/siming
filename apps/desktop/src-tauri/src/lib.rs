@@ -254,6 +254,7 @@ fn recovery_root(app: &tauri::AppHandle) -> Result<std::path::PathBuf, CommandEr
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             core_version,
             create_project,

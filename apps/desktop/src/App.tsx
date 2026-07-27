@@ -64,6 +64,9 @@ export default function App() {
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
   const [settings, setSettings] = useState(defaultSettings);
+  const [newProjectRootPath, setNewProjectRootPath] = useState<string | null>(
+    null,
+  );
   const [workbenchPanel, setWorkbenchPanel] =
     useState<WorkbenchPanelMode | null>(null);
   const recoveryState = useRef({
@@ -171,14 +174,27 @@ export default function App() {
     try {
       const rootPath = await chooseProjectDirectory();
       if (!rootPath) return;
-      const name = window.prompt("项目名称", "新的司命项目")?.trim();
-      if (!name) return;
+      setNewProjectRootPath(rootPath);
+      setNotice("请填写项目名称。");
+    } catch (error) {
+      setNotice(`选择项目目录失败：${errorMessage(error)}`);
+    }
+  }
+
+  async function handleCreateNew(name: string) {
+    if (!newProjectRootPath) return;
+    try {
       setBusy(true);
-      const snapshot = await createProject(rootPath, name, "zh-CN");
+      const snapshot = await createProject(
+        newProjectRootPath,
+        name,
+        "zh-CN",
+      );
+      setNewProjectRootPath(null);
       setProject(snapshot);
       setNotice(`已创建项目：${snapshot.rootPath}`);
     } catch (error) {
-      setNotice(errorMessage(error));
+      setNotice(`新建项目失败：${errorMessage(error)}`);
     } finally {
       setBusy(false);
     }
@@ -355,6 +371,12 @@ export default function App() {
           busy={busy}
           onNew={handleNew}
           onOpen={handleOpen}
+          newProjectRootPath={newProjectRootPath}
+          onCreateNew={handleCreateNew}
+          onCancelNew={() => {
+            setNewProjectRootPath(null);
+            setNotice("欢迎使用司命。");
+          }}
         />
       </main>
     );
@@ -407,6 +429,12 @@ export default function App() {
               busy={busy}
               onNew={handleNew}
               onOpen={handleOpen}
+              newProjectRootPath={newProjectRootPath}
+              onCreateNew={handleCreateNew}
+              onCancelNew={() => {
+                setNewProjectRootPath(null);
+                setNotice("欢迎使用司命。");
+              }}
               onReturn={() => setActivity("project")}
             />
           )}

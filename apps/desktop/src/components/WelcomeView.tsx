@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Braces,
   CircleCheckBig,
@@ -7,12 +9,17 @@ import {
   Play,
 } from "lucide-react";
 
+const repositoryUrl = "https://github.com/yue19870813/siming";
+
 export function WelcomeView({
   projectName,
   notice,
   busy,
   onNew,
   onOpen,
+  newProjectRootPath,
+  onCreateNew,
+  onCancelNew,
   onReturn,
 }: {
   projectName?: string;
@@ -20,8 +27,17 @@ export function WelcomeView({
   busy: boolean;
   onNew: () => void;
   onOpen: () => void;
+  newProjectRootPath?: string | null;
+  onCreateNew?: (name: string) => void;
+  onCancelNew?: () => void;
   onReturn?: () => void;
 }) {
+  const [newProjectName, setNewProjectName] = useState("新的司命项目");
+
+  useEffect(() => {
+    if (newProjectRootPath) setNewProjectName("新的司命项目");
+  }, [newProjectRootPath]);
+
   return (
     <section className="welcome-view">
       <div className="welcome-glow welcome-glow--left" />
@@ -86,9 +102,72 @@ export function WelcomeView({
 
         <footer className="welcome-footer">
           <Play size={12} />
-          <span>{notice}</span>
+          {notice === "欢迎使用司命。" ? (
+            <a
+              href={repositoryUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => {
+                event.preventDefault();
+                void openUrl(repositoryUrl);
+              }}
+            >
+              {notice}
+            </a>
+          ) : (
+            <span>{notice}</span>
+          )}
         </footer>
       </div>
+      {newProjectRootPath && onCreateNew && onCancelNew && (
+        <div className="welcome-modal-backdrop">
+          <form
+            className="welcome-modal"
+            aria-label="新建项目"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const name = newProjectName.trim();
+              if (name) onCreateNew(name);
+            }}
+          >
+            <div>
+              <span className="welcome-kicker">新建项目</span>
+              <h2>设置项目名称</h2>
+              <p>项目文件将创建在所选目录中。</p>
+            </div>
+            <label>
+              项目名称
+              <input
+                autoFocus
+                value={newProjectName}
+                disabled={busy}
+                onChange={(event) => setNewProjectName(event.target.value)}
+              />
+            </label>
+            <div className="welcome-modal-path">
+              <span>项目目录</span>
+              <code>{newProjectRootPath}</code>
+            </div>
+            {notice.startsWith("新建项目失败：") && (
+              <p className="welcome-modal-error" role="alert">
+                {notice}
+              </p>
+            )}
+            <div className="welcome-modal-actions">
+              <button type="button" disabled={busy} onClick={onCancelNew}>
+                取消
+              </button>
+              <button
+                className="welcome-primary"
+                type="submit"
+                disabled={busy || !newProjectName.trim()}
+              >
+                {busy ? "创建中…" : "创建项目"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </section>
   );
 }
