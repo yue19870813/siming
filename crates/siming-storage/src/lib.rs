@@ -18,6 +18,16 @@ mod delivery;
 pub use delivery::*;
 
 const PROJECT_FILE: &str = ".siming/project.json";
+const PROJECT_MARKER_EXTENSION: &str = "siming";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectMarker {
+    schema_version: u32,
+    project_id: String,
+    name: String,
+    manifest: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -168,7 +178,7 @@ pub fn create_project(
 }
 
 pub fn open_project(root: &Path) -> StorageResult<ProjectSnapshot> {
-    let root = absolute_path(root)?;
+    let root = project_root(root)?;
     let manifest_path = root.join(PROJECT_FILE);
     if !manifest_path.exists() {
         return Err(StorageError::ProjectNotFound(
@@ -177,6 +187,8 @@ pub fn open_project(root: &Path) -> StorageResult<ProjectSnapshot> {
     }
 
     let manifest: ProjectManifest = read_json(&manifest_path)?;
+    // Backfill a visible marker for legacy projects when the directory is writable.
+    let _ = write_project_marker(&root, &manifest);
     let dialogues = manifest
         .dialogues
         .iter()
@@ -229,9 +241,15 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
         ));
     }
 
-    let old_paths = if root.join(PROJECT_FILE).exists() {
-        let old: ProjectManifest = read_json(&root.join(PROJECT_FILE))?;
+    let old_manifest = if root.join(PROJECT_FILE).exists() {
+        Some(read_json::<ProjectManifest>(&root.join(PROJECT_FILE))?)
+    } else {
+        None
+    };
+    let old_paths = if let Some(old) = &old_manifest {
         old.dialogues
+            .iter()
+            .cloned()
             .into_iter()
             .map(|entry| (entry.id, entry.path))
             .collect::<BTreeMap<_, _>>()
@@ -274,6 +292,15 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
         &snapshot.resources.tags,
     )?;
     write_json_atomic(&root.join(PROJECT_FILE), &snapshot.manifest)?;
+    write_project_marker(&root, &snapshot.manifest)?;
+
+    if let Some(old) = old_manifest {
+        let old_marker = root.join(project_marker_file_name(&old));
+        let new_marker = root.join(project_marker_file_name(&snapshot.manifest));
+        if old_marker != new_marker && old_marker.is_file() {
+            fs::remove_file(old_marker)?;
+        }
+    }
 
     let new_paths: BTreeSet<_> = snapshot
         .manifest
@@ -291,6 +318,59 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
     }
 
     Ok(())
+}
+
+fn project_root(path: &Path) -> StorageResult<PathBuf> {
+    let path = absolute_path(path)?;
+    if path.is_file()
+        && path.extension().and_then(|value| value.to_str()) == Some(PROJECT_MARKER_EXTENSION)
+    {
+        return path
+            .parent()
+            .map(Path::to_path_buf)
+            .ok_or_else(|| StorageError::ProjectNotFound(path.display().to_string()));
+    }
+    Ok(path)
+}
+
+fn write_project_marker(root: &Path, manifest: &ProjectManifest) -> StorageResult<()> {
+    let marker = ProjectMarker {
+        schema_version: 1,
+        project_id: manifest.project_id.clone(),
+        name: manifest.name.clone(),
+        manifest: PROJECT_FILE.to_owned(),
+    };
+    write_json_atomic(&root.join(project_marker_file_name(manifest)), &marker)
+}
+
+fn project_marker_file_name(manifest: &ProjectManifest) -> String {
+    let sanitized = manifest
+        .name
+        .trim()
+        .chars()
+        .map(|character| {
+            if character.is_control()
+                || matches!(
+                    character,
+                    '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|'
+                )
+            {
+                '_'
+            } else {
+                character
+            }
+        })
+        .collect::<String>();
+    let sanitized = sanitized.trim_matches([' ', '.']);
+    let stem = if sanitized.is_empty() {
+        format!(
+            "siming-{}",
+            &manifest.project_id[..8.min(manifest.project_id.len())]
+        )
+    } else {
+        sanitized.to_owned()
+    };
+    format!("{stem}.{PROJECT_MARKER_EXTENSION}")
 }
 
 fn absolute_path(path: &Path) -> StorageResult<PathBuf> {
@@ -381,12 +461,26 @@ mod tests {
     fn creates_saves_and_reopens_a_project() {
         let root = std::env::temp_dir().join(format!("siming-storage-{}", Uuid::new_v4()));
         let mut snapshot = create_project(&root, "测试项目", "zh-CN").unwrap();
+        let original_marker = root.join("测试项目.siming");
+        assert!(original_marker.is_file());
         snapshot.manifest.name = "已修改".to_owned();
         save_project(&snapshot).unwrap();
+        let renamed_marker = root.join("已修改.siming");
+        assert!(renamed_marker.is_file());
+        assert!(!original_marker.exists());
 
+        let marker: ProjectMarker = read_json(&renamed_marker).unwrap();
+        assert_eq!(marker.project_id, snapshot.manifest.project_id);
+        assert_eq!(marker.manifest, PROJECT_FILE);
+
+        fs::remove_file(&renamed_marker).unwrap();
         let reopened = open_project(&root).unwrap();
+        assert!(renamed_marker.is_file());
         assert_eq!(reopened.manifest.name, "已修改");
         assert_eq!(reopened.dialogues.len(), 1);
+
+        let reopened_from_marker = open_project(&renamed_marker).unwrap();
+        assert_eq!(reopened_from_marker.manifest.name, "已修改");
 
         fs::remove_dir_all(root).unwrap();
     }
