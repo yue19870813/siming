@@ -19,6 +19,7 @@ pub use delivery::*;
 
 const PROJECT_FILE: &str = ".siming/project.json";
 const PROJECT_MARKER_EXTENSION: &str = "siming";
+const DEFAULT_SUPPORTED_LOCALES: [&str; 5] = ["zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -145,6 +146,14 @@ pub fn create_project(
         }],
     };
 
+    let mut locales = vec![default_locale.to_owned()];
+    locales.extend(
+        DEFAULT_SUPPORTED_LOCALES
+            .iter()
+            .filter(|locale| **locale != default_locale)
+            .map(|locale| (*locale).to_owned()),
+    );
+
     let manifest = ProjectManifest {
         schema_version: 1,
         project_id: Uuid::new_v4().to_string(),
@@ -159,7 +168,7 @@ pub fn create_project(
         },
         default_export_format: ExportFormat::Json,
         default_locale: default_locale.to_owned(),
-        locales: vec![default_locale.to_owned()],
+        locales,
         dialogues: vec![DialogueIndexEntry {
             id: dialogue_id,
             key: "intro".to_owned(),
@@ -250,7 +259,6 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
         old.dialogues
             .iter()
             .cloned()
-            .into_iter()
             .map(|entry| (entry.id, entry.path))
             .collect::<BTreeMap<_, _>>()
     } else {
@@ -461,6 +469,10 @@ mod tests {
     fn creates_saves_and_reopens_a_project() {
         let root = std::env::temp_dir().join(format!("siming-storage-{}", Uuid::new_v4()));
         let mut snapshot = create_project(&root, "测试项目", "zh-CN").unwrap();
+        assert_eq!(
+            snapshot.manifest.locales,
+            ["zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR"]
+        );
         let original_marker = root.join("测试项目.siming");
         assert!(original_marker.is_file());
         snapshot.manifest.name = "已修改".to_owned();

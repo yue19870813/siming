@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createId, createNode } from "../model/demo";
+import { DEFAULT_PROJECT_LOCALES } from "../model/locales";
 import type {
   Activity,
   DialogueDocument,
@@ -74,7 +75,7 @@ const emptyProject = (): ProjectSnapshot => ({
     },
     defaultExportFormat: "json",
     defaultLocale: "zh-CN",
-    locales: ["zh-CN"],
+    locales: [...DEFAULT_PROJECT_LOCALES],
     dialogues: [],
   },
   dialogues: [],

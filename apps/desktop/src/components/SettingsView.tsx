@@ -1,6 +1,7 @@
 import { FolderCog, MonitorCog, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { chooseProjectDirectory } from "../lib/projectApi";
+import { DEFAULT_PROJECT_LOCALES, localeName } from "../model/locales";
 import type { SystemSettings } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 
@@ -401,7 +402,7 @@ export function SettingsView({
                     exports: "",
                     exportPathMode: "relative",
                     defaultLocale: "zh-CN",
-                    locales: "zh-CN, en-US",
+                    locales: DEFAULT_PROJECT_LOCALES.join(", "),
                   })
                 }
                 onSave={applyProjectSettings}
@@ -709,10 +710,4 @@ function normalizeAbsoluteDirectory(value: string) {
 function resolvePath(root: string, relative: string) {
   const base = root || "<项目根目录>";
   return `${base.replace(/\/$/, "")}/${normalizeDirectory(relative)}`;
-}
-
-function localeName(locale: string) {
-  if (locale === "zh-CN") return "简体中文";
-  if (locale === "en-US") return "English";
-  return locale;
 }

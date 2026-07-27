@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { translationCompletion } from "../model/i18n";
+import { localeName } from "../model/locales";
 import type { ViewMode } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 import type { WorkbenchPanelMode } from "./WorkbenchPanel";
@@ -251,8 +252,7 @@ function localeLabel(
   project: ReturnType<typeof useEditorStore.getState>["project"],
   locale: string,
 ) {
-  const name =
-    locale === "zh-CN" ? "简体中文" : locale === "en-US" ? "English" : locale;
+  const name = localeName(locale);
   if (locale === project.manifest.defaultLocale) return `${name} · 默认`;
   const percent = translationCompletion(project, locale);
   return `${name} · ${percent}%`;

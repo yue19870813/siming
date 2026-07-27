@@ -153,6 +153,28 @@ test("project and system settings are separate pages", async () => {
   );
 });
 
+test("project language defaults include five supported locales", async () => {
+  openTestProject();
+  render(<App />);
+  await act(async () => undefined);
+
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
+
+  expect(screen.getByRole("textbox", { name: /支持语言/ })).toHaveValue(
+    "zh-CN, zh-TW, en-US, ja-JP, ko-KR",
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "应用项目设置" }));
+  expect(useEditorStore.getState().project.manifest.locales).toEqual([
+    "zh-CN",
+    "zh-TW",
+    "en-US",
+    "ja-JP",
+    "ko-KR",
+  ]);
+});
+
 test("project export path can switch between relative and absolute modes", async () => {
   openTestProject();
   render(<App />);

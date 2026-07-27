@@ -265,11 +265,7 @@ function ProjectExplorer() {
                 if (!consumeSuppressedPaletteClick()) addNode(item.type);
               }}
               onPointerDown={(event) =>
-                beginNodePointerDrag(
-                  event,
-                  item.type,
-                  item.label,
-                )
+                beginNodePointerDrag(event, item.type, item.label)
               }
             >
               <i style={{ background: item.color }} />
