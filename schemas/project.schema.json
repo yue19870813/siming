@@ -53,6 +53,14 @@
         "$ref": "#/$defs/locale"
       }
     },
+    "dialogueDirectories": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/projectRelativePath"
+      },
+      "default": []
+    },
     "dialogues": {
       "type": "array",
       "items": {
@@ -99,4 +107,3 @@
     }
   }
 }
-

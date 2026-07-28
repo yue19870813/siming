@@ -26,6 +26,8 @@ pub struct ProjectManifest {
     pub default_export_format: ExportFormat,
     pub default_locale: String,
     pub locales: Vec<String>,
+    #[serde(default)]
+    pub dialogue_directories: Vec<String>,
     pub dialogues: Vec<DialogueIndexEntry>,
 }
 
@@ -431,6 +433,19 @@ pub fn validate_editable_project(
                 "对话文件路径重复",
                 ".siming/project.json",
                 Some(entry.id.clone()),
+            ));
+        }
+    }
+    let mut dialogue_directories = BTreeSet::new();
+    for directory in &manifest.dialogue_directories {
+        if !valid_project_relative_path(directory)
+            || !dialogue_directories.insert(directory.as_str())
+        {
+            diagnostics.push(error(
+                "DIALOGUE_DIRECTORY_INVALID",
+                "对话目录必须是唯一且不能逃逸项目根目录的相对路径",
+                ".siming/project.json",
+                None,
             ));
         }
     }

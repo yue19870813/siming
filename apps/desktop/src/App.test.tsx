@@ -141,6 +141,102 @@ test("project title opens the project menu", async () => {
   );
 });
 
+test("dialogues in the same directory share one folder in the explorer", async () => {
+  openTestProject();
+  useEditorStore.getState().addDialogue("dialogues/prologue");
+  useEditorStore.getState().addDialogue("dialogues/prologue");
+  useEditorStore.getState().markSaved();
+
+  const { container } = render(<App />);
+
+  expect(screen.getAllByText("dialogues/prologue")).toHaveLength(1);
+  expect(
+    [...container.querySelectorAll(".tree-file strong")].map(
+      (element) => element.textContent,
+    ),
+  ).toEqual(
+    expect.arrayContaining(["序章 · 雨夜来客", "新对话 2", "新对话 3"]),
+  );
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});
+
+test("dialogue directories can be collapsed and search expands matches", async () => {
+  openTestProject();
+  useEditorStore.getState().addDialogue("dialogues/prologue");
+  useEditorStore.getState().markSaved();
+  render(<App />);
+
+  const folder = screen.getByRole("button", { name: "dialogues/prologue" });
+  expect(folder).toHaveAttribute("aria-expanded", "true");
+  expect(
+    folder.closest(".tree-file-group")?.querySelectorAll(".tree-file"),
+  ).toHaveLength(2);
+
+  fireEvent.click(folder);
+  expect(folder).toHaveAttribute("aria-expanded", "false");
+  expect(
+    folder.closest(".tree-file-group")?.querySelectorAll(".tree-file"),
+  ).toHaveLength(0);
+
+  fireEvent.change(screen.getByPlaceholderText("搜索对话、路径…"), {
+    target: { value: "新对话 2" },
+  });
+  expect(folder).toHaveAttribute("aria-expanded", "true");
+  expect(
+    folder.closest(".tree-file-group")?.querySelectorAll(".tree-file"),
+  ).toHaveLength(1);
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});
+
+test("a dialogue directory can be created from the project explorer", async () => {
+  openTestProject();
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "新建对话目录" }));
+  const directoryPath = screen.getByRole("textbox", { name: "目录路径" });
+  expect(directoryPath).toHaveValue("dialogues/prologue/新目录");
+  fireEvent.change(directoryPath, {
+    target: { value: "dialogues/chapter-2" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "创建" }));
+
+  expect(screen.getByText("dialogues/chapter-2")).toBeInTheDocument();
+  expect(screen.getByText("空目录")).toBeInTheDocument();
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});
+
+test("a dialogue can be created from the project explorer", async () => {
+  openTestProject();
+  useEditorStore.getState().addDialogue("dialogues/chapter-2");
+  useEditorStore.getState().markSaved();
+  const { container } = render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "新建对话" }));
+  expect(screen.getByRole("form", { name: "新建对话" })).toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "目录路径" })).toHaveValue(
+    "dialogues/chapter-2",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "创建" }));
+
+  expect(
+    [...container.querySelectorAll(".tree-file strong")].map(
+      (element) => element.textContent,
+    ),
+  ).toContain("新对话 3");
+  expect(
+    useEditorStore.getState().project.manifest.dialogues.at(-1)?.path,
+  ).toBe("dialogues/chapter-2/dialogue-3.json");
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});
+
 test("project and system settings are separate pages", async () => {
   openTestProject();
   render(<App />);

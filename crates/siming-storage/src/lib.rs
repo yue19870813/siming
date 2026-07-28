@@ -169,6 +169,7 @@ pub fn create_project(
         default_export_format: ExportFormat::Json,
         default_locale: default_locale.to_owned(),
         locales,
+        dialogue_directories: vec!["dialogues".to_owned()],
         dialogues: vec![DialogueIndexEntry {
             id: dialogue_id,
             key: "intro".to_owned(),
@@ -264,6 +265,11 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
     } else {
         BTreeMap::new()
     };
+
+    for directory in &snapshot.manifest.dialogue_directories {
+        let path = resolve_project_path(&root, directory)?;
+        fs::create_dir_all(path)?;
+    }
 
     for entry in &snapshot.manifest.dialogues {
         let dialogue = dialogue_by_id
@@ -475,8 +481,13 @@ mod tests {
         );
         let original_marker = root.join("测试项目.siming");
         assert!(original_marker.is_file());
+        snapshot
+            .manifest
+            .dialogue_directories
+            .push("dialogues/空目录".to_owned());
         snapshot.manifest.name = "已修改".to_owned();
         save_project(&snapshot).unwrap();
+        assert!(root.join("dialogues/空目录").is_dir());
         let renamed_marker = root.join("已修改.siming");
         assert!(renamed_marker.is_file());
         assert!(!original_marker.exists());

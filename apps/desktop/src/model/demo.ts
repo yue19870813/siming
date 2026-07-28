@@ -128,6 +128,7 @@ export function createDemoProject(): ProjectSnapshot {
       defaultExportFormat: "json",
       defaultLocale: "zh-CN",
       locales: ["zh-CN", "en-US"],
+      dialogueDirectories: ["dialogues/prologue"],
       dialogues: [
         {
           id: dialogue.id,

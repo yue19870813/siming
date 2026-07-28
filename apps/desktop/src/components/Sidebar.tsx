@@ -3,6 +3,7 @@ import {
   ChevronDown,
   FileText,
   Folder,
+  FolderPlus,
   FolderTree,
   Plus,
   Search,
@@ -131,12 +132,23 @@ function ProjectExplorer() {
   const selectedId = useEditorStore((state) => state.selectedDialogueId);
   const select = useEditorStore((state) => state.setSelectedDialogue);
   const addDialogue = useEditorStore((state) => state.addDialogue);
+  const addDialogueDirectory = useEditorStore(
+    (state) => state.addDialogueDirectory,
+  );
   const deleteDialogue = useEditorStore((state) => state.deleteDialogue);
   const addNode = useEditorStore((state) => state.addNode);
   const [filter, setFilter] = useState("");
   const [quickFilter, setQuickFilter] = useState<
     "all" | "recent" | "translation"
   >("all");
+  const [createDraft, setCreateDraft] = useState<{
+    type: "dialogue" | "directory";
+    path: string;
+    error: string;
+  } | null>(null);
+  const [collapsedDirectories, setCollapsedDirectories] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const entries = project.manifest.dialogues
     .map((entry) => ({
@@ -163,23 +175,142 @@ function ProjectExplorer() {
   const translationIncomplete = project.dialogues.filter((dialogue) =>
     dialogueHasMissingTranslation(dialogue, project.manifest.locales),
   ).length;
+  const dialogueRoot =
+    project.manifest.paths.dialogues.replace(/^\/+|\/+$/g, "") || "dialogues";
+  const selectedEntry = project.manifest.dialogues.find(
+    (entry) => entry.id === selectedId,
+  );
+  const selectedDirectory = selectedEntry
+    ? selectedEntry.path.split("/").filter(Boolean).slice(0, -1).join("/") ||
+      dialogueRoot
+    : dialogueRoot;
+  const directoryGroups = new Map<string, typeof entries>();
+  if (!filter && quickFilter === "all") {
+    for (const directory of project.manifest.dialogueDirectories ?? []) {
+      directoryGroups.set(directory, []);
+    }
+  }
+  for (const item of entries) {
+    const segments = item.entry.path.split("/").filter(Boolean);
+    const directory = segments.slice(0, -1).join("/") || dialogueRoot;
+    const group = directoryGroups.get(directory) ?? [];
+    group.push(item);
+    directoryGroups.set(directory, group);
+  }
+  const groupedEntries = [...directoryGroups.entries()].sort(
+    ([left], [right]) => left.localeCompare(right),
+  );
 
   return (
     <>
       <header className="panel-heading">
         <strong>项目内容</strong>
-        <button
-          title="新建对话"
-          onClick={() => {
-            const folder =
-              window.prompt("保存目录（相对于项目根目录）", "dialogues") ??
-              "dialogues";
-            addDialogue(folder);
+        <div className="panel-heading-actions">
+          <button
+            title="新建对话目录"
+            aria-label="新建对话目录"
+            onClick={() => {
+              setCreateDraft({
+                type: "directory",
+                path: `${selectedDirectory}/新目录`,
+                error: "",
+              });
+            }}
+          >
+            <FolderPlus size={15} />
+          </button>
+          <button
+            title="新建对话"
+            aria-label="新建对话"
+            onClick={() => {
+              setCreateDraft({
+                type: "dialogue",
+                path: selectedDirectory,
+                error: "",
+              });
+            }}
+          >
+            <Plus size={15} />
+          </button>
+        </div>
+      </header>
+      {createDraft && (
+        <form
+          className="sidebar-create-form"
+          aria-label={
+            createDraft.type === "directory" ? "新建对话目录" : "新建对话"
+          }
+          onSubmit={(event) => {
+            event.preventDefault();
+            const path = normalizeCreationPath(createDraft.path);
+            if (
+              !path ||
+              (path !== dialogueRoot && !path.startsWith(`${dialogueRoot}/`))
+            ) {
+              setCreateDraft({
+                ...createDraft,
+                error: `目录必须位于 ${dialogueRoot} 下。`,
+              });
+              return;
+            }
+            if (
+              createDraft.type === "directory" &&
+              (project.manifest.dialogueDirectories ?? []).includes(path)
+            ) {
+              setCreateDraft({
+                ...createDraft,
+                error: "该目录已经存在。",
+              });
+              return;
+            }
+            if (createDraft.type === "directory") {
+              addDialogueDirectory(path);
+            } else {
+              addDialogue(path);
+            }
+            setCollapsedDirectories((collapsed) => {
+              const next = new Set(collapsed);
+              next.delete(path);
+              return next;
+            });
+            setCreateDraft(null);
           }}
         >
-          <Plus size={15} />
-        </button>
-      </header>
+          <strong>
+            {createDraft.type === "directory" ? "新建对话目录" : "新建对话"}
+          </strong>
+          <label>
+            <span>目录路径</span>
+            <input
+              autoFocus
+              aria-label="目录路径"
+              value={createDraft.path}
+              onChange={(event) =>
+                setCreateDraft({
+                  ...createDraft,
+                  path: event.target.value,
+                  error: "",
+                })
+              }
+            />
+          </label>
+          {createDraft.error && (
+            <small className="sidebar-create-error">{createDraft.error}</small>
+          )}
+          <div>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setCreateDraft(null)}
+            >
+              取消
+            </button>
+            <button type="submit" className="button button--primary">
+              创建
+            </button>
+          </div>
+        </form>
+      )}
       <label className="search-field">
         <Search size={13} />
         <input
@@ -215,41 +346,71 @@ function ProjectExplorer() {
           <small>对话目录</small>
           <span>{entries.length}</span>
         </div>
-        {entries.map(({ entry, dialogue }) => {
-          const segments = entry.path.split("/");
-          const folder = segments.slice(0, -1).join(" / ");
+        {groupedEntries.map(([directory, groupEntries]) => {
+          const isCollapsed =
+            collapsedDirectories.has(directory) &&
+            !filter &&
+            quickFilter === "all";
           return (
-            <div key={entry.id} className="tree-file-group">
-              <div className="tree-folder">
-                <ChevronDown size={12} />
-                <Folder size={13} />
-                <span>{folder || "dialogues"}</span>
-              </div>
+            <div
+              key={directory}
+              className={`tree-file-group ${isCollapsed ? "is-collapsed" : ""}`}
+            >
               <button
-                className={`tree-file ${selectedId === entry.id ? "is-active" : ""}`}
-                onClick={() => select(entry.id)}
+                type="button"
+                className="tree-folder"
+                aria-expanded={!isCollapsed}
+                onClick={() =>
+                  setCollapsedDirectories((collapsed) => {
+                    const next = new Set(collapsed);
+                    if (next.has(directory)) next.delete(directory);
+                    else next.add(directory);
+                    return next;
+                  })
+                }
               >
-                <FileText size={13} />
-                <span>
-                  <strong>{dialogue?.name ?? entry.key}</strong>
-                  <small>{dialogue?.nodes.length ?? 0} 个节点</small>
-                </span>
-                {project.dialogues.length > 1 && (
-                  <Trash2
-                    size={13}
-                    className="row-action"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (window.confirm(`删除“${dialogue?.name}”？`)) {
-                        deleteDialogue(entry.id);
-                      }
-                    }}
-                  />
-                )}
+                <ChevronDown
+                  size={12}
+                  className={isCollapsed ? "is-collapsed" : undefined}
+                />
+                <Folder size={13} />
+                <span>{directory}</span>
               </button>
+              {!isCollapsed &&
+                groupEntries.map(({ entry, dialogue }) => (
+                  <button
+                    key={entry.id}
+                    className={`tree-file ${selectedId === entry.id ? "is-active" : ""}`}
+                    onClick={() => select(entry.id)}
+                  >
+                    <FileText size={13} />
+                    <span>
+                      <strong>{dialogue?.name ?? entry.key}</strong>
+                      <small>{dialogue?.nodes.length ?? 0} 个节点</small>
+                    </span>
+                    {project.dialogues.length > 1 && (
+                      <Trash2
+                        size={13}
+                        className="row-action"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (window.confirm(`删除“${dialogue?.name}”？`)) {
+                            deleteDialogue(entry.id);
+                          }
+                        }}
+                      />
+                    )}
+                  </button>
+                ))}
+              {!isCollapsed && groupEntries.length === 0 && (
+                <small className="tree-empty-directory">空目录</small>
+              )}
             </div>
           );
         })}
+        {!groupedEntries.length && (
+          <p className="empty-list">暂无对话目录或匹配的对话</p>
+        )}
       </section>
       <section className="node-palette">
         <div className="section-label">
@@ -303,6 +464,22 @@ function ProjectExplorer() {
       </section>
     </>
   );
+}
+
+function normalizeCreationPath(path: string) {
+  const normalized = path
+    .trim()
+    .replaceAll("\\", "/")
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/\/+/g, "/");
+  if (
+    !normalized ||
+    /^[A-Za-z]:/.test(normalized) ||
+    normalized.split("/").some((segment) => segment === "." || segment === "..")
+  ) {
+    return null;
+  }
+  return normalized;
 }
 
 function SearchPanel() {

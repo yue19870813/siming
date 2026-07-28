@@ -123,6 +123,36 @@ test("markSaved establishes a new clean history point", () => {
   expect(useEditorStore.getState().project.manifest.name).toBe("已保存名称");
 });
 
+test("dialogue directories are persisted and reused by new dialogues", () => {
+  const store = useEditorStore.getState();
+  store.addDialogueDirectory("dialogues/chapter-1");
+
+  let state = useEditorStore.getState();
+  expect(state.project.manifest.dialogueDirectories).toContain(
+    "dialogues/chapter-1",
+  );
+
+  state.addDialogue("dialogues/chapter-1");
+  state = useEditorStore.getState();
+  const entry = state.project.manifest.dialogues.at(-1);
+  expect(entry?.path).toMatch(/^dialogues\/chapter-1\/dialogue-\d+\.json$/);
+  expect(
+    state.project.manifest.dialogueDirectories.filter(
+      (directory) => directory === "dialogues/chapter-1",
+    ),
+  ).toHaveLength(1);
+});
+
+test("dialogue directories cannot escape their configured root", () => {
+  useEditorStore.getState().addDialogueDirectory("../outside");
+
+  const state = useEditorStore.getState();
+  expect(state.project.manifest.dialogueDirectories).not.toContain(
+    "../outside",
+  );
+  expect(state.notice).toBe("目录必须是项目内的有效相对路径。");
+});
+
 test("unapplied source draft blocks view switching until discarded", () => {
   useEditorStore.getState().setViewMode("data");
   useEditorStore

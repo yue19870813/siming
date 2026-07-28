@@ -126,6 +126,7 @@ export type ProjectSnapshot = {
     defaultExportFormat: "json";
     defaultLocale: string;
     locales: string[];
+    dialogueDirectories: string[];
     dialogues: DialogueIndexEntry[];
   };
   dialogues: DialogueDocument[];
