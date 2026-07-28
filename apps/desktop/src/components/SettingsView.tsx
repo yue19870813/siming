@@ -18,6 +18,7 @@ const systemDefaults: SystemSettings = {
   autoSaveDelaySeconds: 30,
   recoverySnapshotIntervalSeconds: 60,
   restoreLastProject: true,
+  lastProjectPath: null,
   projectExportDirectories: {},
 };
 

@@ -177,6 +177,39 @@ textarea {
   background: var(--canvas);
 }
 
+.startup-shell {
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  height: 100vh;
+  color: var(--muted);
+  background:
+    radial-gradient(circle at 50% 45%, var(--primary-soft), transparent 22%),
+    var(--canvas);
+}
+
+.startup-indicator {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  font-size: var(--ui-font-11, 11px);
+  font-weight: 500;
+}
+
+.startup-indicator > span {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 14px;
+  color: white;
+  background: linear-gradient(145deg, #927dff, #624ad1);
+  box-shadow: 0 12px 30px rgb(109 82 220 / 28%);
+  font-size: var(--ui-font-20, 20px);
+  font-weight: 800;
+}
+
 .topbar {
   z-index: 20;
   display: grid;

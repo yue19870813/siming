@@ -49,6 +49,7 @@ const defaultSettings: SystemSettings = {
   autoSaveDelaySeconds: 30,
   recoverySnapshotIntervalSeconds: 60,
   restoreLastProject: true,
+  lastProjectPath: null,
   projectExportDirectories: {},
 };
 
@@ -93,8 +94,11 @@ export default function App() {
   const [workbenchHeight, setWorkbenchHeight] = useState(430);
   const [workbenchPanel, setWorkbenchPanel] =
     useState<WorkbenchPanelMode | null>(null);
+  const [startupReady, setStartupReady] = useState(() => !isTauri());
   const appBodyRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
+  const startupInitialized = useRef(false);
+  const settingsRef = useRef(defaultSettings);
   const recoveryState = useRef({
     project,
     dirty,
@@ -104,10 +108,77 @@ export default function App() {
   });
 
   useEffect(() => {
-    readSystemSettings()
-      .then(setSettings)
-      .catch(() => setSettings(defaultSettings));
-  }, []);
+    if (startupInitialized.current) return;
+    startupInitialized.current = true;
+    void (async () => {
+      let loadedSettings = defaultSettings;
+      try {
+        loadedSettings = await readSystemSettings();
+        settingsRef.current = loadedSettings;
+        setSettings(loadedSettings);
+      } catch {
+        settingsRef.current = defaultSettings;
+        setSettings(defaultSettings);
+        setStartupReady(true);
+        return;
+      }
+      if (
+        !isTauri() ||
+        !loadedSettings.restoreLastProject ||
+        !loadedSettings.lastProjectPath
+      ) {
+        setStartupReady(true);
+        return;
+      }
+      try {
+        setBusy(true);
+        const snapshot = await openProject(loadedSettings.lastProjectPath);
+        const recovery = await readRecoverySnapshot(
+          snapshot.manifest.projectId,
+        );
+        if (
+          recovery &&
+          recovery.projectRoot === snapshot.rootPath &&
+          window.confirm(
+            `检测到 ${new Date(recovery.createdAtUnixMs).toLocaleString()} 的未保存恢复快照${
+              recovery.sourceDraft ? "（包含源 JSON 草稿）" : ""
+            }，是否恢复？`,
+          )
+        ) {
+          setProject(recovery.project, true);
+          if (recovery.sourceDraft) {
+            setSourceDraft(
+              recovery.sourceDraft.dialogueId,
+              recovery.sourceDraft.source,
+              true,
+            );
+          }
+          setNotice("已恢复上次未保存的编辑状态。");
+        } else {
+          setProject(snapshot);
+          setNotice(`已恢复上次项目：${snapshot.rootPath}`);
+        }
+        if (snapshot.rootPath !== loadedSettings.lastProjectPath) {
+          const nextSettings = {
+            ...loadedSettings,
+            lastProjectPath: snapshot.rootPath,
+          };
+          settingsRef.current = nextSettings;
+          setSettings(nextSettings);
+          await writeSystemSettings(nextSettings);
+        }
+      } catch (error) {
+        const nextSettings = { ...loadedSettings, lastProjectPath: null };
+        settingsRef.current = nextSettings;
+        setSettings(nextSettings);
+        await writeSystemSettings(nextSettings).catch(() => undefined);
+        setNotice(`无法打开上次项目：${errorMessage(error)}`);
+      } finally {
+        setBusy(false);
+        setStartupReady(true);
+      }
+    })();
+  }, [setBusy, setNotice, setProject, setSourceDraft]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
@@ -239,6 +310,7 @@ export default function App() {
       const snapshot = await createProject(newProjectRootPath, name, "zh-CN");
       setNewProjectRootPath(null);
       setProject(snapshot);
+      await rememberLastProject(snapshot.rootPath);
       setNotice(`已创建项目：${snapshot.rootPath}`);
     } catch (error) {
       setNotice(`新建项目失败：${errorMessage(error)}`);
@@ -284,6 +356,7 @@ export default function App() {
         setProject(snapshot);
         setNotice(`已打开：${snapshot.rootPath}`);
       }
+      await rememberLastProject(snapshot.rootPath);
     } catch (error) {
       setNotice(errorMessage(error));
     } finally {
@@ -406,6 +479,7 @@ export default function App() {
       const reopened = await openProject(project.rootPath);
       await clearRecoverySnapshot(project.manifest.projectId);
       setProject(reopened);
+      await rememberLastProject(reopened.rootPath);
       setNotice(`迁移完成，备份：${migrated.backupDirectory ?? "已生成"}`);
     } catch (error) {
       setNotice(`迁移失败：${errorMessage(error)}`);
@@ -415,6 +489,7 @@ export default function App() {
   }
 
   async function handleSettingsChange(next: SystemSettings, showNotice = true) {
+    settingsRef.current = next;
     setSettings(next);
     try {
       await writeSystemSettings(next);
@@ -424,6 +499,15 @@ export default function App() {
     }
   }
 
+  async function rememberLastProject(rootPath: string) {
+    const currentSettings = settingsRef.current;
+    if (!rootPath || currentSettings.lastProjectPath === rootPath) return;
+    const nextSettings = { ...currentSettings, lastProjectPath: rootPath };
+    settingsRef.current = nextSettings;
+    setSettings(nextSettings);
+    await writeSystemSettings(nextSettings);
+  }
+
   const editorActivity = activity === "project" || activity === "search";
   const resourceActivity = [
     "characters",
@@ -431,6 +515,21 @@ export default function App() {
     "events",
     "tags",
   ].includes(activity);
+
+  if (!startupReady && !projectLoaded) {
+    return (
+      <main className="startup-shell">
+        <div
+          className="startup-indicator"
+          role="status"
+          aria-label="正在启动司命"
+        >
+          <span>命</span>
+          <strong>正在恢复上次项目…</strong>
+        </div>
+      </main>
+    );
+  }
 
   if (!projectLoaded) {
     return (

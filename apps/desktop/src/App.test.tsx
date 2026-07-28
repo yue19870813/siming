@@ -75,6 +75,104 @@ test("uses dark as the default browser theme", async () => {
   expect(document.documentElement.dataset.theme).toBe("dark");
 });
 
+test("restores the last project on startup", async () => {
+  const project = createDemoProject();
+  project.rootPath = "/tmp/last-siming-project";
+  let resolveOpenProject!: (snapshot: typeof project) => void;
+  const pendingOpenProject = new Promise<typeof project>((resolve) => {
+    resolveOpenProject = resolve;
+  });
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    configurable: true,
+    value: {},
+  });
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === "read_system_settings") {
+      return {
+        schemaVersion: 1,
+        theme: "dark",
+        defaultProjectDirectory: null,
+        interfaceLocale: "zh-CN",
+        uiFontSize: "medium",
+        editorFontSize: 13,
+        keymap: "system",
+        autoSaveDelaySeconds: 30,
+        recoverySnapshotIntervalSeconds: 60,
+        restoreLastProject: true,
+        lastProjectPath: project.rootPath,
+        projectExportDirectories: {},
+      } as never;
+    }
+    if (command === "open_project") return (await pendingOpenProject) as never;
+    if (command === "read_recovery_snapshot") return null as never;
+    return undefined as never;
+  });
+
+  render(<App />);
+
+  expect(
+    screen.getByRole("status", { name: "正在启动司命" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "让每一条剧情分支清晰可见" }),
+  ).not.toBeInTheDocument();
+  await act(async () => resolveOpenProject(project));
+
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: /司命演示项目/ })).toBeVisible(),
+  );
+  expect(invoke).toHaveBeenCalledWith("open_project", {
+    rootPath: project.rootPath,
+  });
+  expect(useEditorStore.getState().project.rootPath).toBe(project.rootPath);
+});
+
+test("opening a project remembers it for the next startup", async () => {
+  const project = createDemoProject();
+  project.rootPath = "/tmp/remembered-siming-project";
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    configurable: true,
+    value: {},
+  });
+  vi.mocked(open).mockResolvedValue(project.rootPath);
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === "read_system_settings") {
+      return {
+        schemaVersion: 1,
+        theme: "dark",
+        defaultProjectDirectory: null,
+        interfaceLocale: "zh-CN",
+        uiFontSize: "medium",
+        editorFontSize: 13,
+        keymap: "system",
+        autoSaveDelaySeconds: 30,
+        recoverySnapshotIntervalSeconds: 60,
+        restoreLastProject: true,
+        lastProjectPath: null,
+        projectExportDirectories: {},
+      } as never;
+    }
+    if (command === "open_project") return project as never;
+    if (command === "read_recovery_snapshot") return null as never;
+    return undefined as never;
+  });
+  render(<App />);
+  await act(async () => undefined);
+
+  fireEvent.click(screen.getByRole("button", { name: "打开项目" }));
+
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith(
+      "write_system_settings",
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          lastProjectPath: project.rootPath,
+        }),
+      }),
+    ),
+  );
+});
+
 test("new project details are confirmed in an in-app dialog", () => {
   const onCreateNew = vi.fn();
 
@@ -335,6 +433,7 @@ test("first export asks for a directory and reuses it afterwards", async () => {
         autoSaveDelaySeconds: 30,
         recoverySnapshotIntervalSeconds: 60,
         restoreLastProject: true,
+        lastProjectPath: null,
         projectExportDirectories: {},
       } as never;
     }

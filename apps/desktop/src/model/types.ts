@@ -149,6 +149,7 @@ export type SystemSettings = {
   autoSaveDelaySeconds: number;
   recoverySnapshotIntervalSeconds: number;
   restoreLastProject: boolean;
+  lastProjectPath: string | null;
   projectExportDirectories: Record<string, string>;
 };
 

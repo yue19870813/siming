@@ -58,6 +58,8 @@ struct SystemSettings {
     recovery_snapshot_interval_seconds: u32,
     restore_last_project: bool,
     #[serde(default)]
+    last_project_path: Option<String>,
+    #[serde(default)]
     project_export_directories: BTreeMap<String, String>,
 }
 
@@ -74,6 +76,7 @@ impl Default for SystemSettings {
             auto_save_delay_seconds: default_auto_save_delay(),
             recovery_snapshot_interval_seconds: 60,
             restore_last_project: true,
+            last_project_path: None,
             project_export_directories: BTreeMap::new(),
         }
     }

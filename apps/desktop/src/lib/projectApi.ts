@@ -161,6 +161,7 @@ function browserSystemSettings(theme: SystemSettings["theme"]): SystemSettings {
     autoSaveDelaySeconds: 30,
     recoverySnapshotIntervalSeconds: 60,
     restoreLastProject: true,
+    lastProjectPath: null,
     projectExportDirectories: {},
   };
 }
