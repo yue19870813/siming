@@ -102,10 +102,15 @@ test("new project details are confirmed in an in-app dialog", () => {
 
 test("top-right actions open the matching workbench and export menu", async () => {
   openTestProject();
-  render(<App />);
+  const { container } = render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "数据" }));
 
   fireEvent.click(screen.getByRole("button", { name: "命令行" }));
   expect(screen.getByRole("textbox", { name: "命令" })).toBeInTheDocument();
+  expect(container.querySelector(".workspace")).toHaveStyle({
+    "--workbench-height": "430px",
+  });
 
   fireEvent.click(screen.getByRole("button", { name: /校验/ }));
   expect(screen.getByRole("region", { name: "工作面板" })).toBeInTheDocument();

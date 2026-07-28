@@ -77,72 +77,74 @@ export function TableView() {
 
   return (
     <div className="table-view">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>路径</th>
-            <th>类型 / Key</th>
-            <th>角色与正文</th>
-            <th>下一步</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => {
-            const text =
-              row.node.data.text?.[locale] ??
-              Object.values(row.node.data.text ?? {})[0] ??
-              (row.node.type === "choice"
-                ? `${row.node.data.choices?.length ?? 0} 个选项`
-                : "");
-            const next = dialogue.edges
-              .filter((edge) => edge.sourceNodeId === row.node.id)
-              .map((edge) => edge.sourcePort)
-              .join(" / ");
-            return (
-              <tr
-                key={`${row.node.id}-${index}`}
-                className={
-                  selectedNodeId === row.node.id ? "is-selected" : undefined
-                }
-                onClick={() => setSelectedNode(row.node.id)}
-              >
-                <td>{index + 1}</td>
-                <td>
-                  <span
-                    className={`path-badge path-badge--${row.path.toLowerCase()}`}
-                  >
-                    {row.path}
-                  </span>
-                </td>
-                <td>
-                  <div
-                    className="tree-indent"
-                    style={{ paddingLeft: row.depth * 14 }}
-                  >
-                    {row.marker === "merge" ? (
-                      <GitMerge size={13} />
-                    ) : row.marker === "loop" ? (
-                      <RotateCcw size={13} />
-                    ) : (
-                      <CornerDownRight size={13} />
+      <div className="table-view-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>路径</th>
+              <th>类型 / Key</th>
+              <th>角色与正文</th>
+              <th>下一步</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => {
+              const text =
+                row.node.data.text?.[locale] ??
+                Object.values(row.node.data.text ?? {})[0] ??
+                (row.node.type === "choice"
+                  ? `${row.node.data.choices?.length ?? 0} 个选项`
+                  : "");
+              const next = dialogue.edges
+                .filter((edge) => edge.sourceNodeId === row.node.id)
+                .map((edge) => edge.sourcePort)
+                .join(" / ");
+              return (
+                <tr
+                  key={`${row.node.id}-${index}`}
+                  className={
+                    selectedNodeId === row.node.id ? "is-selected" : undefined
+                  }
+                  onClick={() => setSelectedNode(row.node.id)}
+                >
+                  <td>{index + 1}</td>
+                  <td>
+                    <span
+                      className={`path-badge path-badge--${row.path.toLowerCase()}`}
+                    >
+                      {row.path}
+                    </span>
+                  </td>
+                  <td>
+                    <div
+                      className="tree-indent"
+                      style={{ paddingLeft: row.depth * 14 }}
+                    >
+                      {row.marker === "merge" ? (
+                        <GitMerge size={13} />
+                      ) : row.marker === "loop" ? (
+                        <RotateCcw size={13} />
+                      ) : (
+                        <CornerDownRight size={13} />
+                      )}
+                      <strong>{row.node.type}</strong>
+                      <small>{row.node.key}</small>
+                    </div>
+                  </td>
+                  <td>
+                    {row.node.data.speakerId && (
+                      <strong>{row.node.data.speakerId} · </strong>
                     )}
-                    <strong>{row.node.type}</strong>
-                    <small>{row.node.key}</small>
-                  </div>
-                </td>
-                <td>
-                  {row.node.data.speakerId && (
-                    <strong>{row.node.data.speakerId} · </strong>
-                  )}
-                  {text}
-                </td>
-                <td>{row.marker ? `引用 ${row.node.key}` : next || "—"}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                    {text}
+                  </td>
+                  <td>{row.marker ? `引用 ${row.node.key}` : next || "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

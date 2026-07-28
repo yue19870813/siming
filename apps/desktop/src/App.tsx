@@ -57,6 +57,10 @@ type PanelLayoutStyle = CSSProperties & {
   "--inspector-width": string;
 };
 
+type WorkspaceLayoutStyle = CSSProperties & {
+  "--workbench-height": string;
+};
+
 export default function App() {
   const project = useEditorStore((state) => state.project);
   const projectLoaded = useEditorStore((state) => state.projectLoaded);
@@ -498,6 +502,13 @@ export default function App() {
         <section
           ref={workspaceRef}
           className={`workspace ${editorActivity ? "workspace--editor" : ""}`}
+          style={
+            {
+              "--workbench-height": workbenchPanel
+                ? `${workbenchHeight}px`
+                : "0px",
+            } as WorkspaceLayoutStyle
+          }
         >
           {editorActivity &&
             (viewMode === "canvas" ? (
