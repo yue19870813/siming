@@ -381,6 +381,12 @@ test("project export path can switch between relative and absolute modes", async
   const projectId = useEditorStore.getState().project.manifest.projectId;
 
   fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.change(screen.getByRole("combobox", { name: /默认导出格式/ }), {
+    target: { value: "binary" },
+  });
+  fireEvent.change(screen.getByRole("combobox", { name: /导出组织方式/ }), {
+    target: { value: "bundled" },
+  });
   fireEvent.click(screen.getByRole("button", { name: "绝对路径" }));
   const exportPath = screen.getByRole("textbox", {
     name: /导出文件位置/,
@@ -389,6 +395,12 @@ test("project export path can switch between relative and absolute modes", async
     target: { value: "/tmp/siming-runtime" },
   });
   fireEvent.click(screen.getByRole("button", { name: "应用项目设置" }));
+  expect(useEditorStore.getState().project.manifest.defaultExportFormat).toBe(
+    "binary",
+  );
+  expect(useEditorStore.getState().project.manifest.exportLayout).toBe(
+    "bundled",
+  );
 
   await waitFor(() =>
     expect(
@@ -453,7 +465,10 @@ test("first export asks for a directory and reuses it afterwards", async () => {
   await waitFor(() =>
     expect(invoke).toHaveBeenCalledWith(
       "export_project",
-      expect.objectContaining({ outputPath: "/tmp/siming-export" }),
+      expect.objectContaining({
+        format: "json",
+        outputPath: "/tmp/siming-export",
+      }),
     ),
   );
   expect(open).toHaveBeenCalledWith(
@@ -482,6 +497,44 @@ test("first export asks for a directory and reuses it afterwards", async () => {
         .mock.calls.filter(([command]) => command === "export_project"),
     ).toHaveLength(2),
   );
+  expect(open).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "选择导出格式" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /XML/ }));
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith(
+      "export_project",
+      expect.objectContaining({ format: "xml" }),
+    ),
+  );
+  expect(screen.getByRole("button", { name: "导出 XML" })).toBeInTheDocument();
+
+  const exportCallsBeforeRepeat = vi
+    .mocked(invoke)
+    .mock.calls.filter(([command]) => command === "export_project").length;
+  fireEvent.click(screen.getByRole("button", { name: "导出 XML" }));
+  await waitFor(() =>
+    expect(
+      vi
+        .mocked(invoke)
+        .mock.calls.filter(([command]) => command === "export_project"),
+    ).toHaveLength(exportCallsBeforeRepeat + 1),
+  );
+  expect(vi.mocked(invoke).mock.calls.at(-1)?.[1]).toEqual(
+    expect.objectContaining({ format: "xml" }),
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "选择导出格式" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /二进制包/ }));
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith(
+      "export_project",
+      expect.objectContaining({ format: "binary" }),
+    ),
+  );
+  expect(
+    screen.getByRole("button", { name: "导出 二进制" }),
+  ).toBeInTheDocument();
   expect(open).not.toHaveBeenCalled();
 });
 

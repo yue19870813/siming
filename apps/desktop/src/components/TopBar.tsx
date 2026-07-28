@@ -13,7 +13,7 @@ import {
 import { useEffect, useState } from "react";
 import { translationCompletion } from "../model/i18n";
 import { localeName } from "../model/locales";
-import type { ViewMode } from "../model/types";
+import type { ExportFormat, ViewMode } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 import type { WorkbenchPanelMode } from "./WorkbenchPanel";
 
@@ -28,7 +28,7 @@ export function TopBar({
   onNew: () => void;
   onOpen: () => void;
   onSave: () => void;
-  onExport: () => void;
+  onExport: (format: ExportFormat) => void;
   onMigration: () => void;
   onPanelOpen: (mode: WorkbenchPanelMode) => void;
 }) {
@@ -40,14 +40,20 @@ export function TopBar({
   const setViewMode = useEditorStore((state) => state.setViewMode);
   const locale = useEditorStore((state) => state.previewLocale);
   const setLocale = useEditorStore((state) => state.setPreviewLocale);
-  const setNotice = useEditorStore((state) => state.setNotice);
   const undo = useEditorStore((state) => state.undo);
   const redo = useEditorStore((state) => state.redo);
   const past = useEditorStore((state) => state.past);
   const future = useEditorStore((state) => state.future);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [activeExportFormat, setActiveExportFormat] = useState<ExportFormat>(
+    project.manifest.defaultExportFormat,
+  );
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
+
+  useEffect(() => {
+    setActiveExportFormat(project.manifest.defaultExportFormat);
+  }, [project.manifest.defaultExportFormat, project.manifest.projectId]);
 
   useEffect(() => {
     const closeMenus = (event: MouseEvent) => {
@@ -68,13 +74,10 @@ export function TopBar({
     };
   }, []);
 
-  const exportFormat = (format: "json" | "xml" | "binary") => {
+  const exportFormat = (format: ExportFormat) => {
     setExportMenuOpen(false);
-    if (format === "json") {
-      onExport();
-      return;
-    }
-    setNotice(`${format === "xml" ? "XML" : "二进制"}导出属于后续格式扩展。`);
+    setActiveExportFormat(format);
+    onExport(format);
   };
 
   return (
@@ -201,9 +204,9 @@ export function TopBar({
           <button
             className="button button--primary export-main"
             disabled={busy}
-            onClick={() => exportFormat("json")}
+            onClick={() => exportFormat(activeExportFormat)}
           >
-            导出 JSON
+            导出 {exportFormatLabel(activeExportFormat)}
           </button>
           <button
             className="button button--primary export-toggle"
@@ -230,14 +233,14 @@ export function TopBar({
                 <span>{"</>"}</span>
                 <span>
                   <strong>XML</strong>
-                  <small>后续格式扩展</small>
+                  <small>类型化结构与多语言资源</small>
                 </span>
               </button>
               <button role="menuitem" onClick={() => exportFormat("binary")}>
                 <span>BIN</span>
                 <span>
                   <strong>二进制包</strong>
-                  <small>后续格式扩展</small>
+                  <small>单文件、带分段完整性校验</small>
                 </span>
               </button>
             </div>
@@ -246,6 +249,12 @@ export function TopBar({
       </div>
     </header>
   );
+}
+
+function exportFormatLabel(format: ExportFormat) {
+  if (format === "xml") return "XML";
+  if (format === "binary") return "二进制";
+  return "JSON";
 }
 
 function localeLabel(

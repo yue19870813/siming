@@ -126,6 +126,7 @@ export function createDemoProject(): ProjectSnapshot {
         exports: "exports/runtime/",
       },
       defaultExportFormat: "json",
+      exportLayout: "directoryChunks",
       defaultLocale: "zh-CN",
       locales: ["zh-CN", "en-US"],
       dialogueDirectories: ["dialogues/prologue"],

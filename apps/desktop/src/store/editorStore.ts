@@ -75,6 +75,7 @@ const emptyProject = (): ProjectSnapshot => ({
       exports: "exports/runtime/",
     },
     defaultExportFormat: "json",
+    exportLayout: "bundled",
     defaultLocale: "zh-CN",
     locales: [...DEFAULT_PROJECT_LOCALES],
     dialogueDirectories: [],

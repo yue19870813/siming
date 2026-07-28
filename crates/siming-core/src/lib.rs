@@ -24,6 +24,8 @@ pub struct ProjectManifest {
     pub name: String,
     pub paths: ProjectPaths,
     pub default_export_format: ExportFormat,
+    #[serde(default)]
+    pub export_layout: ExportLayout,
     pub default_locale: String,
     pub locales: Vec<String>,
     #[serde(default)]
@@ -41,6 +43,16 @@ pub struct ProjectPaths {
 #[serde(rename_all = "lowercase")]
 pub enum ExportFormat {
     Json,
+    Xml,
+    Binary,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportLayout {
+    #[default]
+    Bundled,
+    DirectoryChunks,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -2061,6 +2073,7 @@ mod tests {
 
         assert_eq!(manifest.schema_version, 1);
         assert_eq!(manifest.default_export_format, ExportFormat::Json);
+        assert_eq!(manifest.export_layout, ExportLayout::Bundled);
         assert_eq!(manifest.dialogues.len(), 1);
     }
 

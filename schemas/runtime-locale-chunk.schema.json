@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://siming.dev/schemas/runtime-locale-chunk.schema.json",
+  "title": "Siming Runtime Locale Chunk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "locale", "texts"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "locale": { "$ref": "runtime.schema.json#/$defs/locale" },
+    "texts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

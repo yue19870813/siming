@@ -35,7 +35,7 @@ import {
 } from "./lib/projectApi";
 import { InterfaceLocaleEffect } from "./lib/interfaceLocale";
 import { beginPanelResize, clampPanelSize } from "./lib/panelResize";
-import type { SystemSettings } from "./model/types";
+import type { ExportFormat, SystemSettings } from "./model/types";
 import { useEditorStore } from "./store/editorStore";
 
 const defaultSettings: SystemSettings = {
@@ -393,7 +393,7 @@ export default function App() {
     }
   }
 
-  async function handleExport() {
+  async function handleExport(format: ExportFormat) {
     if (!projectLoaded) {
       setNotice("请先新建或打开项目，再导出运行时数据。");
       return;
@@ -432,10 +432,13 @@ export default function App() {
       setBusy(true);
       const result = await exportProject(
         project,
+        format,
         isAbsolutePath(configuredPath) ? configuredPath : undefined,
       );
+      const formatLabel =
+        format === "xml" ? "XML" : format === "binary" ? "二进制" : "JSON";
       setNotice(
-        `已导出 ${result.files.length} 个文件：${result.outputDirectory}`,
+        `已导出${formatLabel}（${result.files.length} 个文件）：${result.outputDirectory}`,
       );
     } catch (error) {
       setNotice(`导出失败：${errorMessage(error)}`);

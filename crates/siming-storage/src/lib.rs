@@ -2,8 +2,8 @@
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use siming_core::{
-    DialogueDocument, DialogueIndexEntry, Edge, ExportFormat, Node, NodeType, Position,
-    ProjectManifest, ProjectPaths, ProjectResources, validate_editable_project,
+    DialogueDocument, DialogueIndexEntry, Edge, ExportFormat, ExportLayout, Node, NodeType,
+    Position, ProjectManifest, ProjectPaths, ProjectResources, validate_editable_project,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -167,6 +167,7 @@ pub fn create_project(
             exports: "exports/runtime/".to_owned(),
         },
         default_export_format: ExportFormat::Json,
+        export_layout: ExportLayout::DirectoryChunks,
         default_locale: default_locale.to_owned(),
         locales,
         dialogue_directories: vec!["dialogues".to_owned()],
@@ -478,6 +479,10 @@ mod tests {
         assert_eq!(
             snapshot.manifest.locales,
             ["zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR"]
+        );
+        assert_eq!(
+            snapshot.manifest.export_layout,
+            ExportLayout::DirectoryChunks
         );
         let original_marker = root.join("测试项目.siming");
         assert!(original_marker.is_file());

@@ -148,12 +148,15 @@ fn simulate_step(
 #[tauri::command]
 fn export_project(
     snapshot: ProjectSnapshot,
+    format: siming_core::ExportFormat,
     output_path: Option<String>,
     pretty: bool,
 ) -> Result<siming_storage::ExportResult, CommandError> {
     Ok(siming_storage::export_project(
         &snapshot,
         output_path.as_deref().map(Path::new),
+        format,
+        None,
         pretty,
     )?)
 }

@@ -71,6 +71,9 @@ export type DialogueIndexEntry = {
   path: string;
 };
 
+export type ExportFormat = "json" | "xml" | "binary";
+export type ExportLayout = "bundled" | "directoryChunks";
+
 export type CharacterDefinition = {
   id: string;
   key: string;
@@ -123,7 +126,8 @@ export type ProjectSnapshot = {
       dialogues: string;
       exports: string;
     };
-    defaultExportFormat: "json";
+    defaultExportFormat: ExportFormat;
+    exportLayout: ExportLayout;
     defaultLocale: string;
     locales: string[];
     dialogueDirectories: string[];

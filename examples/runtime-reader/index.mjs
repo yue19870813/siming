@@ -3,13 +3,12 @@ import { join } from "node:path";
 
 const [root = "exports/runtime", dialogueKey, localeName] =
   process.argv.slice(2);
-const project = JSON.parse(
-  await readFile(join(root, "dialogues.runtime.json"), "utf8"),
-);
+const chunked = await readJsonIfExists(join(root, "project.runtime.json"));
+const bundled = chunked
+  ? null
+  : JSON.parse(await readFile(join(root, "dialogues.runtime.json"), "utf8"));
+const project = chunked ?? bundled;
 const locale = localeName ?? project.defaultLocale;
-const texts = JSON.parse(
-  await readFile(join(root, "locales", `${locale}.json`), "utf8"),
-).texts;
 const dialogueEntry = Object.entries(project.dialogues).find(
   ([, item]) => item.key === dialogueKey,
 );
@@ -18,13 +17,41 @@ if (!dialogueEntry) {
   throw new Error(`Dialogue key not found: ${dialogueKey}`);
 }
 
+const [dialogueId, dialogueIndex] = dialogueEntry;
+let dialogue;
+let texts;
+if (chunked) {
+  const structure = JSON.parse(
+    await readFile(join(root, dialogueIndex.structurePath), "utf8"),
+  );
+  dialogue = structure.dialogues[dialogueId];
+  if (!dialogue) {
+    throw new Error(
+      `Dialogue ${dialogueId} is missing from its structure chunk`,
+    );
+  }
+  const globalPath = project.localePaths[locale];
+  const dialogueLocalePath = dialogueIndex.localePaths[locale];
+  const globalTexts = globalPath
+    ? JSON.parse(await readFile(join(root, globalPath), "utf8")).texts
+    : {};
+  const dialogueTexts = dialogueLocalePath
+    ? JSON.parse(await readFile(join(root, dialogueLocalePath), "utf8")).texts
+    : {};
+  texts = { ...globalTexts, ...dialogueTexts };
+} else {
+  dialogue = dialogueIndex;
+  texts = JSON.parse(
+    await readFile(join(root, "locales", `${locale}.json`), "utf8"),
+  ).texts;
+}
+
 const variables = Object.fromEntries(
   Object.values(project.resources.variables).map((item) => [
     item.key,
     item.defaultValue,
   ]),
 );
-const [, dialogue] = dialogueEntry;
 let nodeId = dialogue.entryNodeId;
 
 while (nodeId) {
@@ -70,6 +97,15 @@ while (nodeId) {
       break;
     default:
       throw new Error(`Unsupported node type: ${node.type}`);
+  }
+}
+
+async function readJsonIfExists(path) {
+  try {
+    return JSON.parse(await readFile(path, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
   }
 }
 

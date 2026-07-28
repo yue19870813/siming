@@ -44,6 +44,8 @@ export function SettingsView({
       ? ("absolute" as const)
       : ("relative" as const),
     defaultLocale: project.manifest.defaultLocale,
+    defaultExportFormat: project.manifest.defaultExportFormat,
+    exportLayout: project.manifest.exportLayout,
     locales: project.manifest.locales.join(", "),
   }));
   const [systemDraft, setSystemDraft] = useState(settings);
@@ -60,10 +62,14 @@ export function SettingsView({
         ? "absolute"
         : "relative",
       defaultLocale: project.manifest.defaultLocale,
+      defaultExportFormat: project.manifest.defaultExportFormat,
+      exportLayout: project.manifest.exportLayout,
       locales: project.manifest.locales.join(", "),
     });
   }, [
     project.manifest.defaultLocale,
+    project.manifest.defaultExportFormat,
+    project.manifest.exportLayout,
     project.manifest.locales,
     project.manifest.name,
     project.manifest.paths.dialogues,
@@ -128,6 +134,8 @@ export function SettingsView({
         draft.manifest.paths.exports = normalizeDirectory(projectDraft.exports);
       }
       draft.manifest.defaultLocale = projectDraft.defaultLocale;
+      draft.manifest.defaultExportFormat = projectDraft.defaultExportFormat;
+      draft.manifest.exportLayout = projectDraft.exportLayout;
       draft.manifest.locales = locales;
     });
     const projectExportDirectories = {
@@ -348,8 +356,37 @@ export function SettingsView({
                   title="默认导出格式"
                   help="工具栏主按钮将优先使用该格式。"
                 >
-                  <select value="json" disabled>
+                  <select
+                    value={projectDraft.defaultExportFormat}
+                    onChange={(event) =>
+                      setProjectDraft({
+                        ...projectDraft,
+                        defaultExportFormat: event.target
+                          .value as typeof projectDraft.defaultExportFormat,
+                      })
+                    }
+                  >
                     <option value="json">运行时 JSON</option>
+                    <option value="xml">XML</option>
+                    <option value="binary">二进制包</option>
+                  </select>
+                </SettingsRow>
+                <SettingsRow
+                  title="导出组织方式"
+                  help="按一级对话目录拆分后，宿主可以按章节或场景加载。"
+                >
+                  <select
+                    value={projectDraft.exportLayout}
+                    onChange={(event) =>
+                      setProjectDraft({
+                        ...projectDraft,
+                        exportLayout: event.target
+                          .value as typeof projectDraft.exportLayout,
+                      })
+                    }
+                  >
+                    <option value="directoryChunks">按一级对话目录拆分</option>
+                    <option value="bundled">合并为整包</option>
                   </select>
                 </SettingsRow>
                 <SettingsRow
@@ -403,6 +440,8 @@ export function SettingsView({
                     exports: "",
                     exportPathMode: "relative",
                     defaultLocale: "zh-CN",
+                    defaultExportFormat: "json",
+                    exportLayout: "directoryChunks",
                     locales: DEFAULT_PROJECT_LOCALES.join(", "),
                   })
                 }

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://siming.dev/schemas/runtime-dialogue-chunk.schema.json",
+  "title": "Siming Runtime Dialogue Chunk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "dialogues"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "dialogues": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "runtime.schema.json#/$defs/dialogue"
+      }
+    }
+  }
+}

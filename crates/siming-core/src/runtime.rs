@@ -5,7 +5,10 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    path::{Component, Path},
+};
 use thiserror::Error;
 
 pub const RUNTIME_SCHEMA_VERSION: u32 = 1;
@@ -31,6 +34,42 @@ pub enum AdvancePolicyCompat {
 pub struct RuntimeBundle {
     pub project: RuntimeProject,
     pub locales: BTreeMap<String, RuntimeLocaleResource>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeChunkedBundle {
+    pub schema_version: u32,
+    pub default_locale: String,
+    pub locales: Vec<String>,
+    pub resources: RuntimeResources,
+    pub dialogues: BTreeMap<String, RuntimeDialogueChunkIndex>,
+    pub dialogue_chunks: BTreeMap<String, RuntimeDialogueChunk>,
+    pub locale_global: BTreeMap<String, RuntimeLocaleChunk>,
+    pub locale_chunks: BTreeMap<String, BTreeMap<String, RuntimeLocaleChunk>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeDialogueChunkIndex {
+    pub key: String,
+    /// Empty for dialogues stored directly below the configured dialogue root.
+    pub chunk: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeDialogueChunk {
+    pub schema_version: u32,
+    pub dialogues: BTreeMap<String, RuntimeDialogue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeLocaleChunk {
+    pub schema_version: u32,
+    pub locale: String,
+    pub texts: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -261,6 +300,119 @@ pub fn compile_runtime(
         },
         locales,
     })
+}
+
+pub fn partition_runtime(
+    manifest: &ProjectManifest,
+    bundle: &RuntimeBundle,
+) -> Result<RuntimeChunkedBundle, CompileError> {
+    let mut dialogues = BTreeMap::new();
+    let mut dialogue_chunks = BTreeMap::<String, RuntimeDialogueChunk>::new();
+
+    for entry in &manifest.dialogues {
+        let dialogue =
+            bundle
+                .project
+                .dialogues
+                .get(&entry.id)
+                .ok_or_else(|| CompileError::InvalidNode {
+                    node_id: entry.id.clone(),
+                    message: "compiled dialogue is missing".to_owned(),
+                })?;
+        let chunk = dialogue_chunk_key(&manifest.paths.dialogues, &entry.path);
+        dialogues.insert(
+            entry.id.clone(),
+            RuntimeDialogueChunkIndex {
+                key: dialogue.key.clone(),
+                chunk: chunk.clone(),
+            },
+        );
+        dialogue_chunks
+            .entry(chunk)
+            .or_insert_with(|| RuntimeDialogueChunk {
+                schema_version: RUNTIME_SCHEMA_VERSION,
+                dialogues: BTreeMap::new(),
+            })
+            .dialogues
+            .insert(entry.id.clone(), dialogue.clone());
+    }
+
+    let mut locale_global = BTreeMap::new();
+    let mut locale_chunks = BTreeMap::new();
+    for (locale, resource) in &bundle.locales {
+        let global_texts = resource
+            .texts
+            .iter()
+            .filter(|(key, _)| !key.starts_with("dialogue."))
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect();
+        locale_global.insert(
+            locale.clone(),
+            RuntimeLocaleChunk {
+                schema_version: RUNTIME_SCHEMA_VERSION,
+                locale: locale.clone(),
+                texts: global_texts,
+            },
+        );
+
+        let mut chunks = BTreeMap::new();
+        for (chunk_key, chunk) in &dialogue_chunks {
+            let dialogue_prefixes = chunk
+                .dialogues
+                .keys()
+                .map(|id| format!("dialogue.{id}."))
+                .collect::<Vec<_>>();
+            let texts = resource
+                .texts
+                .iter()
+                .filter(|(key, _)| {
+                    dialogue_prefixes
+                        .iter()
+                        .any(|prefix| key.starts_with(prefix))
+                })
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect::<BTreeMap<_, _>>();
+            if !texts.is_empty() {
+                chunks.insert(
+                    chunk_key.clone(),
+                    RuntimeLocaleChunk {
+                        schema_version: RUNTIME_SCHEMA_VERSION,
+                        locale: locale.clone(),
+                        texts,
+                    },
+                );
+            }
+        }
+        locale_chunks.insert(locale.clone(), chunks);
+    }
+
+    Ok(RuntimeChunkedBundle {
+        schema_version: RUNTIME_SCHEMA_VERSION,
+        default_locale: bundle.project.default_locale.clone(),
+        locales: bundle.project.locales.clone(),
+        resources: bundle.project.resources.clone(),
+        dialogues,
+        dialogue_chunks,
+        locale_global,
+        locale_chunks,
+    })
+}
+
+fn dialogue_chunk_key(dialogue_root: &str, dialogue_path: &str) -> String {
+    let normalized_root = dialogue_root.replace('\\', "/");
+    let normalized_path = dialogue_path.replace('\\', "/");
+    let root = Path::new(&normalized_root);
+    let path = Path::new(&normalized_path);
+    let relative = path.strip_prefix(root).unwrap_or(path);
+    let parent = relative.parent().unwrap_or_else(|| Path::new(""));
+    parent
+        .components()
+        .find_map(|component| match component {
+            Component::Normal(value) => value.to_str(),
+            _ => None,
+        })
+        .unwrap_or_default()
+        .to_owned()
 }
 
 fn compile_resources(
@@ -538,6 +690,77 @@ mod tests {
         let serialized = serde_json::to_string(&bundle.project).unwrap();
         assert!(!serialized.contains("position"));
         assert!(!serialized.contains("\"edges\""));
+    }
+
+    #[test]
+    fn partitions_dialogues_and_texts_by_first_directory() {
+        let mut manifest = parse_project_manifest(include_str!(
+            "../../../fixtures/minimal-project/.siming/project.json"
+        ))
+        .unwrap();
+        let dialogue = parse_dialogue_document(include_str!(
+            "../../../fixtures/minimal-project/dialogues/intro.json"
+        ))
+        .unwrap();
+        let resources = fixture_resources();
+        let mut bundle =
+            compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap();
+
+        manifest.dialogues[0].path = "dialogues/intro.json".to_owned();
+        let nested_id = "22222222-2222-4222-8222-222222222222".to_owned();
+        let mut nested_entry = manifest.dialogues[0].clone();
+        nested_entry.id = nested_id.clone();
+        nested_entry.key = "nested".to_owned();
+        nested_entry.path = "dialogues/episode-1/deep/nested.json".to_owned();
+        manifest.dialogues.push(nested_entry);
+
+        let mut nested_dialogue = bundle.project.dialogues[&dialogue.id].clone();
+        nested_dialogue.key = "nested".to_owned();
+        bundle
+            .project
+            .dialogues
+            .insert(nested_id.clone(), nested_dialogue);
+        for resource in bundle.locales.values_mut() {
+            let copied = resource
+                .texts
+                .iter()
+                .filter(|(key, _)| key.starts_with(&format!("dialogue.{}.", dialogue.id)))
+                .map(|(key, value)| {
+                    (
+                        key.replacen(
+                            &format!("dialogue.{}.", dialogue.id),
+                            &format!("dialogue.{nested_id}."),
+                            1,
+                        ),
+                        value.clone(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            resource.texts.extend(copied);
+        }
+
+        let chunks = partition_runtime(&manifest, &bundle).unwrap();
+        assert_eq!(
+            chunks
+                .dialogue_chunks
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["", "episode-1"]
+        );
+        assert_eq!(chunks.dialogues[&nested_id].chunk, "episode-1");
+        assert!(
+            chunks.locale_global["zh-CN"]
+                .texts
+                .keys()
+                .all(|key| !key.starts_with("dialogue."))
+        );
+        assert!(
+            chunks.locale_chunks["zh-CN"]["episode-1"]
+                .texts
+                .keys()
+                .all(|key| key.starts_with(&format!("dialogue.{nested_id}.")))
+        );
     }
 
     fn fixture_resources() -> ProjectResources {

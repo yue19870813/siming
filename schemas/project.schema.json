@@ -40,7 +40,11 @@
       }
     },
     "defaultExportFormat": {
-      "const": "json"
+      "enum": ["json", "xml", "binary"]
+    },
+    "exportLayout": {
+      "enum": ["bundled", "directoryChunks"],
+      "default": "bundled"
     },
     "defaultLocale": {
       "$ref": "#/$defs/locale"

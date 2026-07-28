@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type {
   Diagnostic,
+  ExportFormat,
   ExportResult,
   MigrationReport,
   ProjectSnapshot,
@@ -48,12 +49,14 @@ export async function saveProject(snapshot: ProjectSnapshot) {
 
 export async function exportProject(
   snapshot: ProjectSnapshot,
+  format: ExportFormat,
   outputPath?: string,
   pretty = false,
 ) {
   requireTauri("运行时导出");
   return invoke<ExportResult>("export_project", {
     snapshot,
+    format,
     outputPath: outputPath ?? null,
     pretty,
   });

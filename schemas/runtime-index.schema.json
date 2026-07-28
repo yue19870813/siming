@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://siming.dev/schemas/runtime-index.schema.json",
+  "title": "Siming Runtime Project Index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "defaultLocale",
+    "locales",
+    "resources",
+    "localePaths",
+    "dialogues"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "defaultLocale": { "$ref": "runtime.schema.json#/$defs/locale" },
+    "locales": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "runtime.schema.json#/$defs/locale" }
+    },
+    "resources": { "$ref": "runtime.schema.json#/$defs/resources" },
+    "localePaths": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "dialogues": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "structurePath", "localePaths"],
+        "properties": {
+          "key": { "$ref": "runtime.schema.json#/$defs/key" },
+          "structurePath": { "type": "string", "minLength": 1 },
+          "localePaths": {
+            "type": "object",
+            "additionalProperties": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

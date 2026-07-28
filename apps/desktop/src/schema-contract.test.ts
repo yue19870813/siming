@@ -82,3 +82,65 @@ test("runtime schema accepts compiled editor-free nodes", () => {
   expect(validate(runtime), JSON.stringify(validate.errors)).toBe(true);
   expect(JSON.stringify(runtime)).not.toContain("position");
 });
+
+test("chunked runtime schemas accept index, dialogue, and locale files", () => {
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  addFormats(ajv);
+  ajv.addSchema(readJson("schemas/runtime.schema.json"));
+  const validateIndex = ajv.compile(
+    readJson("schemas/runtime-index.schema.json"),
+  );
+  const validateDialogue = ajv.compile(
+    readJson("schemas/runtime-dialogue-chunk.schema.json"),
+  );
+  const validateLocale = ajv.compile(
+    readJson("schemas/runtime-locale-chunk.schema.json"),
+  );
+  const dialogueId = "2fd88ddc-aa3b-466f-92a2-48785adce71e";
+  const startId = "3f0e9d88-5ec4-4cf5-9a83-9ad4ee9f7451";
+  const endId = "b4aa0f79-bd0e-45cd-8a6e-094e6f50ccfd";
+
+  expect(
+    validateIndex({
+      schemaVersion: 1,
+      defaultLocale: "zh-CN",
+      locales: ["zh-CN"],
+      resources: { characters: {}, variables: {}, events: {} },
+      localePaths: { "zh-CN": "locales/zh-CN/global.json" },
+      dialogues: {
+        [dialogueId]: {
+          key: "intro",
+          structurePath: "dialogues/chapter-1/runtime.json",
+          localePaths: {
+            "zh-CN": "locales/zh-CN/dialogues/chapter-1/runtime.json",
+          },
+        },
+      },
+    }),
+    JSON.stringify(validateIndex.errors),
+  ).toBe(true);
+  expect(
+    validateDialogue({
+      schemaVersion: 1,
+      dialogues: {
+        [dialogueId]: {
+          key: "intro",
+          entryNodeId: startId,
+          nodes: {
+            [startId]: { key: "start", type: "start", next: endId },
+            [endId]: { key: "end", type: "end" },
+          },
+        },
+      },
+    }),
+    JSON.stringify(validateDialogue.errors),
+  ).toBe(true);
+  expect(
+    validateLocale({
+      schemaVersion: 1,
+      locale: "zh-CN",
+      texts: { [`dialogue.${dialogueId}.${startId}.text`]: "正文" },
+    }),
+    JSON.stringify(validateLocale.errors),
+  ).toBe(true);
+});

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use serde_json::{Value, json};
-use siming_core::{Diagnostic, DiagnosticSeverity};
+use siming_core::{Diagnostic, DiagnosticSeverity, ExportFormat, ExportLayout};
 use siming_storage::{DeliveryError, ProjectSnapshot};
 use std::{path::PathBuf, process::ExitCode};
 
@@ -32,7 +32,7 @@ enum Command {
         #[arg(long)]
         warnings_as_errors: bool,
     },
-    /// Compile deterministic runtime JSON and locale resources.
+    /// Compile deterministic runtime data and locale resources.
     Export {
         /// Project path. Defaults to the current directory.
         #[arg(default_value = ".")]
@@ -42,6 +42,12 @@ enum Command {
         output: Option<PathBuf>,
         #[arg(long)]
         pretty: bool,
+        /// Runtime export format. Defaults to the project setting.
+        #[arg(long, value_enum)]
+        format: Option<RuntimeExportFormat>,
+        /// Runtime file layout. Defaults to the project setting.
+        #[arg(long, value_enum)]
+        layout: Option<RuntimeExportLayout>,
     },
     /// Check or apply source schema migrations.
     Migrate {
@@ -71,6 +77,29 @@ enum OutputFormat {
     Json,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum RuntimeExportFormat {
+    Json,
+    Xml,
+    Binary,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum RuntimeExportLayout {
+    Bundled,
+    DirectoryChunks,
+}
+
+impl From<RuntimeExportFormat> for ExportFormat {
+    fn from(value: RuntimeExportFormat) -> Self {
+        match value {
+            RuntimeExportFormat::Json => Self::Json,
+            RuntimeExportFormat::Xml => Self::Xml,
+            RuntimeExportFormat::Binary => Self::Binary,
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let code = std::panic::catch_unwind(|| run(Cli::parse())).unwrap_or_else(|_| {
         eprintln!("内部错误：命令执行异常终止。");
@@ -94,7 +123,9 @@ fn run(cli: Cli) -> u8 {
             path,
             output,
             pretty,
-        }) => export_command(path, output, pretty),
+            format,
+            layout,
+        }) => export_command(path, output, format, layout, pretty),
         Some(Command::Migrate {
             path,
             check: _,
@@ -148,7 +179,13 @@ fn validate_command(path: PathBuf, format: OutputFormat, warnings_as_errors: boo
     }
 }
 
-fn export_command(path: PathBuf, output: Option<PathBuf>, pretty: bool) -> u8 {
+fn export_command(
+    path: PathBuf,
+    output: Option<PathBuf>,
+    format: Option<RuntimeExportFormat>,
+    layout: Option<RuntimeExportLayout>,
+    pretty: bool,
+) -> u8 {
     let snapshot = match siming_storage::open_project(&path) {
         Ok(snapshot) => snapshot,
         Err(error) => {
@@ -156,7 +193,14 @@ fn export_command(path: PathBuf, output: Option<PathBuf>, pretty: bool) -> u8 {
             return EXIT_USAGE;
         }
     };
-    match siming_storage::export_project(&snapshot, output.as_deref(), pretty) {
+    let format = format
+        .map(ExportFormat::from)
+        .unwrap_or(snapshot.manifest.default_export_format);
+    let layout = layout.map(|layout| match layout {
+        RuntimeExportLayout::Bundled => ExportLayout::Bundled,
+        RuntimeExportLayout::DirectoryChunks => ExportLayout::DirectoryChunks,
+    });
+    match siming_storage::export_project(&snapshot, output.as_deref(), format, layout, pretty) {
         Ok(result) => {
             println!("已导出到 {}", result.output_directory);
             for file in result.files {
@@ -335,6 +379,9 @@ mod tests {
         for args in [
             vec!["siming", "validate", ".", "--format", "json"],
             vec!["siming", "export", ".", "--output", "build", "--pretty"],
+            vec!["siming", "export", ".", "--format", "xml"],
+            vec!["siming", "export", ".", "--format", "binary"],
+            vec!["siming", "export", ".", "--layout", "directory-chunks"],
             vec!["siming", "migrate", ".", "--check"],
             vec![
                 "siming",
