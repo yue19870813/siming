@@ -134,6 +134,27 @@ fn save_project(snapshot: ProjectSnapshot) -> Result<(), CommandError> {
 }
 
 #[tauri::command]
+fn import_character_avatar(
+    root_path: String,
+    character_id: String,
+    source_path: String,
+) -> Result<String, CommandError> {
+    Ok(siming_storage::import_character_avatar(
+        Path::new(&root_path),
+        &character_id,
+        Path::new(&source_path),
+    )?)
+}
+
+#[tauri::command]
+fn read_project_asset(root_path: String, relative_path: String) -> Result<Vec<u8>, CommandError> {
+    Ok(siming_storage::read_project_asset(
+        Path::new(&root_path),
+        &relative_path,
+    )?)
+}
+
+#[tauri::command]
 fn validate_project(snapshot: ProjectSnapshot) -> Vec<siming_core::Diagnostic> {
     siming_core::validate_project(&snapshot.manifest, &snapshot.dialogues, &snapshot.resources)
 }
@@ -276,6 +297,8 @@ pub fn run() {
             create_project,
             open_project,
             save_project,
+            import_character_avatar,
+            read_project_asset,
             validate_project,
             simulate_step,
             export_project,

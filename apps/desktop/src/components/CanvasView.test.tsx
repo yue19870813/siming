@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test } from "vitest";
 import { createDemoProject } from "../model/demo";
 import { nodeDropEvent } from "../lib/nodeDrag";
@@ -68,5 +68,28 @@ describe("CanvasView palette drop", () => {
     );
     expect(created?.type).toBe("condition");
     expect(created?.position).toEqual({ x: 395, y: 307 });
+  });
+
+  test("shows the character name and portrait placeholder on dialogue nodes", () => {
+    const { container } = render(<CanvasView />);
+
+    expect(screen.getByText("杜尔")).toBeInTheDocument();
+    expect(container.querySelector(".dialogue-node-avatar")).not.toBeNull();
+  });
+
+  test("keeps narrator dialogue content in the text column", () => {
+    useEditorStore.getState().commit("改为旁白", (project) => {
+      const dialogueNode = project.dialogues[0].nodes.find(
+        (node) => node.type === "dialogue",
+      );
+      if (dialogueNode) dialogueNode.data.speakerId = undefined;
+    });
+
+    render(<CanvasView />);
+    const narrator = screen.getByText("旁白");
+    const content = narrator.closest(".dialogue-node-content");
+
+    expect(content?.querySelector(".dialogue-node-avatar")).not.toBeNull();
+    expect(narrator.parentElement).not.toHaveClass("dialogue-node-avatar");
   });
 });

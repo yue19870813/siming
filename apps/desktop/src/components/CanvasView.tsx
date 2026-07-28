@@ -16,10 +16,15 @@ import {
 import "@xyflow/react/dist/style.css";
 import { GitBranch, MessageCircle, Play, Square, Zap } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { CharacterAvatar } from "./CharacterAvatar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 import { formatCondition } from "../model/conditions";
 import { createId } from "../model/demo";
-import type { DialogueNode, NodeType } from "../model/types";
+import type {
+  CharacterDefinition,
+  DialogueNode,
+  NodeType,
+} from "../model/types";
 import {
   nodeDragCancelEvent,
   type NodeDragDetail,
@@ -43,6 +48,8 @@ const typeMeta: Record<
 type CanvasNodeData = {
   node: DialogueNode;
   locale: string;
+  projectRoot: string;
+  character?: CharacterDefinition;
 };
 
 type CanvasFlowNode = FlowNode<CanvasNodeData, "siming">;
@@ -51,13 +58,18 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
   data,
   selected,
 }: NodeProps) {
-  const { node, locale } = data as CanvasNodeData;
+  const { node, locale, projectRoot, character } = data as CanvasNodeData;
   const meta = typeMeta[node.type];
   const Icon = meta.icon;
   const text =
     node.data.text?.[locale] ??
     Object.values(node.data.text ?? {})[0] ??
     meta.label;
+  const speakerName = character
+    ? (character.name[locale] ??
+      Object.values(character.name)[0] ??
+      character.key)
+    : node.data.speakerId || "旁白";
 
   return (
     <article
@@ -76,10 +88,19 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
       </header>
       <div className="flow-node-content">
         {node.type === "dialogue" && (
-          <>
-            <strong>{node.data.speakerId || "旁白"}</strong>
-            <p>{text}</p>
-          </>
+          <div className="dialogue-node-content">
+            <CharacterAvatar
+              className="dialogue-node-avatar"
+              rootPath={projectRoot}
+              avatar={character?.avatar}
+              name={speakerName}
+              color={character?.color ?? meta.color}
+            />
+            <div>
+              <strong>{speakerName}</strong>
+              <p>{text}</p>
+            </div>
+          </div>
         )}
         {node.type === "choice" &&
           node.data.choices?.map((choice, index) => (
@@ -163,9 +184,22 @@ export function CanvasView() {
         type: "siming",
         position: node.position,
         selected: node.id === selectedNodeId,
-        data: { node, locale },
+        data: {
+          node,
+          locale,
+          projectRoot: project.rootPath,
+          character: project.resources.characters.find(
+            (item) => item.key === node.data.speakerId,
+          ),
+        },
       })),
-    [dialogue, locale, selectedNodeId],
+    [
+      dialogue,
+      locale,
+      project.resources.characters,
+      project.rootPath,
+      selectedNodeId,
+    ],
   );
   const [nodes, setNodes, onNodesChange] =
     useNodesState<CanvasFlowNode>(derivedNodes);

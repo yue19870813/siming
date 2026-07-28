@@ -78,6 +78,7 @@ export type CharacterDefinition = {
   id: string;
   key: string;
   name: LocalizedText;
+  avatar?: string;
   color: string;
   description: string;
   tags: string[];

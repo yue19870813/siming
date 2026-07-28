@@ -20,6 +20,8 @@ pub use delivery::*;
 const PROJECT_FILE: &str = ".siming/project.json";
 const PROJECT_MARKER_EXTENSION: &str = "siming";
 const DEFAULT_SUPPORTED_LOCALES: [&str; 5] = ["zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR"];
+const MAX_CHARACTER_AVATAR_BYTES: u64 = 5 * 1024 * 1024;
+const CHARACTER_AVATAR_EXTENSIONS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -221,6 +223,65 @@ pub fn open_project(root: &Path) -> StorageResult<ProjectSnapshot> {
         dialogues,
         resources,
     })
+}
+
+pub fn import_character_avatar(
+    root: &Path,
+    character_id: &str,
+    source: &Path,
+) -> StorageResult<String> {
+    let root = project_root(root)?;
+    let source = absolute_path(source)?;
+    let metadata = fs::metadata(&source)?;
+    if !metadata.is_file() {
+        return Err(StorageError::InvalidProject(
+            "角色头像必须是图片文件".to_owned(),
+        ));
+    }
+    if metadata.len() > MAX_CHARACTER_AVATAR_BYTES {
+        return Err(StorageError::InvalidProject(
+            "角色头像不能超过 5 MB".to_owned(),
+        ));
+    }
+    let extension = source
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase)
+        .filter(|value| CHARACTER_AVATAR_EXTENSIONS.contains(&value.as_str()))
+        .ok_or_else(|| {
+            StorageError::InvalidProject("角色头像仅支持 PNG、JPG、JPEG 和 WebP".to_owned())
+        })?;
+    let character_id = Uuid::parse_str(character_id)
+        .map_err(|_| StorageError::InvalidProject("角色 ID 不是有效 UUID".to_owned()))?;
+    let relative = format!(
+        "assets/characters/{}-{}.{}",
+        character_id,
+        Uuid::new_v4(),
+        extension
+    );
+    let target = resolve_project_path(&root, &relative)?;
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::copy(source, target)?;
+    Ok(relative)
+}
+
+pub fn read_project_asset(root: &Path, relative: &str) -> StorageResult<Vec<u8>> {
+    let root = project_root(root)?;
+    let path = resolve_project_path(&root, relative)?;
+    let metadata = fs::metadata(&path)?;
+    if !metadata.is_file() {
+        return Err(StorageError::InvalidProject(
+            "项目资源不是有效文件".to_owned(),
+        ));
+    }
+    if metadata.len() > MAX_CHARACTER_AVATAR_BYTES {
+        return Err(StorageError::InvalidProject(
+            "项目图片资源不能超过 5 MB".to_owned(),
+        ));
+    }
+    Ok(fs::read(path)?)
 }
 
 pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
@@ -510,6 +571,22 @@ mod tests {
         let reopened_from_marker = open_project(&renamed_marker).unwrap();
         assert_eq!(reopened_from_marker.manifest.name, "已修改");
 
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn imports_and_reads_a_character_avatar_inside_the_project() {
+        let root = std::env::temp_dir().join(format!("siming-avatar-{}", Uuid::new_v4()));
+        let source = std::env::temp_dir().join(format!("siming-avatar-{}.png", Uuid::new_v4()));
+        create_project(&root, "头像测试", "zh-CN").unwrap();
+        fs::write(&source, b"fake-png").unwrap();
+        let character_id = Uuid::new_v4().to_string();
+
+        let relative = import_character_avatar(&root, &character_id, &source).unwrap();
+
+        assert!(relative.starts_with("assets/characters/"));
+        assert_eq!(read_project_asset(&root, &relative).unwrap(), b"fake-png");
+        fs::remove_file(source).unwrap();
         fs::remove_dir_all(root).unwrap();
     }
 }

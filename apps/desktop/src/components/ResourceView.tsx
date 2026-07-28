@@ -1,5 +1,17 @@
-import { Copy, Plus, Search, ShieldAlert, Trash2 } from "lucide-react";
+import {
+  Copy,
+  ImagePlus,
+  Plus,
+  Search,
+  ShieldAlert,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  chooseCharacterAvatarFile,
+  importCharacterAvatar,
+} from "../lib/projectApi";
 import {
   conditionUsesVariable,
   renameConditionVariable,
@@ -13,6 +25,7 @@ import type {
   VariableDefinition,
 } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
+import { CharacterAvatar } from "./CharacterAvatar";
 
 type Resource =
   CharacterDefinition | VariableDefinition | EventDefinition | TagDefinition;
@@ -45,7 +58,12 @@ export function ResourceView({ activity }: { activity: Activity }) {
   const resources = project.resources[resourceKey] as Resource[];
   const [selectedId, setSelectedId] = useState(resources[0]?.id ?? "");
   const [query, setQuery] = useState("");
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const selected = resources.find((item) => item.id === selectedId);
+  const selectedCharacter =
+    resourceKey === "characters" && selected
+      ? (selected as CharacterDefinition)
+      : null;
 
   useEffect(() => {
     if (!resources.some((item) => item.id === selectedId)) {
@@ -103,6 +121,36 @@ export function ResourceView({ activity }: { activity: Activity }) {
     });
   };
 
+  const chooseAvatar = async () => {
+    if (!selectedCharacter) return;
+    if (!project.rootPath) {
+      setNotice("请先保存或打开真实项目，再导入角色头像。");
+      return;
+    }
+    try {
+      const sourcePath = await chooseCharacterAvatarFile();
+      if (!sourcePath) return;
+      setAvatarBusy(true);
+      const characterId = selectedCharacter.id;
+      const avatar = await importCharacterAvatar(
+        project.rootPath,
+        characterId,
+        sourcePath,
+      );
+      commit("设置角色头像", (draft) => {
+        const character = draft.resources.characters.find(
+          (item) => item.id === characterId,
+        );
+        if (character) character.avatar = avatar;
+      });
+      setNotice(`角色头像已导入：${avatar}`);
+    } catch (error) {
+      setNotice(`角色头像导入失败：${errorMessage(error)}`);
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
   return (
     <section className="resource-view">
       <header className="workspace-heading">
@@ -129,15 +177,30 @@ export function ResourceView({ activity }: { activity: Activity }) {
             {filtered.map((item) => (
               <button
                 key={item.id}
-                className={item.id === selectedId ? "is-active" : undefined}
+                className={[
+                  item.id === selectedId ? "is-active" : "",
+                  resourceKey === "characters" ? "has-avatar" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 onClick={() => setSelectedId(item.id)}
               >
-                <i
-                  style={{
-                    background:
-                      "color" in item ? item.color : "var(--accent-primary)",
-                  }}
-                />
+                {resourceKey === "characters" ? (
+                  <CharacterAvatar
+                    className="resource-list-avatar"
+                    rootPath={project.rootPath}
+                    avatar={(item as CharacterDefinition).avatar}
+                    name={resourceName(item, locale)}
+                    color={(item as CharacterDefinition).color}
+                  />
+                ) : (
+                  <i
+                    style={{
+                      background:
+                        "color" in item ? item.color : "var(--accent-primary)",
+                    }}
+                  />
+                )}
                 <span>
                   <strong>{resourceName(item, locale)}</strong>
                   <span
@@ -208,6 +271,53 @@ export function ResourceView({ activity }: { activity: Activity }) {
                   <ShieldAlert size={15} />
                   当前定义有 {referenceCount} 处引用，删除保护已启用。
                 </div>
+              )}
+              {selectedCharacter && (
+                <section className="character-avatar-editor">
+                  <CharacterAvatar
+                    className="character-avatar-preview"
+                    rootPath={project.rootPath}
+                    avatar={selectedCharacter.avatar}
+                    name={resourceName(selectedCharacter, locale)}
+                    color={selectedCharacter.color}
+                  />
+                  <div>
+                    <strong>角色头像</strong>
+                    <p>
+                      支持 PNG、JPG、JPEG、WebP，图片会复制到项目内，最大 5 MB。
+                    </p>
+                    {selectedCharacter.avatar && (
+                      <code>{selectedCharacter.avatar}</code>
+                    )}
+                    <div>
+                      <button
+                        className="button button--ghost"
+                        disabled={avatarBusy}
+                        onClick={() => void chooseAvatar()}
+                      >
+                        <ImagePlus size={14} />
+                        {avatarBusy
+                          ? "导入中…"
+                          : selectedCharacter.avatar
+                            ? "更换头像"
+                            : "选择头像"}
+                      </button>
+                      {selectedCharacter.avatar && (
+                        <button
+                          className="button button--ghost"
+                          onClick={() =>
+                            update((item) => {
+                              if ("avatar" in item) item.avatar = undefined;
+                            }, "移除角色头像")
+                          }
+                        >
+                          <X size={14} />
+                          移除
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </section>
               )}
               <div className="form-grid">
                 <label>
@@ -442,4 +552,12 @@ function replaceReferences(
       }
     }
   }
+}
+
+function errorMessage(error: unknown) {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    return String(error.message);
+  }
+  return "发生未知错误";
 }

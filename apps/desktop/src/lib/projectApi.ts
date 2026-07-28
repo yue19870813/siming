@@ -47,6 +47,45 @@ export async function saveProject(snapshot: ProjectSnapshot) {
   return invoke<void>("save_project", { snapshot });
 }
 
+export async function chooseCharacterAvatarFile() {
+  if (!isTauri()) {
+    throw new Error("角色头像导入需要在 Tauri dev 模式中运行。");
+  }
+  const selected = await open({
+    directory: false,
+    multiple: false,
+    title: "选择角色头像",
+    filters: [
+      {
+        name: "图片",
+        extensions: ["png", "jpg", "jpeg", "webp"],
+      },
+    ],
+  });
+  return typeof selected === "string" ? selected : null;
+}
+
+export async function importCharacterAvatar(
+  rootPath: string,
+  characterId: string,
+  sourcePath: string,
+) {
+  requireTauri("角色头像导入");
+  return invoke<string>("import_character_avatar", {
+    rootPath,
+    characterId,
+    sourcePath,
+  });
+}
+
+export async function readProjectAsset(rootPath: string, relativePath: string) {
+  requireTauri("项目资源读取");
+  return invoke<number[]>("read_project_asset", {
+    rootPath,
+    relativePath,
+  });
+}
+
 export async function exportProject(
   snapshot: ProjectSnapshot,
   format: ExportFormat,

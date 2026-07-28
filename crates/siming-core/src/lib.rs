@@ -131,6 +131,8 @@ pub struct CharacterDefinition {
     pub id: String,
     pub key: String,
     pub name: LocalizedText,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
     #[serde(default = "default_color")]
     pub color: String,
     #[serde(default)]
