@@ -1,0 +1,32 @@
+name: C# SDK
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Regenerate Rust exports and reference traces
+        run: |
+          python3 sdks/csharp/scripts/generate-contracts.py
+          python3 sdks/csharp/scripts/unity-metadata.py
+          git diff --exit-code -- sdks/csharp/contracts sdks/csharp/Packages
+      - name: Build and run runtime contracts
+        run: dotnet run --project sdks/csharp/tests/Siming.Tests -c Release
+      - name: Build console example
+        run: dotnet build sdks/csharp/examples/Console -c Release
+      - name: Build distribution packages
+        run: python3 sdks/csharp/scripts/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: siming-csharp-packages
+          path: sdks/csharp/artifacts/packages/*

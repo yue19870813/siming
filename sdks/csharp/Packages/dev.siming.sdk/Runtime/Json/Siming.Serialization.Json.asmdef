@@ -1,0 +1,1 @@
+{ "name": "Siming.Serialization.Json", "rootNamespace": "Siming.Serialization.Json", "references": ["Siming.Runtime"], "overrideReferences": true, "precompiledReferences": ["Newtonsoft.Json.dll"], "noEngineReferences": true }

@@ -1,0 +1,19 @@
+{
+  "name": "dev.siming.sdk",
+  "version": "0.1.0",
+  "displayName": "Siming SDK",
+  "description": "Engine-independent dialogue runtime and Unity 6 integration.",
+  "unity": "6000.0",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.2",
+    "com.unity.modules.unitywebrequest": "1.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Dialogue",
+      "description": "Dialogue, choices, async events, locale switching and host-owned state.",
+      "path": "Samples~/BasicDialogue"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>netstandard2.1</TargetFramework><Description>Verified JSON export loader for Siming.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Siming.Runtime/Siming.Runtime.csproj" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Compile Include="../../Packages/dev.siming.sdk/Runtime/Json/**/*.cs" />
+  </ItemGroup>
+</Project>

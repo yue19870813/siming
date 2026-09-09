@@ -1,0 +1,1 @@
+{ "name": "Siming.Unity", "rootNamespace": "Siming.Unity", "references": ["Siming.Runtime", "Siming.Serialization.Json"] }

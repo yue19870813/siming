@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+artifacts/
+UnityValidation/Library/
+UnityValidation/Logs/
+UnityValidation/Temp/
+UnityValidation/UserSettings/
+UnityValidation/Builds/

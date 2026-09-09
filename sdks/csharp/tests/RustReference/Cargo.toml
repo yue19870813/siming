@@ -1,0 +1,11 @@
+[package]
+name = "siming-sdk-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+siming-core = { path = "../../../../crates/siming-core" }
+serde_json = "1"

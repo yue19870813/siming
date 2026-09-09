@@ -1,0 +1,1 @@
+{ "name": "Siming.BasicDialogue", "references": ["Siming.Runtime", "Siming.Serialization.Json", "Siming.Unity"] }

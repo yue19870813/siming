@@ -62,3 +62,7 @@ npm run tauri -- build --no-bundle
 - [产品需求文档](./docs/产品需求文档.md)
 - [技术方案](./docs/技术方案.md)
 - [运行时格式与宿主接入](./docs/运行时格式.md)
+
+## C# runtime SDK
+
+The engine-independent C# SDK and Unity 6 package support JSON exports, dialogue playback, async business events, localization, and host-owned playback state. See the [SDK guide](sdks/csharp/README.md) for packages, examples, and validation.

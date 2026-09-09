@@ -1,0 +1,64 @@
+{
+  "contractVersion": 1,
+  "dialogueKey": "sdk_demo",
+  "locale": "en-US",
+  "scenarios": [
+    {
+      "businessEvents": [
+        "quest.begin"
+      ],
+      "choices": [
+        "accept"
+      ],
+      "hostEvents": [
+        "camera.prepare",
+        "analytics.enter",
+        "ui.show",
+        "fx.quest",
+        "ui.hide"
+      ],
+      "name": "accept",
+      "nodes": [
+        "start",
+        "welcome",
+        "choice",
+        "set",
+        "add",
+        "condition",
+        "business",
+        "auto",
+        "end"
+      ],
+      "variables": {
+        "accepted": true,
+        "score": 2.0,
+        "title": "hero"
+      }
+    },
+    {
+      "businessEvents": [],
+      "choices": [
+        "reject"
+      ],
+      "hostEvents": [
+        "camera.prepare",
+        "analytics.enter",
+        "ui.show",
+        "ui.hide"
+      ],
+      "name": "reject",
+      "nodes": [
+        "start",
+        "welcome",
+        "choice",
+        "reject",
+        "end"
+      ],
+      "variables": {
+        "accepted": false,
+        "score": 0,
+        "title": "hero"
+      }
+    }
+  ]
+}
