@@ -5,7 +5,7 @@
 ## 安装和运行
 
 - 通用 .NET：引用 `Siming.Serialization.Json` NuGet 包，它依赖 `Siming.Runtime`。核心目标是 .NET Standard 2.1，示例与测试使用 .NET 8。
-- Unity 6：Package Manager → **Install package from disk**，选择 `Packages/dev.siming.sdk/package.json`。也可安装生成的 `.tgz`，或使用 Git URL `https://github.com/sunyingyingmu/Siming.git?path=/sdks/csharp/Packages/dev.siming.sdk`（该路径提交到远端后可用）。
+- Unity 6：Package Manager → **Install package from disk**，选择 `Packages/dev.siming.sdk/package.json`。也可安装生成的 `.tgz`，或使用 Git URL `https://github.com/yue19870813/Siming.git?path=/sdks/csharp/Packages/dev.siming.sdk`（该路径提交到远端后可用）。
 - .NET 与 UPM 直接编译 `Packages/dev.siming.sdk/Runtime` 中同一份源代码，请勿同时导入 NuGet DLL 和 UPM 源码。
 
 从仓库根目录运行：
