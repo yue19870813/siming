@@ -1,53 +1,265 @@
-# 司命（Siming）
+# Siming
 
-<img src="./docs/assets/brand/siming-logo-light.png" width="420" alt="司命（Siming）Logo">
+Siming is a cross-platform dialogue editor for games and interactive narratives. It organizes dialogue, choices, conditions, variables, and business events as visual story graphs, then compiles projects into engine-independent runtime data for Unity, Unreal Engine, or a custom host.
 
-掌管命运与叙事走向的剧情对话编辑器。
-这是一个剧情对话编辑器。帮助你快速配置生产带有分支和条件判断的剧情对话。
+![Siming Logo](./docs/assets/brand/siming-logo-light.png)
 
-## 工程结构
+> This repository contains the desktop editor, Rust core and CLI, runtime data contracts, and C# / Unity 6 SDK.
 
-```text
-apps/desktop/          React + Tauri 正式桌面应用
-crates/siming-core/    共享数据契约与领域核心
-crates/siming-storage/ 安全文件存储边界
-crates/siming-cli/     独立命令行程序
-schemas/               版本化 JSON Schema
-fixtures/              GUI、CLI 和迁移共用固定样例
-examples/              引擎无关的运行时读取示例
-prototype/             产品交互稿与私有在线预览
-```
+## Features
 
-## 开发环境
+- **Visual dialogue editing**: Build dialogue, choice, condition, event, and end nodes as connected graphs.
+- **Branching and conditions**: Drive narrative branches with variables and player choices.
+- **Localization**: Configure multiple locales and export separate localized resources.
+- **Host and business events**: Send presentation notifications or invoke asynchronous events implemented by the game host.
+- **Runtime export**: Export JSON, XML, or binary data in bundled or directory-chunked layouts.
+- **Validation and migration**: Validate schemas and references, promote warnings to errors, and migrate project data before export.
+- **C# / Unity SDK**: Play dialogues, handle variables and events, switch locales, capture and restore playback state, and integrate with Unity 6.
 
-- Node.js 22.13 或更高版本
-- Rust stable（包含 `rustfmt`、`clippy`）
-- 当前平台对应的 Tauri 2 系统依赖
+## Quick start
 
-安装桌面端依赖：
+### Requirements
+
+- Node.js 22.13 or later
+- Rust stable with `rustfmt` and `clippy`
+- The platform dependencies required by Tauri 2
+- .NET 8 or later for the C# SDK; Unity 6 for the Unity integration
+
+### Run the desktop editor
 
 ```bash
 cd apps/desktop
 npm install
-```
 
-运行前端或桌面应用：
-
-```bash
+# Start the Vite frontend
 npm run dev
+
+# Start the Tauri desktop application
 npm run tauri -- dev
 ```
 
-验证完整工程：
+`prototype/` contains product interaction prototypes and private previews. It is not part of the production desktop build.
+
+### Use the fixture project and CLI
+
+The repository includes a minimal fixture project at [`fixtures/minimal-project`](./fixtures/minimal-project). Use it to validate the project format, run the CLI, and generate runtime data.
 
 ```bash
+# Show the CLI version
+cargo run -p siming-cli -- --version
+
+# Validate a project
+cargo run -p siming-cli -- validate fixtures/minimal-project
+
+# Show a project summary
+cargo run -p siming-cli -- info fixtures/minimal-project
+
+# Export runtime data
+cargo run -p siming-cli -- export fixtures/minimal-project \
+  --output /tmp/siming-runtime \
+  --format json \
+  --layout directory-chunks \
+  --pretty
+```
+
+The generated files in `/tmp/siming-runtime` are the runtime data consumed by a host or SDK. If `--format` and `--layout` are omitted, the project settings in `.siming/project.json` are used.
+
+## CLI usage
+
+The CLI entry point is `siming`. In the source repository, use `cargo run -p siming-cli --` in its place.
+
+| Command | Purpose | Example |
+| --- | --- | --- |
+| `validate` | Validate project structure, references, text, and runtime constraints | `siming validate . --warnings-as-errors` |
+| `export` | Compile and export runtime data | `siming export . --output exports/runtime --format json` |
+| `migrate` | Check or apply a schema migration | `siming migrate . --check` / `siming migrate . --write` |
+| `info` | Show schema, locales, content counts, and validation summary | `siming info . --format json` |
+
+Common commands:
+
+```bash
+# Machine-readable validation output
+siming validate . --format json
+
+# Export JSON, XML, or binary runtime data
+siming export . --output exports/runtime --format json --pretty
+siming export . --output exports/runtime --format xml --pretty
+siming export . --output exports/runtime --format binary
+
+# Select the file layout
+siming export . --output exports/runtime --layout bundled
+siming export . --output exports/runtime --layout directory-chunks
+
+# Check or apply migrations; --write creates a backup first
+siming migrate . --check
+siming migrate . --write
+```
+
+Exit codes are `0` for success, `1` for validation or compilation failure, `2` for argument/path/version errors, and `3` for an unexpected internal error.
+
+## Project structure
+
+```text
+apps/desktop/          React + Tauri desktop application
+crates/siming-core/    Shared contracts, validation, and runtime compiler
+crates/siming-storage/ Project loading, migration, and safe export boundary
+crates/siming-cli/     Standalone command-line tool
+schemas/               Versioned JSON Schemas
+fixtures/              Shared GUI, CLI, and migration fixtures
+examples/              Engine-independent runtime reader examples
+sdks/csharp/           C# runtime, Unity 6 package, examples, and tests
+prototype/             Product interaction prototypes and private previews
+```
+
+A project normally contains:
+
+```text
+my-project/
+├── .siming/project.json       # Project manifest, locales, and export settings
+├── dialogues/                 # Dialogue graph files
+├── definitions/               # Character, variable, event, and tag definitions
+└── exports/runtime/           # Runtime data generated by the CLI
+```
+
+## Runtime export formats
+
+### Bundled layout (`bundled`)
+
+Use this layout when the whole project should be loaded at once:
+
+```text
+exports/runtime/
+├── manifest.json
+├── dialogues.runtime.json
+└── locales/
+    ├── zh-CN.json
+    └── en-US.json
+```
+
+### Directory-chunked layout (`directory-chunks`)
+
+Use this layout to load chapters, scenes, or dialogues on demand. The project index, dialogue structures, and locale resources are split into files so a host can load only the chunks required by an entry point.
+
+The JSON runtime contracts are defined by:
+
+- [`schemas/runtime.schema.json`](./schemas/runtime.schema.json)
+- [`schemas/runtime-index.schema.json`](./schemas/runtime-index.schema.json)
+- [`schemas/runtime-dialogue-chunk.schema.json`](./schemas/runtime-dialogue-chunk.schema.json)
+- [`schemas/runtime-locale-chunk.schema.json`](./schemas/runtime-locale-chunk.schema.json)
+
+See the [runtime format guide](./docs/运行时格式.md) for node progression, text keys, and the binary protocol. The repository also includes an engine-independent reader example:
+
+```bash
+node examples/runtime-reader/index.mjs exports/runtime intro zh-CN
+```
+
+## C# / Unity SDK integration
+
+The C# SDK consumes runtime data generated by `siming export`. It does not depend on a Rust native library and does not provide UI, audio/video playback, task systems, or save-file persistence. It includes:
+
+- A general .NET runtime: `Siming.Runtime` and `Siming.Serialization.Json`
+- A Unity 6 UPM package: `sdks/csharp/Packages/dev.siming.sdk`
+- Loaders for bundled and directory-chunked JSON exports
+- Dialogue playback, choices, automatic dialogue, variables, conditions, and asynchronous business events
+- Host event notifications, locale switching, and host-owned playback state capture/restoration
+
+### .NET integration
+
+After referencing the SDK, open an export directory with the JSON loader and create a session:
+
+```csharp
+using Siming;
+using Siming.Serialization.Json;
+
+using var project = await SimingProject.OpenAsync(
+    new JsonProjectLoader(new DirectoryDataSource("exports/runtime")),
+    cancellationToken);
+
+using var session = project.CreateSession(
+    businessEvents: new GameEvents(),
+    locale: "en-US");
+
+session.StateChanged += view =>
+{
+    Console.WriteLine($"{view.SpeakerName}: {view.Text}");
+};
+
+session.HostEventReceived += message =>
+{
+    // Play audio, change cameras, trigger animations, etc.
+    HandleHostEvent(message);
+};
+
+await session.StartByKeyAsync("intro", cancellationToken);
+
+if (session.Current.Status == SessionStatus.WaitingDialogue)
+{
+    await session.ContinueAsync(cancellationToken);
+}
+else if (session.Current.Status == SessionStatus.WaitingChoice)
+{
+    await session.ChooseAsync(choiceId, cancellationToken);
+}
+```
+
+Implement `IBusinessEventHandler` for game-owned business events:
+
+```csharp
+sealed class GameEvents : IBusinessEventHandler
+{
+    public async Task ExecuteAsync(
+        string name,
+        DataValue parameters,
+        BusinessEventContext context,
+        CancellationToken cancellationToken)
+    {
+        switch (name)
+        {
+            case "quest.begin":
+                await BeginQuestAsync(parameters, cancellationToken);
+                context.Set("accepted", new VariableValue(true));
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown event: {name}");
+        }
+    }
+}
+```
+
+| API | Purpose |
+| --- | --- |
+| `SimingProject.OpenAsync(...)` | Open and validate the runtime manifest, indexes, and default locale resources |
+| `CreateSession(...)` | Create an isolated session with optional variable storage and business event handling |
+| `StartAsync(...)` / `StartByKeyAsync(...)` | Start by dialogue ID or entry key |
+| `ContinueAsync(...)` | Advance a dialogue that is waiting for input |
+| `ChooseAsync(choiceId, ...)` | Select a choice |
+| `TickAsync(deltaSeconds, ...)` | Drive automatic dialogue timing from the host |
+| `SetLocaleAsync(locale, ...)` | Switch the current session locale |
+| `CaptureState()` / `RestoreStateAsync(...)` | Capture or restore minimal state at a safe waiting point |
+| `Stop()` / `Dispose()` | Stop the session and release resources |
+
+Do not call advance, locale-switch, capture, or restore APIs from callbacks because this can cause reentrancy. Schedule follow-up work in the next host update instead. The SDK does not write save files; the host should persist playback state and variable values as one consistent save.
+
+### Unity 6 integration
+
+1. In Unity Package Manager, select **Install package from disk**.
+2. Select [`sdks/csharp/Packages/dev.siming.sdk/package.json`](./sdks/csharp/Packages/dev.siming.sdk/package.json).
+3. Put the runtime directory generated by `siming export` under `Assets/StreamingAssets/Siming/`, or implement `IRuntimeDataSource` for Addressables, memory, or remote resources.
+4. Import the **Basic Dialogue** sample and use its `BasicDialogue` component as a starting point.
+
+All SDK calls, event handlers, and Unity object access should run on Unity's main thread. Automatic dialogue is driven by the host through `TickAsync`; the sample component supports scaled or unscaled time.
+
+For installation details, API constraints, save-state handling, error codes, and Unity validation commands, see the [C# SDK documentation](./sdks/csharp/README.md) and [SDK guide](./sdks/csharp/Packages/dev.siming.sdk/SDK-GUIDE.md).
+
+## Development and verification
+
+```bash
+# Rust
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo run -p siming-cli -- --version
-cargo run -p siming-cli -- validate fixtures/minimal-project
-cargo run -p siming-cli -- export fixtures/minimal-project --output /tmp/siming-runtime
 
+# Desktop application
 cd apps/desktop
 npm run format:check
 npm run lint
@@ -55,14 +267,30 @@ npm run typecheck
 npm test
 npm run build
 npm run tauri -- build --no-bundle
+
+# C# SDK (run from the repository root)
+dotnet run --project sdks/csharp/tests/Siming.Tests
+dotnet run --project sdks/csharp/examples/Console -- \
+  sdks/csharp/contracts/directory-chunks sdk_demo en-US
 ```
 
-产品与技术文档：
+Generate SDK test contracts and local packages:
 
-- [产品需求文档](./docs/产品需求文档.md)
-- [技术方案](./docs/技术方案.md)
-- [运行时格式与宿主接入](./docs/运行时格式.md)
+```bash
+python3 sdks/csharp/scripts/generate-contracts.py
+python3 sdks/csharp/scripts/package.py
+```
 
-## C# runtime SDK
+## Documentation
 
-The engine-independent C# SDK and Unity 6 package support JSON exports, dialogue playback, async business events, localization, and host-owned playback state. See the [SDK guide](sdks/csharp/README.md) for packages, examples, and validation.
+- [Product requirements](./docs/产品需求文档.md)
+- [Technical design](./docs/技术方案.md)
+- [Runtime format and host integration](./docs/运行时格式.md)
+- [C# SDK documentation](./sdks/csharp/README.md)
+- [C# SDK guide](./sdks/csharp/Packages/dev.siming.sdk/SDK-GUIDE.md)
+- [CLI and data contract examples](./examples/runtime-reader/README.md)
+- [中文说明](./README.zh.md)
+
+## License
+
+Siming is released under the [Apache License 2.0](./LICENSE).
