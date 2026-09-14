@@ -36,6 +36,16 @@ const english = new Map<string, string>([
     "目录必须是项目内的有效相对路径。",
     "Directory must be a valid relative path within the project.",
   ],
+  ["请先修正宿主消息草稿。", "Correct the host message draft first."],
+  ["上移消息", "Move message up"],
+  ["下移消息", "Move message down"],
+  ["删除消息", "Delete message"],
+  [
+    "消息体必须是有效的 JSON 对象。当前输入尚未保存。",
+    "The payload must be a valid JSON object. This input has not been saved.",
+  ],
+  ["还原", "Restore"],
+  ["未命名消息", "Unnamed message"],
   ["角色分组", "Character Groups"],
   ["全部角色", "All Characters"],
   ["未分组", "Ungrouped"],
@@ -60,6 +70,7 @@ const english = new Map<string, string>([
   ["重命名角色分组", "Rename character group"],
   ["删除角色分组", "Delete character group"],
   ["移动角色分组", "Move character to group"],
+  ["修改宿主消息", "Edit host messages"],
 
   ["设置", "Settings"],
   ["项目设置", "Project Settings"],
@@ -355,6 +366,8 @@ function translateInterfaceText(source: string, locale: InterfaceLocale) {
   const exact = english.get(source);
   if (exact) return exact;
   return source
+    .replace(/^消息名称 (\d+)$/, "Message name $1")
+    .replace(/^消息体 (\d+)$/, "Message payload $1")
     .replace(/^选择角色 (.+)$/, "Select character $1")
     .replace(/^重命名分组 (.+)$/, "Rename group $1")
     .replace(/^删除分组 (.+)$/, "Delete group $1")

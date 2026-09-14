@@ -1,4 +1,8 @@
 import {
+  confirmDiscardHostDraft,
+  hasInvalidHostDraft,
+} from "./lib/hostDraftGuard";
+import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   useEffect,
@@ -233,7 +237,7 @@ export default function App() {
 
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirty && !sourceDraftDirty) return;
+      if (!dirty && !sourceDraftDirty && !hasInvalidHostDraft()) return;
       event.preventDefault();
       event.returnValue = "";
     };
@@ -289,6 +293,7 @@ export default function App() {
   });
 
   async function handleNew() {
+    if (!confirmDiscardHostDraft()) return;
     if (
       projectLoaded &&
       (dirty || sourceDraftDirty) &&
@@ -322,6 +327,7 @@ export default function App() {
   }
 
   async function handleOpen() {
+    if (!confirmDiscardHostDraft()) return;
     if (
       projectLoaded &&
       (dirty || sourceDraftDirty) &&
@@ -367,6 +373,7 @@ export default function App() {
   }
 
   async function handleSave() {
+    if (!confirmDiscardHostDraft()) return;
     if (!projectLoaded) {
       setNotice("请先新建或打开项目。");
       return;
@@ -396,6 +403,7 @@ export default function App() {
   }
 
   async function handleExport(format: ExportFormat) {
+    if (!confirmDiscardHostDraft()) return;
     if (!projectLoaded) {
       setNotice("请先新建或打开项目，再导出运行时数据。");
       return;

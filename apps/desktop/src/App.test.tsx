@@ -617,3 +617,37 @@ test("command copy and paste duplicates the selected canvas node", async () => {
   expect(state.selectedNodeId).not.toBe(selected.id);
   expect(state.notice).toMatch(/^已粘贴节点：/);
 });
+
+test("save and export protect invalid host drafts without writing files", async () => {
+  openTestProject();
+  const state = useEditorStore.getState();
+  const node = state.project.dialogues[0].nodes[0];
+  state.commit("test host event", (draft) => {
+    draft.dialogues[0].nodes[0].data.hostEvents = [
+      { name: "ui.test", payload: {} },
+    ];
+  });
+  state.setSelectedNode(node.id);
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  render(<App />);
+  fireEvent.change(screen.getByLabelText("消息体 1"), {
+    target: { value: "{" },
+  });
+  fireEvent.keyDown(window, { key: "s", metaKey: true });
+  fireEvent.click(screen.getByRole("button", { name: "导出 JSON" }));
+  expect(confirm).toHaveBeenCalledTimes(2);
+  expect(
+    vi
+      .mocked(invoke)
+      .mock.calls.some(
+        ([command]) =>
+          command === "save_project" || command === "export_project",
+      ),
+  ).toBe(false);
+  expect(screen.getByLabelText("消息体 1")).toHaveValue("{");
+  fireEvent.click(screen.getByText("还原"));
+  confirm.mockRestore();
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});

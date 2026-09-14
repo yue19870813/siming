@@ -93,3 +93,23 @@ describe("CanvasView palette drop", () => {
     expect(narrator.parentElement).not.toHaveClass("dialogue-node-avatar");
   });
 });
+
+test("host summaries show ordered names, overflow count and no payload", () => {
+  const project = createDemoProject();
+  project.dialogues[0].nodes.forEach((node) => {
+    delete node.data.hostEvents;
+  });
+  project.dialogues[0].nodes[0].data.hostEvents = [
+    { name: "ui.first", payload: { private: "body-must-not-appear" } },
+    { name: "", payload: {} },
+    { name: "ui.third", payload: {} },
+  ];
+  useEditorStore.getState().setProject(project);
+  const { container } = render(<CanvasView />);
+  const summary = container.querySelector(".host-event-summary")!;
+  expect(summary).toHaveTextContent("ui.first");
+  expect(summary).toHaveTextContent("未命名消息");
+  expect(summary).toHaveTextContent("+1");
+  expect(summary).toHaveAttribute("title", "ui.first\n未命名消息\nui.third");
+  expect(summary.outerHTML).not.toContain("body-must-not-appear");
+});

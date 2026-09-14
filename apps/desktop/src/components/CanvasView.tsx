@@ -125,7 +125,20 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
         {node.type === "end" && <p>结束当前对话</p>}
       </div>
       {node.data.hostEvents && node.data.hostEvents.length > 0 && (
-        <footer>HOST ×{node.data.hostEvents.length}</footer>
+        <footer
+          className="host-event-summary"
+          title={node.data.hostEvents
+            .map((event) => event.name.trim() || "未命名消息")
+            .join("\n")}
+        >
+          <b>HOST</b>
+          {node.data.hostEvents.slice(0, 2).map((event, index) => (
+            <span key={index}>{event.name.trim() || "未命名消息"}</span>
+          ))}
+          {node.data.hostEvents.length > 2 && (
+            <b>+{node.data.hostEvents.length - 2}</b>
+          )}
+        </footer>
       )}
       {node.type === "condition" && (
         <>

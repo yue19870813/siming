@@ -1,5 +1,6 @@
 import { collectDialogueDirectories } from "../lib/dialogueCreation";
 import { CreationDialog } from "./CreationDialog";
+import { confirmDiscardHostDraft } from "../lib/hostDraftGuard";
 import {
   Braces,
   ChevronDown,
@@ -213,6 +214,7 @@ function ProjectExplorer() {
             title="新建对话目录"
             aria-label="新建对话目录"
             onClick={() => {
+              if (!confirmDiscardHostDraft()) return;
               setCreateDraft({
                 type: "directory",
                 path: selectedDirectory,
@@ -225,6 +227,7 @@ function ProjectExplorer() {
             title="新建对话"
             aria-label="新建对话"
             onClick={() => {
+              if (!confirmDiscardHostDraft()) return;
               setCreateDraft({
                 type: "dialogue",
                 path: selectedDirectory,

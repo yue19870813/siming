@@ -1,4 +1,6 @@
-import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-react";
+import { confirmDiscardHostDraft } from "../lib/hostDraftGuard";
+import { HostEventsEditor } from "./HostEventsEditor";
+import { Copy, Plus, Trash2 } from "lucide-react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { createConditionLeaf } from "../model/conditions";
 import { createId } from "../model/demo";
@@ -7,7 +9,6 @@ import type {
   ConditionExpression,
   DialogueDocument,
   DialogueNode,
-  HostEvent,
   ProjectSnapshot,
   VariableDefinition,
 } from "../model/types";
@@ -82,11 +83,13 @@ export function Inspector({
       <div className="inspector-content">
         {node ? (
           <NodeInspector
+            key={node.id}
             node={node}
             project={project}
             locale={locale}
             update={updateNode}
             onDelete={() => {
+              if (!confirmDiscardHostDraft()) return;
               if (node.id === dialogue.entryNodeId) {
                 useEditorStore
                   .getState()
@@ -625,101 +628,6 @@ function ChoiceEditor({
         <Plus size={13} /> 新增选项
       </button>
     </div>
-  );
-}
-
-function HostEventsEditor({
-  events,
-  update,
-}: {
-  events: HostEvent[];
-  update: (
-    recipe: (draft: DialogueNode, dialogue: DialogueDocument) => void,
-    label?: string,
-  ) => void;
-}) {
-  const move = (index: number, direction: -1 | 1) =>
-    update((draft) => {
-      const list = draft.data.hostEvents ?? [];
-      const target = index + direction;
-      if (target < 0 || target >= list.length) return;
-      [list[index], list[target]] = [list[target], list[index]];
-    }, "调整宿主消息顺序");
-
-  return (
-    <Section
-      title="宿主消息"
-      action={
-        <button
-          onClick={() =>
-            update((draft) => {
-              draft.data.hostEvents ??= [];
-              draft.data.hostEvents.push({ name: "ui.custom", payload: {} });
-            }, "新增宿主消息")
-          }
-        >
-          <Plus size={13} /> 新增
-        </button>
-      }
-    >
-      {!events.length && (
-        <p className="section-empty">当前节点没有宿主消息。</p>
-      )}
-      {events.map((event, index) => (
-        <div className="host-event-card" key={`${index}-${event.name}`}>
-          <header>
-            <strong>#{index + 1}</strong>
-            <span>HOST</span>
-            <button disabled={index === 0} onClick={() => move(index, -1)}>
-              <ArrowUp size={12} />
-            </button>
-            <button
-              disabled={index === events.length - 1}
-              onClick={() => move(index, 1)}
-            >
-              <ArrowDown size={12} />
-            </button>
-            <button
-              onClick={() =>
-                update((draft) => {
-                  draft.data.hostEvents = draft.data.hostEvents?.filter(
-                    (_item, itemIndex) => itemIndex !== index,
-                  );
-                }, "删除宿主消息")
-              }
-            >
-              <Trash2 size={12} />
-            </button>
-          </header>
-          <input
-            value={event.name}
-            onChange={(changeEvent) =>
-              update((draft) => {
-                if (draft.data.hostEvents?.[index]) {
-                  draft.data.hostEvents[index].name = changeEvent.target.value;
-                }
-              })
-            }
-          />
-          <textarea
-            rows={3}
-            value={JSON.stringify(event.payload, null, 2)}
-            onChange={(changeEvent) => {
-              try {
-                const payload = JSON.parse(changeEvent.target.value);
-                update((draft) => {
-                  if (draft.data.hostEvents?.[index]) {
-                    draft.data.hostEvents[index].payload = payload;
-                  }
-                });
-              } catch {
-                // Keep the last valid payload.
-              }
-            }}
-          />
-        </div>
-      ))}
-    </Section>
   );
 }
 

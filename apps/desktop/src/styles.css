@@ -3405,6 +3405,21 @@ html[data-theme="light"] .cm-editor {
   color: var(--danger);
   font-size: 12px;
 }
+.host-event-summary {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.host-event-summary > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.host-event-summary > b {
+  flex-shrink: 0;
+  font-size: 10px;
+}
 .character-groups {
   padding: 12px;
   border-bottom: 1px solid var(--border);

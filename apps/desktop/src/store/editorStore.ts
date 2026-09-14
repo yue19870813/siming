@@ -6,6 +6,7 @@ import {
   type CreationResult,
   type DialogueCreationOptions,
 } from "../lib/dialogueCreation";
+import { confirmDiscardHostDraft } from "../lib/hostDraftGuard";
 import { create } from "zustand";
 import { createId, createNode } from "../model/demo";
 import { DEFAULT_PROJECT_LOCALES } from "../model/locales";
@@ -134,7 +135,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   past: [],
   future: [],
 
-  setProject: (project, dirty = false) =>
+  setProject: (project, dirty = false) => {
+    if (!confirmDiscardHostDraft()) return;
     set({
       project,
       projectLoaded: true,
@@ -151,8 +153,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       past: [],
       future: [],
       activity: "project",
-    }),
+    });
+  },
   setSelectedDialogue: (selectedDialogueId) => {
+    if (!confirmDiscardHostDraft()) return;
     const state = get();
     if (
       state.sourceDraftDirty &&
@@ -168,10 +172,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       sourceDraftDirty: false,
     });
   },
-  setSelectedNode: (selectedNodeId) => set({ selectedNodeId }),
+  setSelectedNode: (selectedNodeId) => {
+    if (selectedNodeId !== get().selectedNodeId && !confirmDiscardHostDraft())
+      return;
+    set({ selectedNodeId });
+  },
   setCanvasInsertionPosition: (canvasInsertionPosition) =>
     set({ canvasInsertionPosition }),
   setViewMode: (viewMode) => {
+    if (!confirmDiscardHostDraft()) return;
     const state = get();
     if (
       state.viewMode === "data" &&
@@ -192,6 +201,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   setActivity: (activity) => {
+    if (!confirmDiscardHostDraft()) return;
     const state = get();
     if (
       activity !== state.activity &&
@@ -233,6 +243,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const before = structuredClone(state.project);
     const after = structuredClone(state.project);
     recipe(after);
+    const activeNode = (project: ProjectSnapshot) =>
+      project.dialogues
+        .find((dialogue) => dialogue.id === state.selectedDialogueId)
+        ?.nodes.find((node) => node.id === state.selectedNodeId);
+    // Preserve drafts during unrelated edits (for example dragging a node).
+    // HostEventsEditor maintains its own row identities when it edits messages.
+    if (
+      label !== "修改宿主消息" &&
+      JSON.stringify(activeNode(before)?.data.hostEvents) !==
+        JSON.stringify(activeNode(after)?.data.hostEvents) &&
+      !confirmDiscardHostDraft()
+    )
+      return;
     set({
       project: after,
       dirty: fingerprint(after) !== state.savedProjectFingerprint,
@@ -242,6 +265,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   undo: () => {
+    if (!confirmDiscardHostDraft()) return;
     const state = get();
     const entry = state.past.at(-1);
     if (!entry) return;
@@ -258,6 +282,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   redo: () => {
+    if (!confirmDiscardHostDraft()) return;
     const state = get();
     const entry = state.future[0];
     if (!entry) return;
@@ -286,6 +311,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   pasteCopiedNode: () => {
+    if (!confirmDiscardHostDraft()) return;
     const state = get();
     const dialogue = state.project.dialogues.find(
       (item) => item.id === state.selectedDialogueId,
@@ -317,6 +343,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   addNode: (type, position) => {
+    if (!confirmDiscardHostDraft()) return;
     const {
       selectedDialogueId,
       previewLocale,
@@ -336,6 +363,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ selectedNodeId: node.id });
   },
   deleteNodes: (ids) => {
+    if (!confirmDiscardHostDraft()) return;
     const state = get();
     const dialogue = state.project.dialogues.find(
       (item) => item.id === state.selectedDialogueId,
@@ -378,6 +406,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
   addDialogue: (folder, options = {}) => {
+    if (!confirmDiscardHostDraft())
+      return { ok: false, error: "请先修正宿主消息草稿。" };
     const state = get();
     const normalizedFolder = normalizeDialogueDirectory(
       folder ?? state.project.manifest.paths.dialogues,
@@ -439,6 +469,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return { ok: true, id, path: `${normalizedFolder}/${key}.json` };
   },
   addDialogueDirectory: (path) => {
+    if (!confirmDiscardHostDraft())
+      return { ok: false, error: "请先修正宿主消息草稿。" };
     const state = get();
     const normalizedPath = normalizeDialogueDirectory(
       path,
@@ -465,6 +497,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return { ok: true, path: normalizedPath };
   },
   deleteDialogue: (id) => {
+    if (!confirmDiscardHostDraft()) return;
     const state = get();
     if (state.project.dialogues.length <= 1) {
       set({ notice: "项目至少需要保留一个对话。" });
@@ -480,6 +513,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ selectedDialogueId: next, selectedNodeId: null });
   },
   closeProject: () => {
+    if (!confirmDiscardHostDraft()) return;
     const project = emptyProject();
     set({
       project,
