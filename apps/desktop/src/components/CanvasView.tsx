@@ -98,7 +98,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
             />
             <div>
               <strong>{speakerName}</strong>
-              <p>{text}</p>
+              <p>{text || "输入对话内容…"}</p>
             </div>
           </div>
         )}

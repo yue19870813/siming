@@ -3518,6 +3518,10 @@ html[data-theme="light"] .cm-editor {
   outline-offset: 1px;
 }
 
+.dialogue-text-input:focus::placeholder {
+  color: transparent;
+}
+
 .speaker-select {
   position: relative;
 }

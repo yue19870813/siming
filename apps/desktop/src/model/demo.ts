@@ -16,7 +16,7 @@ export function createNode(
   const data: DialogueNode["data"] = { hostEvents: [] };
 
   if (type === "dialogue") {
-    data.text = { [locale]: "输入对话内容…" };
+    data.text = { [locale]: "" };
     data.advancePolicy = { mode: "manual" };
   }
   if (type === "choice") {

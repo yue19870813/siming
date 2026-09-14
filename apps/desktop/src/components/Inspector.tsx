@@ -671,7 +671,13 @@ function LocalizedField({
     <Field label={label}>
       <textarea
         rows={5}
+        className="dialogue-text-input"
+        placeholder="输入对话内容…"
         value={value}
+        onFocus={() => {
+          // Older nodes stored the editing hint as dialogue content.
+          if (value === "输入对话内容…") onChange("");
+        }}
         onChange={(event) => onChange(event.target.value)}
       />
     </Field>

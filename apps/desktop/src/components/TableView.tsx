@@ -136,7 +136,8 @@ export function TableView() {
                     {row.node.data.speakerId && (
                       <strong>{row.node.data.speakerId} · </strong>
                     )}
-                    {text}
+                    {text ||
+                      (row.node.type === "dialogue" ? "输入对话内容…" : "")}
                   </td>
                   <td>{row.marker ? `引用 ${row.node.key}` : next || "—"}</td>
                 </tr>
