@@ -241,6 +241,8 @@ export default function App() {
       const command = event.metaKey || event.ctrlKey;
       if (!command) return;
       const target = event.target;
+      if (target instanceof Element && target.closest('[role="dialog"]'))
+        return;
       const editingText =
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||

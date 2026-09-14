@@ -3306,3 +3306,123 @@ html[data-theme="light"] .cm-editor {
     display: none;
   }
 }
+
+/* Creation and resource management share an accessible, expandable dialog. */
+.editor-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 55%);
+}
+.editor-modal {
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 35%);
+}
+.editor-modal h2 {
+  margin: 0 0 20px;
+  font-size: 20px;
+}
+.editor-modal h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.editor-modal label {
+  display: grid;
+  gap: 8px;
+}
+.editor-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+.creation-dialog-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.creation-dialog-grid > section {
+  min-width: 0;
+}
+.creation-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.creation-directory-tree {
+  height: 240px;
+  overflow: auto;
+  padding: 8px 0;
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.creation-directory-row {
+  display: flex;
+  min-width: max-content;
+}
+.creation-directory-row button {
+  text-align: left;
+  padding: 8px;
+}
+.creation-directory-row [role="treeitem"] {
+  flex: 1;
+}
+.creation-directory-row .is-active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: 6px;
+}
+.creation-directory-row .directory-toggle {
+  width: 28px;
+  flex-shrink: 0;
+}
+.creation-path,
+.creation-details output {
+  overflow-wrap: anywhere;
+  font-family: monospace;
+  color: var(--muted);
+}
+.pending-directory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.form-error {
+  color: var(--danger);
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  .creation-dialog-grid {
+    grid-template-columns: 1fr;
+  }
+  .creation-directory-tree {
+    height: 160px;
+  }
+}
+
+.editor-modal {
+  font-size: var(--ui-font-12, 12px);
+}
+.editor-modal input {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+}
+.editor-modal input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}

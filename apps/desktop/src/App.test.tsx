@@ -295,15 +295,16 @@ test("a dialogue directory can be created from the project explorer", async () =
   render(<App />);
 
   fireEvent.click(screen.getByRole("button", { name: "新建对话目录" }));
-  const directoryPath = screen.getByRole("textbox", { name: "目录路径" });
-  expect(directoryPath).toHaveValue("dialogues/prologue/新目录");
+  const directoryPath = screen.getByRole("textbox", { name: "目录名称" });
+  expect(directoryPath).toHaveValue("新目录");
+  fireEvent.click(screen.getByRole("treeitem", { name: "dialogues" }));
   fireEvent.change(directoryPath, {
-    target: { value: "dialogues/chapter-2" },
+    target: { value: "chapter-2" },
   });
   fireEvent.click(screen.getByRole("button", { name: "创建" }));
 
   expect(screen.getByText("dialogues/chapter-2")).toBeInTheDocument();
-  expect(screen.getByText("空目录")).toBeInTheDocument();
+  expect(screen.getAllByText("空目录").length).toBeGreaterThan(0);
   await waitFor(() =>
     expect(document.documentElement.dataset.theme).toBe("dark"),
   );
@@ -316,9 +317,10 @@ test("a dialogue can be created from the project explorer", async () => {
   const { container } = render(<App />);
 
   fireEvent.click(screen.getByRole("button", { name: "新建对话" }));
-  expect(screen.getByRole("form", { name: "新建对话" })).toBeInTheDocument();
-  expect(screen.getByRole("textbox", { name: "目录路径" })).toHaveValue(
-    "dialogues/chapter-2",
+  expect(screen.getByRole("dialog", { name: "新建对话" })).toBeInTheDocument();
+  expect(screen.getByRole("treeitem", { name: "chapter-2" })).toHaveAttribute(
+    "aria-selected",
+    "true",
   );
   fireEvent.click(screen.getByRole("button", { name: "创建" }));
 

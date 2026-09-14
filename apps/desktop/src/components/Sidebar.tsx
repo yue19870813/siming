@@ -1,3 +1,5 @@
+import { collectDialogueDirectories } from "../lib/dialogueCreation";
+import { CreationDialog } from "./CreationDialog";
 import {
   Braces,
   ChevronDown,
@@ -131,10 +133,6 @@ function ProjectExplorer() {
   const project = useEditorStore((state) => state.project);
   const selectedId = useEditorStore((state) => state.selectedDialogueId);
   const select = useEditorStore((state) => state.setSelectedDialogue);
-  const addDialogue = useEditorStore((state) => state.addDialogue);
-  const addDialogueDirectory = useEditorStore(
-    (state) => state.addDialogueDirectory,
-  );
   const deleteDialogue = useEditorStore((state) => state.deleteDialogue);
   const addNode = useEditorStore((state) => state.addNode);
   const [filter, setFilter] = useState("");
@@ -144,7 +142,6 @@ function ProjectExplorer() {
   const [createDraft, setCreateDraft] = useState<{
     type: "dialogue" | "directory";
     path: string;
-    error: string;
   } | null>(null);
   const [collapsedDirectories, setCollapsedDirectories] = useState<Set<string>>(
     () => new Set(),
@@ -180,10 +177,16 @@ function ProjectExplorer() {
   const selectedEntry = project.manifest.dialogues.find(
     (entry) => entry.id === selectedId,
   );
-  const selectedDirectory = selectedEntry
-    ? selectedEntry.path.split("/").filter(Boolean).slice(0, -1).join("/") ||
-      dialogueRoot
-    : dialogueRoot;
+  const [activeDirectory, setActiveDirectory] = useState<string | null>(null);
+  const selectedDirectory =
+    (activeDirectory &&
+    collectDialogueDirectories(project).includes(activeDirectory)
+      ? activeDirectory
+      : null) ??
+    (selectedEntry
+      ? selectedEntry.path.split("/").filter(Boolean).slice(0, -1).join("/") ||
+        dialogueRoot
+      : dialogueRoot);
   const directoryGroups = new Map<string, typeof entries>();
   if (!filter && quickFilter === "all") {
     for (const directory of project.manifest.dialogueDirectories ?? []) {
@@ -212,8 +215,7 @@ function ProjectExplorer() {
             onClick={() => {
               setCreateDraft({
                 type: "directory",
-                path: `${selectedDirectory}/新目录`,
-                error: "",
+                path: selectedDirectory,
               });
             }}
           >
@@ -226,7 +228,6 @@ function ProjectExplorer() {
               setCreateDraft({
                 type: "dialogue",
                 path: selectedDirectory,
-                error: "",
               });
             }}
           >
@@ -235,81 +236,22 @@ function ProjectExplorer() {
         </div>
       </header>
       {createDraft && (
-        <form
-          className="sidebar-create-form"
-          aria-label={
-            createDraft.type === "directory" ? "新建对话目录" : "新建对话"
-          }
-          onSubmit={(event) => {
-            event.preventDefault();
-            const path = normalizeCreationPath(createDraft.path);
-            if (
-              !path ||
-              (path !== dialogueRoot && !path.startsWith(`${dialogueRoot}/`))
-            ) {
-              setCreateDraft({
-                ...createDraft,
-                error: `目录必须位于 ${dialogueRoot} 下。`,
-              });
-              return;
-            }
-            if (
-              createDraft.type === "directory" &&
-              (project.manifest.dialogueDirectories ?? []).includes(path)
-            ) {
-              setCreateDraft({
-                ...createDraft,
-                error: "该目录已经存在。",
-              });
-              return;
-            }
-            if (createDraft.type === "directory") {
-              addDialogueDirectory(path);
-            } else {
-              addDialogue(path);
-            }
+        <CreationDialog
+          type={createDraft.type}
+          initialDirectory={createDraft.path}
+          onClose={() => setCreateDraft(null)}
+          onCreated={(path) => {
+            setActiveDirectory(path);
             setCollapsedDirectories((collapsed) => {
               const next = new Set(collapsed);
               next.delete(path);
               return next;
             });
+            setFilter("");
+            setQuickFilter("all");
             setCreateDraft(null);
           }}
-        >
-          <strong>
-            {createDraft.type === "directory" ? "新建对话目录" : "新建对话"}
-          </strong>
-          <label>
-            <span>目录路径</span>
-            <input
-              autoFocus
-              aria-label="目录路径"
-              value={createDraft.path}
-              onChange={(event) =>
-                setCreateDraft({
-                  ...createDraft,
-                  path: event.target.value,
-                  error: "",
-                })
-              }
-            />
-          </label>
-          {createDraft.error && (
-            <small className="sidebar-create-error">{createDraft.error}</small>
-          )}
-          <div>
-            <button
-              type="button"
-              className="button button--ghost"
-              onClick={() => setCreateDraft(null)}
-            >
-              取消
-            </button>
-            <button type="submit" className="button button--primary">
-              创建
-            </button>
-          </div>
-        </form>
+        />
       )}
       <label className="search-field">
         <Search size={13} />
@@ -360,14 +302,15 @@ function ProjectExplorer() {
                 type="button"
                 className="tree-folder"
                 aria-expanded={!isCollapsed}
-                onClick={() =>
+                onClick={() => {
+                  setActiveDirectory(directory);
                   setCollapsedDirectories((collapsed) => {
                     const next = new Set(collapsed);
                     if (next.has(directory)) next.delete(directory);
                     else next.add(directory);
                     return next;
-                  })
-                }
+                  });
+                }}
               >
                 <ChevronDown
                   size={12}
@@ -381,7 +324,10 @@ function ProjectExplorer() {
                   <button
                     key={entry.id}
                     className={`tree-file ${selectedId === entry.id ? "is-active" : ""}`}
-                    onClick={() => select(entry.id)}
+                    onClick={() => {
+                      setActiveDirectory(null);
+                      select(entry.id);
+                    }}
                   >
                     <FileText size={13} />
                     <span>
@@ -464,22 +410,6 @@ function ProjectExplorer() {
       </section>
     </>
   );
-}
-
-function normalizeCreationPath(path: string) {
-  const normalized = path
-    .trim()
-    .replaceAll("\\", "/")
-    .replace(/^\/+|\/+$/g, "")
-    .replace(/\/+/g, "/");
-  if (
-    !normalized ||
-    /^[A-Za-z]:/.test(normalized) ||
-    normalized.split("/").some((segment) => segment === "." || segment === "..")
-  ) {
-    return null;
-  }
-  return normalized;
 }
 
 function SearchPanel() {

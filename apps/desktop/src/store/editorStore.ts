@@ -1,3 +1,11 @@
+import {
+  collectDialogueDirectories,
+  directoryConflict,
+  nextDialogueKey,
+  normalizeDialogueDirectory,
+  type CreationResult,
+  type DialogueCreationOptions,
+} from "../lib/dialogueCreation";
 import { create } from "zustand";
 import { createId, createNode } from "../model/demo";
 import { DEFAULT_PROJECT_LOCALES } from "../model/locales";
@@ -58,8 +66,11 @@ type EditorState = {
   pasteCopiedNode: () => void;
   addNode: (type: NodeType, position?: { x: number; y: number }) => void;
   deleteNodes: (ids: string[]) => void;
-  addDialogue: (folder?: string) => void;
-  addDialogueDirectory: (path: string) => void;
+  addDialogue: (
+    folder?: string,
+    options?: DialogueCreationOptions,
+  ) => CreationResult;
+  addDialogueDirectory: (path: string) => CreationResult;
   deleteDialogue: (id: string) => void;
   closeProject: () => void;
 };
@@ -366,25 +377,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({ selectedNodeId: null });
     }
   },
-  addDialogue: (folder = "dialogues") => {
+  addDialogue: (folder, options = {}) => {
     const state = get();
     const normalizedFolder = normalizeDialogueDirectory(
-      folder,
+      folder ?? state.project.manifest.paths.dialogues,
       state.project.manifest.paths.dialogues,
     );
     if (!normalizedFolder) {
       set({ notice: "目录必须是项目内的有效相对路径。" });
-      return;
+      return { ok: false, error: "目录必须是项目内的有效相对路径。" };
+    }
+    const pending = options.directories ?? [];
+    if (
+      (options.name !== undefined && !options.name.trim()) ||
+      [normalizedFolder, ...pending].some(
+        (path) =>
+          !normalizeDialogueDirectory(
+            path,
+            state.project.manifest.paths.dialogues,
+          ) || directoryConflict(state.project, path),
+      )
+    ) {
+      return { ok: false, error: "名称或目录无效，或与对话文件冲突。" };
     }
     const id = createId();
     const start = createNode("start", { x: 100, y: 180 }, state.previewLocale);
     const end = createNode("end", { x: 480, y: 180 }, state.previewLocale);
-    const sequence = state.project.dialogues.length + 1;
+    const key = nextDialogueKey(state.project, normalizedFolder, pending);
     const dialogue: DialogueDocument = {
       schemaVersion: 1,
       id,
-      key: `dialogue-${sequence}`,
-      name: `新对话 ${sequence}`,
+      key,
+      name: options.name?.trim() ?? `新对话 ${key.slice(9)}`,
       description: "",
       tags: [],
       entryNodeId: start.id,
@@ -401,11 +425,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     };
     state.commit("新建对话", (draft) => {
       draft.dialogues.push(dialogue);
-      draft.manifest.dialogueDirectories ??= [];
-      if (!draft.manifest.dialogueDirectories.includes(normalizedFolder)) {
-        draft.manifest.dialogueDirectories.push(normalizedFolder);
-        draft.manifest.dialogueDirectories.sort();
-      }
+      draft.manifest.dialogueDirectories = collectDialogueDirectories(draft, [
+        ...pending,
+        normalizedFolder,
+      ]);
       draft.manifest.dialogues.push({
         id,
         key: dialogue.key,
@@ -413,6 +436,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       });
     });
     set({ selectedDialogueId: id, selectedNodeId: null, activity: "project" });
+    return { ok: true, id, path: `${normalizedFolder}/${key}.json` };
   },
   addDialogueDirectory: (path) => {
     const state = get();
@@ -420,23 +444,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       path,
       state.project.manifest.paths.dialogues,
     );
-    if (!normalizedPath) {
-      set({ notice: "目录必须是项目内的有效相对路径。" });
-      return;
-    }
-    if (
-      (state.project.manifest.dialogueDirectories ?? []).includes(
-        normalizedPath,
-      )
-    ) {
-      set({ notice: `目录“${normalizedPath}”已存在。` });
-      return;
+    let error = "";
+    if (!normalizedPath) error = "目录必须是项目内的有效相对路径。";
+    else if (
+      collectDialogueDirectories(state.project).some(
+        (item) => item.toLowerCase() === normalizedPath.toLowerCase(),
+      ) ||
+      directoryConflict(state.project, normalizedPath)
+    )
+      error = "该路径已存在或与对话文件冲突。";
+    if (error || !normalizedPath) {
+      set({ notice: error });
+      return { ok: false, error };
     }
     state.commit("新建对话目录", (draft) => {
-      draft.manifest.dialogueDirectories ??= [];
-      draft.manifest.dialogueDirectories.push(normalizedPath);
-      draft.manifest.dialogueDirectories.sort();
+      draft.manifest.dialogueDirectories = collectDialogueDirectories(draft, [
+        normalizedPath,
+      ]);
     });
+    return { ok: true, path: normalizedPath };
   },
   deleteDialogue: (id) => {
     const state = get();
@@ -474,30 +500,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 }));
-
-function normalizeDialogueDirectory(path: string, root: string) {
-  const normalize = (value: string) =>
-    value
-      .trim()
-      .replaceAll("\\", "/")
-      .replace(/^\/+|\/+$/g, "")
-      .replace(/\/+/g, "/");
-  const normalized = normalize(path);
-  const normalizedRoot = normalize(root);
-  if (
-    !normalized ||
-    !normalizedRoot ||
-    /^[A-Za-z]:/.test(normalized) ||
-    normalized
-      .split("/")
-      .some((segment) => segment === "." || segment === "..") ||
-    (normalized !== normalizedRoot &&
-      !normalized.startsWith(`${normalizedRoot}/`))
-  ) {
-    return null;
-  }
-  return normalized;
-}
 
 export function currentDialogue(state: EditorState) {
   return state.project.dialogues.find(

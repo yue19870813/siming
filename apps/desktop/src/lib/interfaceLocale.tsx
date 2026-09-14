@@ -4,6 +4,38 @@ import type { SystemSettings } from "../model/types";
 type InterfaceLocale = SystemSettings["interfaceLocale"];
 
 const english = new Map<string, string>([
+  ["基本信息", "Basic Information"],
+  ["新建对话目录", "New Dialogue Directory"],
+  ["新建对话", "New Dialogue"],
+  ["选择父目录", "Select Parent Directory"],
+  ["搜索目录", "Search directories"],
+  ["搜索目录…", "Search directories\u2026"],
+  ["目录树", "Directory tree"],
+  ["展开或折叠目录", "Expand or collapse directory"],
+  ["没有匹配的目录。", "No matching directories."],
+  ["新建子目录", "New Subdirectory"],
+  ["子目录名称", "Subdirectory name"],
+  ["添加目录", "Add Directory"],
+  ["目录名称", "Directory name"],
+  ["对话名称", "Dialogue name"],
+  ["目标目录", "Target directory"],
+  ["最终路径", "Final path"],
+  ["创建", "Create"],
+  ["保存", "Save"],
+  ["名称不能为空。", "Name cannot be empty."],
+  ["请输入有效的目录名称。", "Enter a valid directory name."],
+  [
+    "该路径已存在或与对话文件冲突。",
+    "This path already exists or conflicts with a dialogue file.",
+  ],
+  [
+    "名称或目录无效，或与对话文件冲突。",
+    "Invalid name or directory, or a conflict with a dialogue file.",
+  ],
+  [
+    "目录必须是项目内的有效相对路径。",
+    "Directory must be a valid relative path within the project.",
+  ],
   ["设置", "Settings"],
   ["项目设置", "Project Settings"],
   ["系统设置", "System Settings"],
@@ -356,7 +388,7 @@ export function InterfaceLocaleEffect({ locale }: { locale: InterfaceLocale }) {
     };
 
     const localizeElement = (element: Element) => {
-      if (shouldSkip(element)) return;
+      if (element.closest(".cm-editor, .flow-node-content")) return;
       for (const attribute of attributes) {
         const value = element.getAttribute(attribute);
         if (!value) continue;
