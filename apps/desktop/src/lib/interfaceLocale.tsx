@@ -4,6 +4,9 @@ import type { SystemSettings } from "../model/types";
 type InterfaceLocale = SystemSettings["interfaceLocale"];
 
 const english = new Map<string, string>([
+  ["搜索角色显示名称或 Key…", "Search character name or Key…"],
+  ["说话人搜索结果", "Speaker search results"],
+  ["没有匹配的角色", "No matching characters"],
   ["基本信息", "Basic Information"],
   ["新建对话目录", "New Dialogue Directory"],
   ["新建对话", "New Dialogue"],

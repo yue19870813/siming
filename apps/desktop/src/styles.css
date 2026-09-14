@@ -3517,3 +3517,47 @@ html[data-theme="light"] .cm-editor {
   outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
+
+.speaker-select {
+  position: relative;
+}
+.speaker-select-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin-top: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel-raised);
+  box-shadow: var(--shadow);
+}
+.speaker-select-popup [role="listbox"] {
+  max-height: 240px;
+  overflow-y: auto;
+}
+.speaker-select-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+.speaker-select-option.is-active {
+  background: var(--primary-soft);
+}
+.speaker-select-option[aria-selected="true"] {
+  color: var(--primary);
+}
+.speaker-select-option small,
+.speaker-select-popup p {
+  color: var(--muted);
+}
+.speaker-select-popup p {
+  padding: 8px;
+  margin: 0;
+}

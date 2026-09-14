@@ -1,3 +1,4 @@
+import { SpeakerSelect } from "./SpeakerSelect";
 import { confirmDiscardHostDraft } from "../lib/hostDraftGuard";
 import { HostEventsEditor } from "./HostEventsEditor";
 import { Copy, Plus, Trash2 } from "lucide-react";
@@ -268,25 +269,16 @@ function NodeInspector({
         </Field>
         {node.type === "dialogue" && (
           <>
-            <Field label="说话人">
-              <select
-                value={node.data.speakerId ?? ""}
-                onChange={(event) =>
-                  update((draft) => {
-                    draft.data.speakerId = event.target.value || undefined;
-                  })
-                }
-              >
-                <option value="">旁白</option>
-                {project.resources.characters.map((character) => (
-                  <option key={character.id} value={character.key}>
-                    {character.name[locale] ??
-                      Object.values(character.name)[0] ??
-                      character.key}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <SpeakerSelect
+              characters={project.resources.characters}
+              locale={locale}
+              value={node.data.speakerId ?? ""}
+              onChange={(key) =>
+                update((draft) => {
+                  draft.data.speakerId = key || undefined;
+                })
+              }
+            />
             <LocalizedField
               label={`正文 · ${locale}`}
               value={node.data.text?.[locale] ?? ""}
