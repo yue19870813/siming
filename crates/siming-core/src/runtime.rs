@@ -648,6 +648,57 @@ mod tests {
     };
 
     #[test]
+    fn character_groups_validate_but_do_not_change_runtime_output() {
+        let mut manifest = parse_project_manifest(include_str!(
+            "../../../fixtures/minimal-project/.siming/project.json"
+        ))
+        .unwrap();
+        let dialogue = parse_dialogue_document(include_str!(
+            "../../../fixtures/minimal-project/dialogues/intro.json"
+        ))
+        .unwrap();
+        let mut resources = fixture_resources();
+        assert!(manifest.character_groups.is_empty());
+        assert!(
+            resources
+                .characters
+                .iter()
+                .all(|character| character.group_id.is_none())
+        );
+        let before =
+            compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap();
+        let id = "15e8b49f-29a3-4089-8989-9d6c4abbbdd1".to_owned();
+        manifest.character_groups.push(crate::CharacterGroup {
+            id: id.clone(),
+            name: "Heroes".to_owned(),
+        });
+        resources.characters[0].group_id = Some(id.clone());
+        let after =
+            compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap();
+        assert_eq!(
+            serde_json::to_value(&before.project).unwrap(),
+            serde_json::to_value(&after.project).unwrap()
+        );
+        resources.characters[0].group_id = Some("missing".to_owned());
+        let mut diagnostics = Vec::new();
+        crate::validate_resource_collections(&manifest, &resources, &mut diagnostics);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == "CHARACTER_GROUP_MISSING")
+        );
+        manifest.character_groups.push(crate::CharacterGroup {
+            id,
+            name: "Heroes".to_owned(),
+        });
+        assert!(
+            crate::validate_editable_project(&manifest, &[dialogue])
+                .iter()
+                .any(|item| item.code == "CHARACTER_GROUP_INVALID")
+        );
+    }
+
+    #[test]
     fn compiles_editor_source_into_runtime_and_locale_resources() {
         let manifest = parse_project_manifest(include_str!(
             "../../../fixtures/minimal-project/.siming/project.json"

@@ -1,3 +1,4 @@
+import { CharacterGroups } from "./CharacterGroups";
 import {
   Copy,
   ImagePlus,
@@ -58,6 +59,14 @@ export function ResourceView({ activity }: { activity: Activity }) {
   const resources = project.resources[resourceKey] as Resource[];
   const [selectedId, setSelectedId] = useState(resources[0]?.id ?? "");
   const [query, setQuery] = useState("");
+  const [groupFilter, setGroupFilter] = useState("all");
+  const groups = project.manifest.characterGroups ?? [];
+  const currentGroup =
+    groupFilter === "ungrouped" ||
+    groups.some((group) => group.id === groupFilter)
+      ? groupFilter
+      : "all";
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [avatarBusy, setAvatarBusy] = useState(false);
   const selected = resources.find((item) => item.id === selectedId);
   const selectedCharacter =
@@ -71,19 +80,39 @@ export function ResourceView({ activity }: { activity: Activity }) {
     }
   }, [resources, selectedId]);
 
-  const filtered = resources.filter((item) =>
-    `${item.key} ${resourceName(item, locale)}`
-      .toLowerCase()
-      .includes(query.toLowerCase()),
+  const filtered = resources.filter(
+    (item) =>
+      (resourceKey !== "characters" ||
+        currentGroup === "all" ||
+        (currentGroup === "ungrouped"
+          ? !(item as CharacterDefinition).groupId
+          : (item as CharacterDefinition).groupId === currentGroup)) &&
+      `${item.key} ${resourceName(item, locale)}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
+  const visibleChecked = filtered.filter((item) => checked.has(item.id));
   const referenceCount = selected
     ? countReferences(project, resourceKey, selected.key)
     : 0;
 
   const add = () => {
     const id = createId();
-    const key = `${resourceKey.slice(0, -1)}-${resources.length + 1}`;
+    let sequence = 1;
+    while (
+      resources.some(
+        (item) => item.key === `${resourceKey.slice(0, -1)}-${sequence}`,
+      )
+    )
+      sequence++;
+    const key = `${resourceKey.slice(0, -1)}-${sequence}`;
     const resource = createResource(resourceKey, id, key, locale);
+    if (
+      resourceKey === "characters" &&
+      currentGroup !== "all" &&
+      currentGroup !== "ungrouped"
+    )
+      (resource as CharacterDefinition).groupId = currentGroup;
     commit(`新增${meta.singular}`, (draft) => {
       (draft.resources[resourceKey] as Resource[]).push(resource);
     });
@@ -165,6 +194,15 @@ export function ResourceView({ activity }: { activity: Activity }) {
       </header>
       <div className="resource-layout">
         <aside className="resource-list">
+          {resourceKey === "characters" && (
+            <CharacterGroups
+              selected={currentGroup}
+              onSelect={(id) => {
+                setGroupFilter(id);
+                setChecked(new Set());
+              }}
+            />
+          )}
           <label className="search-field">
             <Search size={13} />
             <input
@@ -173,46 +211,115 @@ export function ResourceView({ activity }: { activity: Activity }) {
               placeholder={meta.placeholder}
             />
           </label>
+          {resourceKey === "characters" && (
+            <div className="character-bulk-actions">
+              <label>
+                <input
+                  type="checkbox"
+                  aria-label="全选当前角色"
+                  checked={
+                    filtered.length > 0 &&
+                    visibleChecked.length === filtered.length
+                  }
+                  onChange={(event) =>
+                    setChecked(
+                      event.target.checked
+                        ? new Set(filtered.map((item) => item.id))
+                        : new Set(),
+                    )
+                  }
+                />
+                全选
+              </label>
+              <select
+                aria-label="批量移动角色"
+                disabled={!visibleChecked.length}
+                value=""
+                onChange={(event) => {
+                  const groupId = event.target.value;
+                  const ids = new Set(visibleChecked.map((item) => item.id));
+                  commit("批量移动角色", (draft) =>
+                    draft.resources.characters.forEach((character) => {
+                      if (!ids.has(character.id)) return;
+                      if (groupId === "ungrouped") delete character.groupId;
+                      else character.groupId = groupId;
+                    }),
+                  );
+                  setChecked(new Set());
+                }}
+              >
+                <option value="" disabled>
+                  移动所选角色
+                </option>
+                <option value="ungrouped">未分组</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="resource-list-items">
             {filtered.map((item) => (
-              <button
-                key={item.id}
-                className={[
-                  item.id === selectedId ? "is-active" : "",
-                  resourceKey === "characters" ? "has-avatar" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => setSelectedId(item.id)}
-              >
-                {resourceKey === "characters" ? (
-                  <CharacterAvatar
-                    className="resource-list-avatar"
-                    rootPath={project.rootPath}
-                    avatar={(item as CharacterDefinition).avatar}
-                    name={resourceName(item, locale)}
-                    color={(item as CharacterDefinition).color}
-                  />
-                ) : (
-                  <i
-                    style={{
-                      background:
-                        "color" in item ? item.color : "var(--accent-primary)",
-                    }}
+              <div className="resource-selection-row" key={item.id}>
+                {resourceKey === "characters" && (
+                  <input
+                    type="checkbox"
+                    aria-label={`选择角色 ${resourceName(item, locale)}`}
+                    checked={checked.has(item.id)}
+                    onChange={(event) =>
+                      setChecked((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(item.id);
+                        else next.delete(item.id);
+                        return next;
+                      })
+                    }
                   />
                 )}
-                <span>
-                  <strong>{resourceName(item, locale)}</strong>
-                  <span
-                    className="resource-identity-separator"
-                    aria-hidden="true"
-                  >
-                    ·
+                <button
+                  className={[
+                    item.id === selectedId ? "is-active" : "",
+                    resourceKey === "characters" ? "has-avatar" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => setSelectedId(item.id)}
+                >
+                  {resourceKey === "characters" ? (
+                    <CharacterAvatar
+                      className="resource-list-avatar"
+                      rootPath={project.rootPath}
+                      avatar={(item as CharacterDefinition).avatar}
+                      name={resourceName(item, locale)}
+                      color={(item as CharacterDefinition).color}
+                    />
+                  ) : (
+                    <i
+                      style={{
+                        background:
+                          "color" in item
+                            ? item.color
+                            : "var(--accent-primary)",
+                      }}
+                    />
+                  )}
+                  <span>
+                    <strong>{resourceName(item, locale)}</strong>
+                    <span
+                      className="resource-identity-separator"
+                      aria-hidden="true"
+                    >
+                      ·
+                    </span>
+                    <small>{item.key}</small>
                   </span>
-                  <small>{item.key}</small>
-                </span>
-                <em>{countReferences(project, resourceKey, item.key)} 引用</em>
-              </button>
+                  <em>
+                    {countReferences(project, resourceKey, item.key)} 引用
+                  </em>
+                </button>
+              </div>
             ))}
             {!filtered.length && <p className="empty-list">暂无定义</p>}
           </div>
@@ -271,6 +378,30 @@ export function ResourceView({ activity }: { activity: Activity }) {
                   <ShieldAlert size={15} />
                   当前定义有 {referenceCount} 处引用，删除保护已启用。
                 </div>
+              )}
+              {selectedCharacter && (
+                <label className="character-group-select">
+                  所属分组
+                  <select
+                    aria-label="所属分组"
+                    value={selectedCharacter.groupId ?? ""}
+                    onChange={(event) =>
+                      update((item) => {
+                        if (event.target.value)
+                          (item as CharacterDefinition).groupId =
+                            event.target.value;
+                        else delete (item as CharacterDefinition).groupId;
+                      }, "移动角色分组")
+                    }
+                  >
+                    <option value="">未分组</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               )}
               {selectedCharacter && (
                 <section className="character-avatar-editor">

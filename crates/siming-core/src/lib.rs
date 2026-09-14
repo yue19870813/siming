@@ -30,6 +30,8 @@ pub struct ProjectManifest {
     pub locales: Vec<String>,
     #[serde(default)]
     pub dialogue_directories: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub character_groups: Vec<CharacterGroup>,
     pub dialogues: Vec<DialogueIndexEntry>,
 }
 
@@ -125,9 +127,17 @@ pub struct ProjectResources {
     pub tags: Vec<TagDefinition>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CharacterGroup {
+    pub id: String,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterDefinition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
     pub id: String,
     pub key: String,
     pub name: LocalizedText,
@@ -438,6 +448,24 @@ pub fn validate_editable_project(
             ".siming/project.json",
             None,
         ));
+    }
+
+    let mut group_ids = BTreeSet::new();
+    let mut group_names = BTreeSet::new();
+    for group in &manifest.character_groups {
+        if Uuid::parse_str(&group.id).is_err()
+            || !group_ids.insert(&group.id)
+            || group.name.trim().is_empty()
+            || !group_names.insert(group.name.trim())
+            || ["全部角色", "未分组"].contains(&group.name.trim())
+        {
+            diagnostics.push(error(
+                "CHARACTER_GROUP_INVALID",
+                "角色分组 ID 或名称无效、重复",
+                ".siming/project.json",
+                Some(group.id.clone()),
+            ));
+        }
     }
 
     for entry in &manifest.dialogues {
@@ -1827,6 +1855,18 @@ fn validate_resource_collections(
         }
     }
     for character in &resources.characters {
+        if character.group_id.as_ref().is_some_and(|id| {
+            !manifest
+                .character_groups
+                .iter()
+                .any(|group| &group.id == id)
+        }) {
+            diagnostics.push(resource_error(
+                "CHARACTER_GROUP_MISSING",
+                "角色引用的分组不存在",
+                &character.id,
+            ));
+        }
         validate_resource_localized_text(
             manifest,
             &character.name,

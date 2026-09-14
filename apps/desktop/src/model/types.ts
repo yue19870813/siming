@@ -74,7 +74,10 @@ export type DialogueIndexEntry = {
 export type ExportFormat = "json" | "xml" | "binary";
 export type ExportLayout = "bundled" | "directoryChunks";
 
+export type CharacterGroup = { id: string; name: string };
+
 export type CharacterDefinition = {
+  groupId?: string;
   id: string;
   key: string;
   name: LocalizedText;
@@ -132,6 +135,7 @@ export type ProjectSnapshot = {
     defaultLocale: string;
     locales: string[];
     dialogueDirectories: string[];
+    characterGroups?: CharacterGroup[];
     dialogues: DialogueIndexEntry[];
   };
   dialogues: DialogueDocument[];

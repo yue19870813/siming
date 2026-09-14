@@ -144,3 +144,16 @@ test("chunked runtime schemas accept index, dialogue, and locale files", () => {
     JSON.stringify(validateLocale.errors),
   ).toBe(true);
 });
+
+test("project schema accepts optional character groups and rejects malformed groups", () => {
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  addFormats(ajv);
+  const validate = ajv.compile(readJson("schemas/project.schema.json"));
+  const project = readJson("fixtures/minimal-project/.siming/project.json");
+  project.characterGroups = [
+    { id: "2fd88ddc-aa3b-466f-92a2-48785adce71e", name: "主角" },
+  ];
+  expect(validate(project)).toBe(true);
+  project.characterGroups[0].name = "   ";
+  expect(validate(project)).toBe(false);
+});

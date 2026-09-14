@@ -36,6 +36,31 @@ const english = new Map<string, string>([
     "目录必须是项目内的有效相对路径。",
     "Directory must be a valid relative path within the project.",
   ],
+  ["角色分组", "Character Groups"],
+  ["全部角色", "All Characters"],
+  ["未分组", "Ungrouped"],
+  ["新建分组", "New Group"],
+  ["重命名分组", "Rename Group"],
+  ["删除分组", "Delete Group"],
+  ["分组名称", "Group name"],
+  [
+    "分组名称不能为空或重复，也不能使用保留名称。",
+    "Group name must be nonempty, unique, and not reserved.",
+  ],
+  [
+    "删除分组后，组内角色将移至“未分组”。角色及对话引用会保留。",
+    "Deleting the group moves its characters to Ungrouped. Characters and dialogue references are preserved.",
+  ],
+  ["全选当前角色", "Select all visible characters"],
+  ["全选", "Select all"],
+  ["批量移动角色", "Move selected characters"],
+  ["移动所选角色", "Move selected characters"],
+  ["所属分组", "Group"],
+  ["新建角色分组", "Create character group"],
+  ["重命名角色分组", "Rename character group"],
+  ["删除角色分组", "Delete character group"],
+  ["移动角色分组", "Move character to group"],
+
   ["设置", "Settings"],
   ["项目设置", "Project Settings"],
   ["系统设置", "System Settings"],
@@ -330,6 +355,9 @@ function translateInterfaceText(source: string, locale: InterfaceLocale) {
   const exact = english.get(source);
   if (exact) return exact;
   return source
+    .replace(/^选择角色 (.+)$/, "Select character $1")
+    .replace(/^重命名分组 (.+)$/, "Rename group $1")
+    .replace(/^删除分组 (.+)$/, "Delete group $1")
     .replace(/^(\d+) 个节点$/, "$1 nodes")
     .replace(/^(\d+) 个定义$/, "$1 definitions")
     .replace(/^(\d+) 个选项$/, "$1 choices")

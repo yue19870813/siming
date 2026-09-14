@@ -173,6 +173,7 @@ pub fn create_project(
         default_locale: default_locale.to_owned(),
         locales,
         dialogue_directories: vec!["dialogues".to_owned()],
+        character_groups: Vec::new(),
         dialogues: vec![DialogueIndexEntry {
             id: dialogue_id,
             key: "intro".to_owned(),
@@ -516,6 +517,31 @@ fn write_definition<T: Serialize>(path: &Path, key: &str, items: &[T]) -> Storag
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn character_groups_and_membership_survive_save_and_reopen() {
+        let root = std::env::temp_dir().join(format!("siming-groups-{}", Uuid::new_v4()));
+        let mut snapshot = create_project(&root, "Groups", "zh-CN").unwrap();
+        let group_id = Uuid::new_v4().to_string();
+        snapshot
+            .manifest
+            .character_groups
+            .push(siming_core::CharacterGroup {
+                id: group_id.clone(),
+                name: "Heroes".to_owned(),
+            });
+        snapshot.resources.characters.push(serde_json::from_value(serde_json::json!({
+            "id": Uuid::new_v4().to_string(), "key": "hero", "name": { "zh-CN": "Hero" }, "groupId": group_id
+        })).unwrap());
+        save_project(&snapshot).unwrap();
+        let reopened = open_project(&root).unwrap();
+        assert_eq!(
+            reopened.manifest.character_groups,
+            snapshot.manifest.character_groups
+        );
+        assert_eq!(reopened.resources.characters, snapshot.resources.characters);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn normalizes_safe_relative_paths() {
