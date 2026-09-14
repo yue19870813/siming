@@ -4,6 +4,26 @@ import type { SystemSettings } from "../model/types";
 type InterfaceLocale = SystemSettings["interfaceLocale"];
 
 const english = new Map<string, string>([
+  ["修改对话目录", "Change Dialogue Directory"],
+  [
+    "是否将原根目录下的已有对话迁移到新目录？",
+    "Migrate existing dialogues from the previous root to the new directory?",
+  ],
+  [
+    "选择迁移会保留子目录结构，在保存项目时写入新目录，旧目录中的原文件会保留。主界面的对话目录仅显示新根目录下的内容。",
+    "Migration preserves subdirectories and writes copies when the project is saved. Original files remain in the old directory. The directory tree only shows content under the new root.",
+  ],
+  [
+    "选择不迁移会保留原文件路径，这些对话将从当前目录树中隐藏。",
+    "Without migration, file paths are preserved and those dialogues are hidden from the current directory tree.",
+  ],
+  ["不迁移，仅修改目录", "Change Directory Only"],
+  ["迁移并保留原文件", "Migrate and Keep Originals"],
+  [
+    "迁移目标路径存在冲突，请选择其它目录。",
+    "Migration paths conflict. Choose a different directory.",
+  ],
+
   ["搜索角色显示名称或 Key…", "Search character name or Key…"],
   ["说话人搜索结果", "Speaker search results"],
   ["没有匹配的角色", "No matching characters"],

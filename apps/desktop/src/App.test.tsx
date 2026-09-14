@@ -247,7 +247,7 @@ test("dialogues in the same directory share one folder in the explorer", async (
 
   const { container } = render(<App />);
 
-  expect(screen.getAllByText("dialogues/prologue")).toHaveLength(1);
+  expect(screen.getAllByText("prologue")).toHaveLength(1);
   expect(
     [...container.querySelectorAll(".tree-file strong")].map(
       (element) => element.textContent,
@@ -266,7 +266,7 @@ test("dialogue directories can be collapsed and search expands matches", async (
   useEditorStore.getState().markSaved();
   render(<App />);
 
-  const folder = screen.getByRole("button", { name: "dialogues/prologue" });
+  const folder = screen.getByRole("button", { name: "prologue" });
   expect(folder).toHaveAttribute("aria-expanded", "true");
   expect(
     folder.closest(".tree-file-group")?.querySelectorAll(".tree-file"),
@@ -303,7 +303,7 @@ test("a dialogue directory can be created from the project explorer", async () =
   });
   fireEvent.click(screen.getByRole("button", { name: "创建" }));
 
-  expect(screen.getByText("dialogues/chapter-2")).toBeInTheDocument();
+  expect(screen.getByText("chapter-2")).toBeInTheDocument();
   expect(screen.getAllByText("空目录").length).toBeGreaterThan(0);
   await waitFor(() =>
     expect(document.documentElement.dataset.theme).toBe("dark"),
@@ -647,6 +647,87 @@ test("save and export protect invalid host drafts without writing files", async 
   expect(screen.getByLabelText("消息体 1")).toHaveValue("{");
   fireEvent.click(screen.getByText("还原"));
   confirm.mockRestore();
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});
+
+test.each([true, false])(
+  "changing the dialogue root asks whether to migrate (%s)",
+  async (migrate) => {
+    openTestProject();
+    const original = structuredClone(useEditorStore.getState().project);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "设置" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /对话文件目录/ }), {
+      target: { value: "stories" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "应用项目设置" }));
+    expect(
+      screen.getByRole("dialog", { name: "修改对话目录" }),
+    ).toBeInTheDocument();
+    expect(useEditorStore.getState().project.manifest.paths.dialogues).toBe(
+      original.manifest.paths.dialogues,
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: migrate ? "迁移并保留原文件" : "不迁移，仅修改目录",
+      }),
+    );
+    expect(useEditorStore.getState().project.manifest.dialogues[0].path).toBe(
+      migrate
+        ? "stories/prologue/rainy-night.json"
+        : original.manifest.dialogues[0].path,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "项目内容" }));
+    expect(
+      screen.queryByRole("button", { name: "dialogues/prologue" }),
+    ).not.toBeInTheDocument();
+    if (migrate)
+      expect(
+        screen.getByRole("button", { name: "prologue" }),
+      ).toBeInTheDocument();
+    else
+      expect(
+        screen.queryByRole("button", { name: /序章 · 雨夜来客 5 个节点/ }),
+      ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.documentElement.dataset.theme).toBe("dark"),
+    );
+  },
+);
+
+test("cancelling root migration leaves project untouched", async () => {
+  openTestProject();
+  const original = useEditorStore.getState().project;
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.change(screen.getByRole("textbox", { name: /对话文件目录/ }), {
+    target: { value: "stories" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "应用项目设置" }));
+  fireEvent.click(screen.getByRole("button", { name: "取消" }));
+  expect(useEditorStore.getState().project).toBe(original);
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});
+
+test("directory tree hides the configured root and shows root dialogues directly", async () => {
+  openTestProject();
+  useEditorStore.getState().addDialogue("dialogues", { name: "根目录对话" });
+  render(<App />);
+  expect(
+    screen.queryByRole("button", { name: "dialogues" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "prologue" })).toBeInTheDocument();
+  const file = screen.getByRole("button", { name: "根目录对话 2 个节点" });
+  expect(
+    file.closest(".tree-file-group")?.querySelector(".tree-folder"),
+  ).toBeNull();
+  expect(
+    useEditorStore.getState().project.manifest.dialogues.at(-1)?.path,
+  ).toBe("dialogues/dialogue-2.json");
   await waitFor(() =>
     expect(document.documentElement.dataset.theme).toBe("dark"),
   );

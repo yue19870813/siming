@@ -1,3 +1,8 @@
+import { Modal } from "./Modal";
+import {
+  migrateDialogueDirectory,
+  withinDialogueRoot,
+} from "../lib/dialogueDirectoryMigration";
 import { FolderCog, MonitorCog, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { chooseProjectDirectory } from "../lib/projectApi";
@@ -32,6 +37,7 @@ export function SettingsView({
   const project = useEditorStore((state) => state.project);
   const commit = useEditorStore((state) => state.commit);
   const setNotice = useEditorStore((state) => state.setNotice);
+  const [migrationPrompt, setMigrationPrompt] = useState(false);
   const [scope, setScope] = useState<SettingsScope>("project");
   const [projectDraft, setProjectDraft] = useState(() => ({
     name: project.manifest.name,
@@ -89,7 +95,7 @@ export function SettingsView({
     [settings.theme],
   );
 
-  const applyProjectSettings = () => {
+  const applyProjectSettings = (migrate?: boolean) => {
     const locales = [
       ...new Set(
         projectDraft.locales
@@ -122,7 +128,33 @@ export function SettingsView({
       setNotice("绝对导出目录必须是完整的本机路径。");
       return;
     }
+    const nextRoot = normalizeDirectory(projectDraft.dialogues);
+    const oldRoot = normalizeDirectory(project.manifest.paths.dialogues);
+    if (
+      nextRoot !== oldRoot &&
+      migrate === undefined &&
+      (project.manifest.dialogues.some((entry) =>
+        withinDialogueRoot(entry.path, oldRoot),
+      ) ||
+        project.manifest.dialogueDirectories.some((path) =>
+          withinDialogueRoot(path, oldRoot),
+        ))
+    ) {
+      setMigrationPrompt(true);
+      return;
+    }
+    if (migrate) {
+      try {
+        migrateDialogueDirectory(structuredClone(project), nextRoot);
+      } catch (error) {
+        setNotice((error as Error).message);
+        setMigrationPrompt(false);
+        return;
+      }
+    }
+    setMigrationPrompt(false);
     commit("应用项目设置", (draft) => {
+      if (migrate) migrateDialogueDirectory(draft, nextRoot);
       draft.manifest.name = projectDraft.name.trim() || "未命名项目";
       draft.manifest.paths.dialogues = normalizeDirectory(
         projectDraft.dialogues,
@@ -159,6 +191,35 @@ export function SettingsView({
 
   return (
     <section className="settings-view settings-hub">
+      {migrationPrompt && (
+        <Modal title="修改对话目录" onClose={() => setMigrationPrompt(false)}>
+          <p>是否将原根目录下的已有对话迁移到新目录？</p>
+          <p>
+            选择迁移会保留子目录结构，在保存项目时写入新目录，旧目录中的原文件会保留。主界面的对话目录仅显示新根目录下的内容。
+          </p>
+          <p>选择不迁移会保留原文件路径，这些对话将从当前目录树中隐藏。</p>
+          <div className="editor-modal-actions">
+            <button
+              className="button button--ghost"
+              onClick={() => setMigrationPrompt(false)}
+            >
+              取消
+            </button>
+            <button
+              className="button button--ghost"
+              onClick={() => applyProjectSettings(false)}
+            >
+              不迁移，仅修改目录
+            </button>
+            <button
+              className="button button--primary"
+              onClick={() => applyProjectSettings(true)}
+            >
+              迁移并保留原文件
+            </button>
+          </div>
+        </Modal>
+      )}
       <header className="settings-header">
         <strong>设置</strong>
         <span>
@@ -445,7 +506,7 @@ export function SettingsView({
                     locales: DEFAULT_PROJECT_LOCALES.join(", "),
                   })
                 }
-                onSave={applyProjectSettings}
+                onSave={() => applyProjectSettings()}
                 saveLabel="应用项目设置"
               />
             </>

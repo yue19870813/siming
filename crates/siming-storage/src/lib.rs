@@ -329,6 +329,31 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
         BTreeMap::new()
     };
 
+    let root_changed = old_manifest.as_ref().is_some_and(|old| {
+        old.paths.dialogues.trim_end_matches('/')
+            != snapshot.manifest.paths.dialogues.trim_end_matches('/')
+    });
+    // Preflight every relocated destination before writing any project data.
+    for entry in &snapshot.manifest.dialogues {
+        if old_paths
+            .get(&entry.id)
+            .is_some_and(|path| path != &entry.path)
+        {
+            let destination = resolve_project_path(&root, &entry.path)?;
+            if destination.exists() {
+                let same_dialogue = destination.is_file()
+                    && read_json::<DialogueDocument>(&destination)
+                        .is_ok_and(|document| document.id == entry.id);
+                if !same_dialogue {
+                    return Err(StorageError::InvalidProject(format!(
+                        "迁移目标路径已存在，未覆盖：{}",
+                        entry.path
+                    )));
+                }
+            }
+        }
+    }
+
     for directory in &snapshot.manifest.dialogue_directories {
         let path = resolve_project_path(&root, directory)?;
         fs::create_dir_all(path)?;
@@ -385,8 +410,14 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
         .iter()
         .map(|entry| entry.path.as_str())
         .collect();
-    for old_path in old_paths.values() {
-        if !new_paths.contains(old_path.as_str()) {
+    for (id, old_path) in &old_paths {
+        let migrated = root_changed
+            && snapshot
+                .manifest
+                .dialogues
+                .iter()
+                .any(|entry| &entry.id == id && &entry.path != old_path);
+        if !migrated && !new_paths.contains(old_path.as_str()) {
             let path = resolve_project_path(&root, old_path)?;
             if path.is_file() {
                 fs::remove_file(path)?;
@@ -517,6 +548,46 @@ fn write_definition<T: Serialize>(path: &Path, key: &str, items: &[T]) -> Storag
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn changing_dialogue_root_copies_documents_and_preserves_originals() {
+        let root = std::env::temp_dir().join(format!("siming-root-copy-{}", Uuid::new_v4()));
+        let mut snapshot = create_project(&root, "Copy", "zh-CN").unwrap();
+        let old_path = snapshot.manifest.dialogues[0].path.clone();
+        let original = fs::read(root.join(&old_path)).unwrap();
+        snapshot.manifest.paths.dialogues = "stories/".to_owned();
+        snapshot.manifest.dialogue_directories = vec!["stories".to_owned()];
+        snapshot.manifest.dialogues[0].path = "stories/intro.json".to_owned();
+        snapshot.dialogues[0].name = "Updated copy".to_owned();
+        save_project(&snapshot).unwrap();
+        assert_eq!(fs::read(root.join(&old_path)).unwrap(), original);
+        let reopened = open_project(&root).unwrap();
+        assert_eq!(reopened.dialogues[0].name, "Updated copy");
+        save_project(&reopened).unwrap();
+        assert_eq!(fs::read(root.join(&old_path)).unwrap(), original);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn root_migration_refuses_to_overwrite_unrelated_destination() {
+        let root = std::env::temp_dir().join(format!("siming-root-conflict-{}", Uuid::new_v4()));
+        let mut snapshot = create_project(&root, "Copy", "zh-CN").unwrap();
+        let original_manifest = fs::read(root.join(PROJECT_FILE)).unwrap();
+        fs::create_dir_all(root.join("stories")).unwrap();
+        fs::write(root.join("stories/intro.json"), "existing content").unwrap();
+        snapshot.manifest.paths.dialogues = "stories/".to_owned();
+        snapshot.manifest.dialogues[0].path = "stories/intro.json".to_owned();
+        assert!(save_project(&snapshot).is_err());
+        assert_eq!(
+            fs::read_to_string(root.join("stories/intro.json")).unwrap(),
+            "existing content"
+        );
+        assert_eq!(
+            fs::read(root.join(PROJECT_FILE)).unwrap(),
+            original_manifest
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn character_groups_and_membership_survive_save_and_reopen() {

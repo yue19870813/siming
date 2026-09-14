@@ -1,3 +1,4 @@
+import { withinDialogueRoot } from "../lib/dialogueDirectoryMigration";
 import { collectDialogueDirectories } from "../lib/dialogueCreation";
 import { CreationDialog } from "./CreationDialog";
 import { confirmDiscardHostDraft } from "../lib/hostDraftGuard";
@@ -148,7 +149,10 @@ function ProjectExplorer() {
     () => new Set(),
   );
 
-  const entries = project.manifest.dialogues
+  const rootEntries = project.manifest.dialogues.filter((entry) =>
+    withinDialogueRoot(entry.path, project.manifest.paths.dialogues),
+  );
+  const entries = rootEntries
     .map((entry) => ({
       entry,
       dialogue: project.dialogues.find((item) => item.id === entry.id),
@@ -170,13 +174,17 @@ function ProjectExplorer() {
       return true;
     });
 
-  const translationIncomplete = project.dialogues.filter((dialogue) =>
-    dialogueHasMissingTranslation(dialogue, project.manifest.locales),
+  const translationIncomplete = project.dialogues.filter(
+    (dialogue) =>
+      rootEntries.some((entry) => entry.id === dialogue.id) &&
+      dialogueHasMissingTranslation(dialogue, project.manifest.locales),
   ).length;
   const dialogueRoot =
     project.manifest.paths.dialogues.replace(/^\/+|\/+$/g, "") || "dialogues";
   const selectedEntry = project.manifest.dialogues.find(
-    (entry) => entry.id === selectedId,
+    (entry) =>
+      entry.id === selectedId &&
+      withinDialogueRoot(entry.path, project.manifest.paths.dialogues),
   );
   const [activeDirectory, setActiveDirectory] = useState<string | null>(null);
   const selectedDirectory =
@@ -191,6 +199,8 @@ function ProjectExplorer() {
   const directoryGroups = new Map<string, typeof entries>();
   if (!filter && quickFilter === "all") {
     for (const directory of project.manifest.dialogueDirectories ?? []) {
+      if (!withinDialogueRoot(directory, project.manifest.paths.dialogues))
+        continue;
       directoryGroups.set(directory, []);
     }
   }
@@ -201,9 +211,11 @@ function ProjectExplorer() {
     group.push(item);
     directoryGroups.set(directory, group);
   }
-  const groupedEntries = [...directoryGroups.entries()].sort(
-    ([left], [right]) => left.localeCompare(right),
-  );
+  const groupedEntries = [...directoryGroups.entries()]
+    .filter(
+      ([directory, items]) => directory !== dialogueRoot || items.length > 0,
+    )
+    .sort(([left], [right]) => left.localeCompare(right));
 
   return (
     <>
@@ -270,14 +282,13 @@ function ProjectExplorer() {
           className={`quick-item ${quickFilter === "all" ? "is-active" : ""}`}
           onClick={() => setQuickFilter("all")}
         >
-          <Braces size={12} /> 全部对话 <span>{project.dialogues.length}</span>
+          <Braces size={12} /> 全部对话 <span>{rootEntries.length}</span>
         </button>
         <button
           className={`quick-item ${quickFilter === "recent" ? "is-active" : ""}`}
           onClick={() => setQuickFilter("recent")}
         >
-          <span>◷</span> 最近编辑{" "}
-          <span>{Math.min(2, project.dialogues.length)}</span>
+          <span>◷</span> 最近编辑 <span>{Math.min(2, rootEntries.length)}</span>
         </button>
         <button
           className={`quick-item ${quickFilter === "translation" ? "is-active" : ""}`}
@@ -292,36 +303,40 @@ function ProjectExplorer() {
           <span>{entries.length}</span>
         </div>
         {groupedEntries.map(([directory, groupEntries]) => {
+          const isRoot = directory === dialogueRoot;
           const isCollapsed =
+            !isRoot &&
             collapsedDirectories.has(directory) &&
             !filter &&
             quickFilter === "all";
           return (
             <div
               key={directory}
-              className={`tree-file-group ${isCollapsed ? "is-collapsed" : ""}`}
+              className={`tree-file-group ${isRoot ? "tree-file-group--root" : ""} ${isCollapsed ? "is-collapsed" : ""}`}
             >
-              <button
-                type="button"
-                className="tree-folder"
-                aria-expanded={!isCollapsed}
-                onClick={() => {
-                  setActiveDirectory(directory);
-                  setCollapsedDirectories((collapsed) => {
-                    const next = new Set(collapsed);
-                    if (next.has(directory)) next.delete(directory);
-                    else next.add(directory);
-                    return next;
-                  });
-                }}
-              >
-                <ChevronDown
-                  size={12}
-                  className={isCollapsed ? "is-collapsed" : undefined}
-                />
-                <Folder size={13} />
-                <span>{directory}</span>
-              </button>
+              {!isRoot && (
+                <button
+                  type="button"
+                  className="tree-folder"
+                  aria-expanded={!isCollapsed}
+                  onClick={() => {
+                    setActiveDirectory(directory);
+                    setCollapsedDirectories((collapsed) => {
+                      const next = new Set(collapsed);
+                      if (next.has(directory)) next.delete(directory);
+                      else next.add(directory);
+                      return next;
+                    });
+                  }}
+                >
+                  <ChevronDown
+                    size={12}
+                    className={isCollapsed ? "is-collapsed" : undefined}
+                  />
+                  <Folder size={13} />
+                  <span>{directory.slice(dialogueRoot.length + 1)}</span>
+                </button>
+              )}
               {!isCollapsed &&
                 groupEntries.map(({ entry, dialogue }) => (
                   <button

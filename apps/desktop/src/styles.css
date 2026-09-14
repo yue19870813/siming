@@ -3565,3 +3565,7 @@ html[data-theme="light"] .cm-editor {
   padding: 8px;
   margin: 0;
 }
+
+.tree-file-group--root .tree-file {
+  margin-left: 0;
+}
