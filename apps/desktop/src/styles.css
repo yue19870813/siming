@@ -2059,6 +2059,7 @@ html.is-dragging-node * {
   background: #0f111a;
 }
 
+.workspace--editor > .canvas-view,
 .workspace--editor > .table-view,
 .workspace--editor > .data-view {
   position: absolute;
