@@ -1,0 +1,109 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. 1.2.3 or 1.2.3-beta.1"
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          python3 scripts/release.py --version "$VERSION" --check
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+      - name: Apply release version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: python3 scripts/release.py --version "$VERSION"
+      - id: commit
+        run: |
+          git add Cargo.toml apps/desktop/src-tauri/tauri.conf.json sdks/csharp/Directory.Build.props sdks/csharp/Packages/dev.siming.sdk/package.json
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "chore(release): prepare v${{ inputs.version }}"
+          git push origin HEAD:${{ github.ref_name }}
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  sdk:
+    needs: prepare
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: '8.0.x' }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: python3 sdks/csharp/scripts/generate-contracts.py && dotnet run --project sdks/csharp/tests/Siming.Tests -c Release && python3 sdks/csharp/scripts/package.py --version "${{ needs.prepare.outputs.version }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdk
+          path: sdks/csharp/artifacts/release/${{ needs.prepare.outputs.version }}/sdk/*
+  desktop:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            name: windows-x64
+          - os: macos-14
+            name: macos-arm64
+          - os: macos-13
+            name: macos-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: apps/desktop/package-lock.json }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+        working-directory: apps/desktop
+      - run: npm run format:check && npm run lint && npm run typecheck && npm test && npm run tauri -- build
+        working-directory: apps/desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.name }}
+          path: target/release/bundle/**
+  release:
+    needs: [prepare, sdk, desktop]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git tag -a "v${{ needs.prepare.outputs.version }}" -m "Release v${{ needs.prepare.outputs.version }}"
+          git push origin "v${{ needs.prepare.outputs.version }}"
+          gh release create "v${{ needs.prepare.outputs.version }}" --title "Siming v${{ needs.prepare.outputs.version }}" ${{ contains(needs.prepare.outputs.version, '-') && '--prerelease' || '' }} --generate-notes
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: find artifacts -type f -print0 | xargs -0 gh release upload "v${{ needs.prepare.outputs.version }}" --clobber
