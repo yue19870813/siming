@@ -46,6 +46,11 @@ namespace Siming.Samples
                 GUILayout.Label($"{current.Status} · {current.Locale}");
                 GUILayout.Label(current.SpeakerName ?? "");
                 GUILayout.Label(current.Text ?? "");
+                // For a TMP_Text body label: bodyLabel.text = TextMeshProFormatter.Format(current.RichText!);
+                // IMGUI is kept dependency-free; show metadata to inspect a v2 export here.
+                if (current.RichText != null) foreach (var run in current.RichText.Runs)
+                    if (run.Style.Bold || run.Style.Italic || run.Style.Color != null)
+                        GUILayout.Label($"Style: bold={run.Style.Bold}, italic={run.Style.Italic}, color={run.Style.Color ?? "default"}");
                 GUI.enabled = !session.IsBusy;
                 if (current.Status == SessionStatus.WaitingDialogue && GUILayout.Button("Continue")) Fire(() => session.ContinueAsync());
                 if (current.Status == SessionStatus.WaitingChoice) foreach (var choice in current.Choices)

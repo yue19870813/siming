@@ -24,14 +24,15 @@ namespace Siming
         public string? SpeakerId { get; }
         public string? SpeakerName { get; }
         public string? Text { get; }
+        public RichText? RichText { get; }
         public IReadOnlyList<DisplayChoice> Choices { get; }
         public double? AutoDelayMs { get; }
         public double RemainingDelayMs { get; }
         public SimingException? Error { get; }
         internal SessionSnapshot(SessionStatus status, string? dialogueId, string? nodeId, RuntimeNode? node, long visit,
-            string locale, string? speaker, string? text, IEnumerable<DisplayChoice> choices, double remaining, SimingException? error)
+            string locale, string? speaker, string? text, IEnumerable<DisplayChoice> choices, double remaining, SimingException? error, RichText? richText = null)
         { Status = status; DialogueId = dialogueId; NodeId = nodeId; NodeKey = node?.Key; VisitSequence = visit; Locale = locale;
-            SpeakerId = node?.SpeakerId; SpeakerName = speaker; Text = text; Choices = Immutable.List(choices);
+            SpeakerId = node?.SpeakerId; SpeakerName = speaker; Text = text; RichText = richText; Choices = Immutable.List(choices);
             AutoDelayMs = node?.AutoDelayMs; RemainingDelayMs = remaining; Error = error; }
     }
     public sealed class PlaybackState
@@ -272,7 +273,7 @@ namespace Siming
                 if (node.TextKey != null) text = loaded.Texts[node.TextKey];
                 foreach (var c in node.Choices) choices.Add(new DisplayChoice(c.Id, loaded.Texts[c.TextKey]));
             }
-            return new SessionSnapshot(status, loaded?.Dialogue.Id, nodeId, node, visit, locale, speaker, text, choices, remaining, error);
+            return new SessionSnapshot(status, loaded?.Dialogue.Id, nodeId, node, visit, locale, speaker, text, choices, remaining, error, node?.TextKey != null && loaded != null ? loaded.RichTexts[node.TextKey] : null);
         }
         private void Publish() { Current = Snapshot(); Notify(StateChanged, Current); }
         private void Notify<T>(Action<T>? callbacks, T value)

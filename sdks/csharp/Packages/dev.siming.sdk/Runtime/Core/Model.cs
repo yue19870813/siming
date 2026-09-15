@@ -1,3 +1,4 @@
+using System.Linq;
 #nullable enable
 using System;
 using System.Collections.Generic;
@@ -106,10 +107,13 @@ namespace Siming
     {
         public RuntimeDialogue Dialogue { get; }
         public IReadOnlyDictionary<string, string> Texts { get; }
+        public IReadOnlyDictionary<string, RichText> RichTexts { get; }
         public string Locale { get; }
         private Action? release;
         public LoadedDialogue(RuntimeDialogue dialogue, IDictionary<string, string> texts, string locale, Action release)
-        { Dialogue = dialogue; Texts = Immutable.Map(texts); Locale = locale; this.release = release; }
+        { Dialogue = dialogue; Texts = Immutable.Map(texts); RichTexts = Immutable.Map(texts.ToDictionary(p => p.Key, p => RichText.FromPlainText(p.Value))); Locale = locale; this.release = release; }
+        public LoadedDialogue(RuntimeDialogue dialogue, IDictionary<string, RichText> texts, string locale, Action release)
+        { Dialogue = dialogue; RichTexts = Immutable.Map(texts); Texts = Immutable.Map(texts.ToDictionary(p => p.Key, p => p.Value.PlainText)); Locale = locale; this.release = release; }
         public void Dispose() => Interlocked.Exchange(ref release, null)?.Invoke();
     }
     public interface IRuntimeDataSource { Task<byte[]> ReadAsync(string path, CancellationToken cancellationToken); }

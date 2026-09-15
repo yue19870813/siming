@@ -19,6 +19,7 @@ internal static class Program
         contracts = Path.GetFullPath(args.Length > 0 ? args[0] : "sdks/csharp/contracts");
         foreach (var layout in new[] { "bundled", "directory-chunks" })
         {
+            await Test(layout + ": rich text v2", () => RichTextContract(layout));
             await Test(layout + ": behavior contract", () => Behavior(layout));
             await Test(layout + ": state and language", () => StateAndLocale(layout));
             await Test(layout + ": variables and invalid actions", () => Variables(layout));
@@ -136,13 +137,30 @@ internal static class Program
         using var stopped = project.CreateSession(); stopped.HostEventReceived += _ => stopped.Stop();
         await Cancelled(stopped.StartByKeyAsync("sdk_demo")); Assert(stopped.Current.Status == SessionStatus.Stopped);
     }
+    private static async Task RichTextContract(string layout)
+    {
+        var source = new MemorySource(layout);
+        foreach (var path in source.Bytes.Keys.Where(p => p.EndsWith(".json") && p != "manifest.json").ToArray())
+            source.Edit(path, j => { j["schemaVersion"] = 2; if (j["texts"] is JObject texts) foreach (var property in texts.Properties().Where(p => p.Name.EndsWith(".text") && !p.Name.Contains(".choice."))) property.Value = JObject.FromObject(new { version = 1, runs = new[] { new { text = "富文本<test>\n", style = new { bold = true, italic = true, color = "#12ABEF" } } } }); });
+        source.Edit("manifest.json", j => { j["schemaVersion"] = 2; j["runtimeSchemaVersion"] = 2; }, false);
+        using var project = await Open(source); using var session = project.CreateSession();
+        await session.StartByKeyAsync("sdk_demo");
+        Assert(session.Current.Text == "富文本<test>\n");
+        var rich = session.Current.RichText!;
+        Assert(rich.Runs[0].Style.Bold && rich.Runs[0].Style.Italic && rich.Runs[0].Style.Color == "#12ABEF");
+        Assert(TextMeshProFormatter.Format(rich) == "<b><i><color=#12ABEF>富文本<noparse><</noparse>test>\n</color></i></b>");
+        Assert(TextMeshProFormatter.Format(RichText.FromPlainText("</noparse><b>")) == "<noparse><</noparse>/noparse><noparse><</noparse>b>");
+        foreach (var path in source.Bytes.Keys.Where(p => p.StartsWith("locales/") && p.EndsWith(".json")).ToArray()) source.Edit(path, j => { foreach (var property in ((JObject)j["texts"]!).Properties().Where(p => p.Value.Type == JTokenType.Object)) property.Value["version"] = 99; });
+        using var invalid = await Open(source); using var badSession = invalid.CreateSession();
+        await Error("InvalidRichText", () => badSession.StartByKeyAsync("sdk_demo"));
+    }
     private static async Task ActionTask(Action action) { await Task.CompletedTask; action(); }
     private static async Task Corruption(string layout)
     {
         var badHash = new MemorySource(layout); badHash.Bytes[badHash.StructurePath] = Encoding.UTF8.GetBytes("{}");
         if (layout == "bundled") await Error("IntegrityFailure", async () => { using var _ = await Open(badHash); });
         else { using var p = await Open(badHash); using var s = p.CreateSession(); await Error("IntegrityFailure", () => s.StartByKeyAsync("sdk_demo")); }
-        var future = new MemorySource(layout); future.Edit("manifest.json", j => j["runtimeSchemaVersion"] = 2, false);
+        var future = new MemorySource(layout); future.Edit("manifest.json", j => j["runtimeSchemaVersion"] = 3, false);
         await Error("UnsupportedVersion", async () => { using var _ = await Open(future); });
         foreach (var item in new (string Code, Action<JObject> Edit)[] {
             ("MissingNode", j => Nodes(j).Properties().First(p => p.Value["type"]!.Value<string>() == "start").Value["next"] = "00000000-0000-0000-0000-000000000000"),

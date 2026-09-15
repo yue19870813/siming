@@ -139,3 +139,13 @@ sdks/csharp/artifacts/unity-validation/Builds/SimingSmoke.app/Contents/MacOS/Sim
 ```
 
 结果与未覆盖的平台见 [VALIDATION.md](VALIDATION.md)。Unity 包不需要 `link.xml` 保留全部类型：解析采用显式引用，验证构建启用 High managed stripping。
+
+### Structured dialogue body (runtime v2)
+
+The JSON loader accepts runtime v1 and v2. `SessionSnapshot.Text` and
+`LoadedDialogue.Texts` remain plain strings. `SessionSnapshot.RichText` and
+`LoadedDialogue.RichTexts` expose immutable `RichText`, `TextRun`, and `TextStyle`
+models. Names and choices remain plain strings. `TextMeshProFormatter.Format`
+converts the body to escaped TMP markup without Unity dependencies. Enable TMP
+rich text and configure font assets with the required glyphs, bold and italic
+faces. See [the v2 format and UE integration guide](../../docs/运行时格式.md).

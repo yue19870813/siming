@@ -65,6 +65,7 @@ namespace Siming.Serialization.Json
         private bool chunked;
         private bool disposed;
         private bool opened;
+        private long runtimeVersion;
         private readonly List<string> permanentPins = new List<string>();
         public JsonProjectLoader(IRuntimeDataSource source) { this.source = source ?? throw new ArgumentNullException(nameof(source)); }
         public async Task<ProjectInfo> OpenAsync(CancellationToken cancellationToken)
@@ -73,7 +74,8 @@ namespace Siming.Serialization.Json
             opened = true;
             var manifestBytes = await source.ReadAsync("manifest.json", cancellationToken);
             var manifest = Parse(manifestBytes);
-            Version(manifest); if (Integer(manifest, "runtimeSchemaVersion") != 1) throw Invalid("UnsupportedVersion", "runtimeSchemaVersion");
+            Version(manifest); if (Integer(manifest, "runtimeSchemaVersion") is not (1 or 2)) throw Invalid("UnsupportedVersion", "runtimeSchemaVersion");
+            runtimeVersion = Integer(manifest, "runtimeSchemaVersion");
             foreach (var token in Array(manifest, "files"))
             {
                 var file = Object(token); var path = RuntimePath.Validate(Text(file, "path")); var hash = Text(file, "sha256"); var bytes = Integer(file, "bytes");
@@ -148,7 +150,7 @@ namespace Siming.Serialization.Json
             var pins = new List<string>();
             try
             {
-                var definition = entry; var texts = new Dictionary<string, string>(StringComparer.Ordinal);
+                var definition = entry; var texts = new Dictionary<string, RichText>(StringComparer.Ordinal);
                 if (chunked)
                 {
                     var structure = await Acquire(Text(entry, "structurePath"), pins, cancellationToken); Version(structure);
@@ -221,8 +223,36 @@ namespace Siming.Serialization.Json
             lock (gate) { if (disposed) return; disposed = true; cache.Clear(); }
             try { lifetime.Cancel(); } finally { lifetime.Dispose(); }
         }
-        private static Dictionary<string, string> LocaleTexts(JObject resource, string locale)
-        { Version(resource); if (Text(resource, "locale") != locale) throw Invalid("InvalidLocales", locale); return Obj(resource, "texts").Properties().ToDictionary(p => p.Name, p => String(p.Value), StringComparer.Ordinal); }
+        private Dictionary<string, RichText> LocaleTexts(JObject resource, string locale)
+        { Version(resource); if (Text(resource, "locale") != locale) throw Invalid("InvalidLocales", locale); return Obj(resource, "texts").Properties().ToDictionary(p => p.Name, p => ParseRichText(p.Value, Integer(resource, "schemaVersion")), StringComparer.Ordinal); }
+        private static RichText ParseRichText(JToken token, long schemaVersion)
+        {
+            if (token.Type == JTokenType.String) return RichText.FromPlainText(String(token));
+            if (schemaVersion != 2) throw Invalid("UnsupportedVersion", "Rich text requires v2");
+            var text = Object(token);
+            if (Integer(text, "version") != 1 || text.Properties().Any(p => p.Name != "version" && p.Name != "runs")) throw Invalid("InvalidRichText", "Unknown rich text version or field");
+            var runs = new List<TextRun>();
+            foreach (var item in Array(text, "runs"))
+            {
+                var run = Object(item);
+                if (run.Properties().Any(p => p.Name != "text" && p.Name != "style")) throw Invalid("InvalidRichText", "Unknown run field");
+                bool bold = false, italic = false; string? color = null;
+                if (run["style"] != null)
+                {
+                    var style = Obj(run, "style");
+                    foreach (var p in style.Properties())
+                    {
+                        if (p.Name == "color") color = String(p.Value);
+                        else if ((p.Name == "bold" || p.Name == "italic") && p.Value.Type == JTokenType.Boolean)
+                        { if (p.Name == "bold") bold = (bool)p.Value; else italic = (bool)p.Value; }
+                        else throw Invalid("InvalidRichText", "Invalid style");
+                    }
+                }
+                try { runs.Add(new TextRun(Text(run, "text"), new TextStyle(bold, italic, color))); }
+                catch (ArgumentException ex) { throw Invalid("InvalidRichText", ex.Message); }
+            }
+            return new RichText(runs);
+        }
         private RuntimeDialogue ParseDialogue(string id, JObject definition)
         {
             var nodes = new Dictionary<string, RuntimeNode>(StringComparer.Ordinal);
@@ -330,7 +360,7 @@ namespace Siming.Serialization.Json
             catch (Exception ex) { throw new SimingException("InvalidJson", "Invalid runtime JSON.", ex); }
         }
         private static string Hash(byte[] bytes) { using var sha = SHA256.Create(); return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant(); }
-        private static void Version(JObject obj) { if (Integer(obj, "schemaVersion") != 1) throw Invalid("UnsupportedVersion", "schemaVersion"); }
+        private void Version(JObject obj) { if (Integer(obj, "schemaVersion") is not (1 or 2) || (runtimeVersion != 0 && Integer(obj, "schemaVersion") != runtimeVersion)) throw Invalid("UnsupportedVersion", "schemaVersion"); }
         private static void Uuid(string id) { if (!Guid.TryParseExact(id, "D", out _)) throw Invalid("InvalidId", id); }
         private static SimingException Invalid(string code, string message) => new SimingException(code, message);
         private static JToken Required(JObject obj, string key) => obj[key] ?? throw Invalid("MissingField", key);
