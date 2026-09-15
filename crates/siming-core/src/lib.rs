@@ -10,6 +10,8 @@ mod runtime;
 pub use runtime::*;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+mod rich_text;
+pub use rich_text::*;
 pub type LocalizedText = BTreeMap<String, String>;
 
 pub fn version() -> &'static str {
@@ -437,6 +439,19 @@ pub fn validate_editable_project(
     dialogues: &[DialogueDocument],
 ) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
+    if !(1..=2).contains(&manifest.schema_version)
+        || dialogues.iter().any(|dialogue| {
+            !(1..=2).contains(&dialogue.schema_version)
+                || dialogue.schema_version > manifest.schema_version
+        })
+    {
+        diagnostics.push(error(
+            "UNSUPPORTED_VERSION",
+            "Unsupported source schema version",
+            ".siming/project.json",
+            None,
+        ));
+    }
     let mut dialogue_ids = BTreeSet::new();
     let mut dialogue_keys = BTreeSet::new();
     let mut dialogue_paths = BTreeSet::new();
@@ -510,6 +525,27 @@ pub fn validate_editable_project(
             ));
         }
 
+        for node in &dialogue.nodes {
+            if let Some(value) = node.data.get("text") {
+                let parsed = serde_json::from_value::<LocalizedBody>(value.clone());
+                let valid = parsed.as_ref().is_ok_and(|body| {
+                    body.values().all(|text| {
+                        text.valid()
+                            && (!matches!(text, TextContent::Rich(_))
+                                || (dialogue.schema_version >= 2
+                                    && node.node_type == NodeType::Dialogue))
+                    })
+                });
+                if !valid {
+                    diagnostics.push(error(
+                        "RICH_TEXT_INVALID",
+                        "正文格式无效；富文本需要对话 v2、受支持的样式和 #RRGGBB 颜色",
+                        "",
+                        Some(node.id.clone()),
+                    ));
+                }
+            }
+        }
         let node_ids: BTreeSet<_> = dialogue.nodes.iter().map(|node| &node.id).collect();
         let node_keys: BTreeSet<_> = dialogue.nodes.iter().map(|node| &node.key).collect();
         if node_ids.len() != dialogue.nodes.len() {
@@ -1268,13 +1304,11 @@ fn log_text_fallback(manifest: &ProjectManifest, node: &Node, session: &mut Simu
     let Some(text) = node
         .data
         .get("text")
-        .and_then(|value| serde_json::from_value::<LocalizedText>(value.clone()).ok())
+        .and_then(|value| serde_json::from_value::<LocalizedBody>(value.clone()).ok())
     else {
         return;
     };
-    if let Ok((_value, true)) =
-        resolve_localized_text(&text, &session.locale, &manifest.default_locale)
-    {
+    if let Ok((_value, true)) = resolve_body(&text, &session.locale, &manifest.default_locale) {
         push_log(
             session,
             SimulationLogKind::LocaleFallback,
@@ -1678,10 +1712,36 @@ fn validate_localized_node_text(
         ));
     }
     for (field_path, value) in fields {
-        let text: LocalizedText = serde_json::from_value(value.clone()).unwrap_or_default();
+        let text: LocalizedBody = match serde_json::from_value(value.clone()) {
+            Ok(text) => text,
+            Err(_) => {
+                diagnostics.push(node_error(
+                    "TEXT_INVALID",
+                    "Invalid text or rich text structure",
+                    file,
+                    node,
+                    field_path.clone(),
+                ));
+                continue;
+            }
+        };
+        for content in text.values() {
+            if !content.valid()
+                || (matches!(content, TextContent::Rich(_))
+                    && (manifest.schema_version < 2 || node.node_type != NodeType::Dialogue))
+            {
+                diagnostics.push(node_error(
+                    "RICH_TEXT_INVALID",
+                    "Rich text requires source v2 and valid styles on dialogue body",
+                    file,
+                    node,
+                    field_path.clone(),
+                ));
+            }
+        }
         if !text
             .get(&manifest.default_locale)
-            .is_some_and(|value| !value.trim().is_empty())
+            .is_some_and(|value| !value.plain_text().trim().is_empty())
         {
             diagnostics.push(node_error(
                 "LOCALE_DEFAULT_TEXT_MISSING",
@@ -1695,7 +1755,7 @@ fn validate_localized_node_text(
             if locale != &manifest.default_locale
                 && !text
                     .get(locale)
-                    .is_some_and(|value| !value.trim().is_empty())
+                    .is_some_and(|value| !value.plain_text().trim().is_empty())
             {
                 diagnostics.push(diagnostic(
                     "LOCALE_TRANSLATION_MISSING",

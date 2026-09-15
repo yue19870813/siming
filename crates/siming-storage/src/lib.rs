@@ -201,8 +201,6 @@ pub fn open_project(root: &Path) -> StorageResult<ProjectSnapshot> {
     }
 
     let manifest: ProjectManifest = read_json(&manifest_path)?;
-    // Backfill a visible marker for legacy projects when the directory is writable.
-    let _ = write_project_marker(&root, &manifest);
     let dialogues = manifest
         .dialogues
         .iter()
@@ -211,6 +209,17 @@ pub fn open_project(root: &Path) -> StorageResult<ProjectSnapshot> {
             read_json(&path)
         })
         .collect::<StorageResult<Vec<_>>>()?;
+    if let Some(diagnostic) = validate_editable_project(&manifest, &dialogues)
+        .into_iter()
+        .find(|d| d.code == "UNSUPPORTED_VERSION" || d.code == "RICH_TEXT_INVALID")
+    {
+        return Err(StorageError::InvalidProject(format!(
+            "{}: {}",
+            diagnostic.code, diagnostic.message
+        )));
+    }
+    // Backfill a marker only after the source format has been accepted.
+    let _ = write_project_marker(&root, &manifest);
     let resources = ProjectResources {
         characters: read_definition(&root.join("definitions/characters.json"), "characters")?,
         variables: read_definition(&root.join("definitions/variables.json"), "variables")?,
@@ -286,6 +295,100 @@ pub fn read_project_asset(root: &Path, relative: &str) -> StorageResult<Vec<u8>>
 }
 
 pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
+    let root = absolute_path(Path::new(&snapshot.root_path))?;
+    let manifest_path = root.join(PROJECT_FILE);
+    let old = if manifest_path.exists() {
+        Some(read_json::<ProjectManifest>(&manifest_path)?)
+    } else {
+        None
+    };
+    if old.as_ref().is_some_and(|manifest| {
+        manifest.schema_version >= 2 && snapshot.manifest.schema_version < 2
+    }) {
+        return Err(StorageError::InvalidProject(
+            "项目已升级为 v2，不能降级保存".to_owned(),
+        ));
+    }
+    let mut upgrading = old
+        .as_ref()
+        .is_some_and(|manifest| manifest.schema_version == 1)
+        && snapshot.manifest.schema_version == 2;
+    for entry in &snapshot.manifest.dialogues {
+        let path = resolve_project_path(&root, &entry.path)?;
+        if path.is_file() {
+            let previous: DialogueDocument = read_json(&path)?;
+            if let Some(next) = snapshot
+                .dialogues
+                .iter()
+                .find(|dialogue| dialogue.id == entry.id)
+            {
+                if previous.schema_version > next.schema_version {
+                    return Err(StorageError::InvalidProject(
+                        "对话已升级，不能降级保存".to_owned(),
+                    ));
+                }
+                upgrading |= previous.schema_version == 1 && next.schema_version == 2;
+            }
+        }
+    }
+    if !upgrading {
+        return save_project_inner(snapshot);
+    }
+    // Snapshot every affected file before the first v2 write. Originals remain recoverable
+    // even if a later definition or manifest write fails.
+    let backup = root
+        .join(".siming/backups")
+        .join(format!("rich-text-v2-{}", Uuid::new_v4()));
+    let mut paths = BTreeSet::from([
+        PROJECT_FILE.to_owned(),
+        "definitions/characters.json".to_owned(),
+        "definitions/variables.json".to_owned(),
+        "definitions/events.json".to_owned(),
+        "definitions/tags.json".to_owned(),
+    ]);
+    for entry in &snapshot.manifest.dialogues {
+        paths.insert(entry.path.clone());
+    }
+    if let Some(old) = &old {
+        for entry in &old.dialogues {
+            paths.insert(entry.path.clone());
+        }
+        paths.insert(project_marker_file_name(old));
+    }
+    paths.insert(project_marker_file_name(&snapshot.manifest));
+    let mut originals = Vec::new();
+    for relative in paths {
+        let path = resolve_project_path(&root, &relative)?;
+        let bytes = if path.is_file() {
+            Some(fs::read(&path)?)
+        } else {
+            None
+        };
+        if let Some(bytes) = &bytes {
+            let destination = backup.join(&relative);
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(destination, bytes)?;
+        }
+        originals.push((path, bytes));
+    }
+    match save_project_inner(snapshot) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            for (path, bytes) in originals {
+                if let Some(bytes) = bytes {
+                    fs::write(path, bytes)?;
+                } else if path.is_file() {
+                    fs::remove_file(path)?;
+                }
+            }
+            Err(error)
+        }
+    }
+}
+
+fn save_project_inner(snapshot: &ProjectSnapshot) -> StorageResult<()> {
     let root = absolute_path(Path::new(&snapshot.root_path))?;
     let diagnostics = validate_editable_project(&snapshot.manifest, &snapshot.dialogues);
     if let Some(diagnostic) = diagnostics.first() {
@@ -548,6 +651,46 @@ fn write_definition<T: Serialize>(path: &Path, key: &str, items: &[T]) -> Storag
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rich_text_upgrade_backs_up_round_trips_and_rejects_downgrade() {
+        let root = std::env::temp_dir().join(format!("siming-rich-{}", Uuid::new_v4()));
+        let mut snapshot = create_project(&root, "Rich", "zh-CN").unwrap();
+        let original = fs::read(root.join(PROJECT_FILE)).unwrap();
+        snapshot.manifest.schema_version = 2;
+        snapshot.dialogues[0].schema_version = 2;
+        let node = &mut snapshot.dialogues[0].nodes[0];
+        node.node_type = siming_core::NodeType::Dialogue;
+        node.data.insert("text".to_owned(), serde_json::json!({"zh-CN":{"version":1,"runs":[{"text":"中文\n<text>","style":{"bold":true,"italic":true,"color":"#ABCDEF"}}]}}));
+        save_project(&snapshot).unwrap();
+        let backup = fs::read_dir(root.join(".siming/backups"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        assert_eq!(fs::read(backup.join(PROJECT_FILE)).unwrap(), original);
+        let reopened = open_project(&root).unwrap();
+        assert_eq!(
+            serde_json::to_value(reopened.dialogues).unwrap(),
+            serde_json::to_value(&snapshot.dialogues).unwrap()
+        );
+        snapshot.manifest.schema_version = 1;
+        assert!(save_project(&snapshot).is_err());
+        snapshot.manifest.schema_version = 2;
+        snapshot.dialogues[0]
+            .nodes
+            .iter_mut()
+            .find(|n| n.node_type == siming_core::NodeType::Dialogue)
+            .unwrap()
+            .data
+            .insert(
+                "text".to_owned(),
+                serde_json::json!({"zh-CN":{"version":99,"runs":[]}}),
+            );
+        assert!(save_project(&snapshot).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn changing_dialogue_root_copies_documents_and_preserves_originals() {

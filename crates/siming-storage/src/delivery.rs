@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use siming_core::{
-    CompileError, ExportFormat, ExportLayout, RUNTIME_SCHEMA_VERSION, RuntimeChunkedBundle,
-    RuntimeResources, compile_runtime, partition_runtime,
+    CompileError, ExportFormat, ExportLayout, RuntimeChunkedBundle, RuntimeResources,
+    compile_runtime, partition_runtime,
 };
 use std::{
     collections::BTreeMap,
@@ -149,7 +149,7 @@ fn export_bundled(
             files.sort_by(|left, right| left.path.cmp(&right.path));
             let manifest = ExportManifest {
                 schema_version: 1,
-                runtime_schema_version: RUNTIME_SCHEMA_VERSION,
+                runtime_schema_version: snapshot.manifest.schema_version,
                 generator_version: siming_core::version().to_owned(),
                 default_locale: snapshot.manifest.default_locale.clone(),
                 locales: snapshot.manifest.locales.clone(),
@@ -242,7 +242,7 @@ fn export_directory_chunks(
             files.sort_by(|left, right| left.path.cmp(&right.path));
             let manifest = ExportManifest {
                 schema_version: 1,
-                runtime_schema_version: RUNTIME_SCHEMA_VERSION,
+                runtime_schema_version: snapshot.manifest.schema_version,
                 generator_version: siming_core::version().to_owned(),
                 default_locale: snapshot.manifest.default_locale.clone(),
                 locales: snapshot.manifest.locales.clone(),
@@ -472,7 +472,7 @@ fn serialize_xml_manifest(
     let mut output = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
     xml_line_break(&mut output, pretty);
     output.push_str("<simingExportManifest schemaVersion=\"1\" runtimeSchemaVersion=\"");
-    output.push_str(&RUNTIME_SCHEMA_VERSION.to_string());
+    output.push_str(&snapshot.manifest.schema_version.to_string());
     output.push_str("\" generatorVersion=\"");
     output.push_str(&escape_xml_attribute(siming_core::version()));
     output.push_str("\" defaultLocale=\"");
@@ -555,24 +555,34 @@ fn serialize_binary_bundle(bundle: &siming_core::RuntimeBundle) -> Result<Vec<u8
     }
     sections.sort_by(|left, right| left.0.cmp(&right.0));
 
-    serialize_binary_sections(sections)
+    serialize_binary_sections(sections, bundle.project.schema_version)
 }
 
 fn serialize_binary_section<T: Serialize>(name: &str, value: &T) -> Result<Vec<u8>, DeliveryError> {
-    serialize_binary_sections(vec![(
-        name.to_owned(),
-        serialize_binary_value(&serde_json::to_value(value)?)?,
-    )])
+    let value = serde_json::to_value(value)?;
+    serialize_binary_sections(
+        vec![(name.to_owned(), serialize_binary_value(&value)?)],
+        value
+            .get("schemaVersion")
+            .or_else(|| {
+                value
+                    .get("project")
+                    .and_then(|project| project.get("schemaVersion"))
+            })
+            .and_then(Value::as_u64)
+            .unwrap_or(1) as u32,
+    )
 }
 
 fn serialize_binary_sections(
     mut sections: Vec<(String, Vec<u8>)>,
+    runtime_version: u32,
 ) -> Result<Vec<u8>, DeliveryError> {
     sections.sort_by(|left, right| left.0.cmp(&right.0));
     let mut output = Vec::new();
     output.extend_from_slice(BINARY_MAGIC);
     output.extend_from_slice(&BINARY_FORMAT_VERSION.to_be_bytes());
-    output.extend_from_slice(&RUNTIME_SCHEMA_VERSION.to_be_bytes());
+    output.extend_from_slice(&runtime_version.to_be_bytes());
     output.extend_from_slice(&(sections.len() as u32).to_be_bytes());
     for (name, payload) in sections {
         let name_bytes = name.as_bytes();
@@ -753,7 +763,7 @@ pub fn check_migration(root: &Path) -> Result<MigrationReport, DeliveryError> {
     }
     Ok(MigrationReport {
         current_schema_version: version as u32,
-        target_schema_version: 1,
+        target_schema_version: (version as u32).max(1),
         required: !changes.is_empty(),
         changes,
         backup_directory: None,
@@ -816,10 +826,10 @@ fn schema_version(value: &Value) -> Result<u64, DeliveryError> {
         .get("schemaVersion")
         .and_then(Value::as_u64)
         .unwrap_or(0);
-    if version > 1 {
+    if version > 2 {
         return Err(DeliveryError::UnsupportedSchema {
             found: version,
-            supported: 1,
+            supported: 2,
         });
     }
     Ok(version)
@@ -852,7 +862,14 @@ fn legacy_host_event_count(dialogue: &Value) -> usize {
 
 fn migrate_value(value: &mut Value) {
     if let Some(object) = value.as_object_mut() {
-        object.insert("schemaVersion".to_owned(), Value::from(1));
+        if object
+            .get("schemaVersion")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            < 1
+        {
+            object.insert("schemaVersion".to_owned(), Value::from(1));
+        }
     }
     if let Some(nodes) = value.get_mut("nodes").and_then(Value::as_array_mut) {
         for node in nodes {
@@ -975,6 +992,44 @@ mod tests {
     use super::*;
     use crate::{create_project, open_project};
     use quick_xml::{Reader, events::Event};
+
+    #[test]
+    fn rich_text_v2_exports_all_formats_and_layouts_deterministically() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/minimal-project");
+        let mut snapshot = open_project(&fixture).unwrap();
+        snapshot.manifest.schema_version = 2;
+        for dialogue in &mut snapshot.dialogues {
+            dialogue.schema_version = 2;
+            for node in &mut dialogue.nodes {
+                if node.node_type == siming_core::NodeType::Dialogue {
+                    node.data.insert("text".to_owned(), serde_json::json!({"zh-CN":{"version":1,"runs":[{"text":"Rich中文","style":{"bold":true,"color":"#ABCDEF"}}]},"en-US":"Fallback"}));
+                }
+            }
+        }
+        let root = test_directory("rich-export");
+        for format in [ExportFormat::Json, ExportFormat::Xml, ExportFormat::Binary] {
+            for layout in [ExportLayout::Bundled, ExportLayout::DirectoryChunks] {
+                let first = root.join("first");
+                let second = root.join("second");
+                let report =
+                    export_project(&snapshot, Some(&first), format, Some(layout), false).unwrap();
+                export_project(&snapshot, Some(&second), format, Some(layout), false).unwrap();
+                let mut found = false;
+                for file in report.files {
+                    let bytes = fs::read(first.join(&file.path)).unwrap();
+                    assert_eq!(bytes, fs::read(second.join(&file.path)).unwrap());
+                    found |= bytes.windows(7).any(|window| window == b"#ABCDEF");
+                    if bytes.starts_with(BINARY_MAGIC) {
+                        assert_eq!(u32::from_be_bytes(bytes[12..16].try_into().unwrap()), 2);
+                    }
+                }
+                assert!(found, "rich style missing from export");
+                fs::remove_dir_all(first).unwrap();
+                fs::remove_dir_all(second).unwrap();
+            }
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn deterministic_export_is_byte_identical_and_editor_free() {
@@ -1177,7 +1232,7 @@ mod tests {
         assert_eq!(u32::from_be_bytes(bytes[8..12].try_into().unwrap()), 1);
         assert_eq!(
             u32::from_be_bytes(bytes[12..16].try_into().unwrap()),
-            RUNTIME_SCHEMA_VERSION
+            siming_core::RUNTIME_SCHEMA_VERSION
         );
         let section_count = u32::from_be_bytes(bytes[16..20].try_into().unwrap());
         assert_eq!(section_count, 3);

@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "defaultLocale", "locales", "resources", "dialogues"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "enum": [1, 2] },
     "defaultLocale": { "$ref": "#/$defs/locale" },
     "locales": {
       "type": "array",

@@ -3,6 +3,7 @@ use crate::{
     LocalizedText, Node, NodeType, ProjectManifest, ProjectResources, VariableType,
     resolve_localized_text, validate_project,
 };
+use crate::{LocalizedBody, TextContent, resolve_body};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -69,7 +70,7 @@ pub struct RuntimeDialogueChunk {
 pub struct RuntimeLocaleChunk {
     pub schema_version: u32,
     pub locale: String,
-    pub texts: BTreeMap<String, String>,
+    pub texts: BTreeMap<String, TextContent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -233,7 +234,7 @@ pub enum RuntimeNodeType {
 pub struct RuntimeLocaleResource {
     pub schema_version: u32,
     pub locale: String,
-    pub texts: BTreeMap<String, String>,
+    pub texts: BTreeMap<String, TextContent>,
 }
 
 #[derive(Debug, Error)]
@@ -274,7 +275,7 @@ pub fn compile_runtime(
             (
                 locale.clone(),
                 RuntimeLocaleResource {
-                    schema_version: RUNTIME_SCHEMA_VERSION,
+                    schema_version: manifest.schema_version,
                     locale: locale.clone(),
                     texts: BTreeMap::new(),
                 },
@@ -292,7 +293,7 @@ pub fn compile_runtime(
 
     Ok(RuntimeBundle {
         project: RuntimeProject {
-            schema_version: RUNTIME_SCHEMA_VERSION,
+            schema_version: manifest.schema_version,
             default_locale: manifest.default_locale.clone(),
             locales: manifest.locales.clone(),
             resources: runtime_resources,
@@ -330,7 +331,7 @@ pub fn partition_runtime(
         dialogue_chunks
             .entry(chunk)
             .or_insert_with(|| RuntimeDialogueChunk {
-                schema_version: RUNTIME_SCHEMA_VERSION,
+                schema_version: manifest.schema_version,
                 dialogues: BTreeMap::new(),
             })
             .dialogues
@@ -349,7 +350,7 @@ pub fn partition_runtime(
         locale_global.insert(
             locale.clone(),
             RuntimeLocaleChunk {
-                schema_version: RUNTIME_SCHEMA_VERSION,
+                schema_version: manifest.schema_version,
                 locale: locale.clone(),
                 texts: global_texts,
             },
@@ -376,7 +377,7 @@ pub fn partition_runtime(
                 chunks.insert(
                     chunk_key.clone(),
                     RuntimeLocaleChunk {
-                        schema_version: RUNTIME_SCHEMA_VERSION,
+                        schema_version: manifest.schema_version,
                         locale: locale.clone(),
                         texts,
                     },
@@ -387,7 +388,7 @@ pub fn partition_runtime(
     }
 
     Ok(RuntimeChunkedBundle {
-        schema_version: RUNTIME_SCHEMA_VERSION,
+        schema_version: manifest.schema_version,
         default_locale: bundle.project.default_locale.clone(),
         locales: bundle.project.locales.clone(),
         resources: bundle.project.resources.clone(),
@@ -515,9 +516,9 @@ fn compile_node(
             next: next("next")?,
         })),
         NodeType::Dialogue => {
-            let text: LocalizedText = value(node, "text")?;
+            let text: LocalizedBody = value(node, "text")?;
             let text_key = format!("dialogue.{}.{}.text", dialogue.id, node.id);
-            insert_localized_text(manifest, locales, &text_key, &text, &node.id)?;
+            insert_localized_body(manifest, locales, &text_key, &text, &node.id)?;
             Ok(RuntimeNode::Dialogue(RuntimeDialogueNode {
                 key: node.key.clone(),
                 node_type: RuntimeNodeType::Dialogue,
@@ -612,7 +613,31 @@ fn insert_localized_text(
                 message: message.to_owned(),
             })?;
         if let Some(resource) = locales.get_mut(locale) {
-            resource.texts.insert(text_key.to_owned(), value.to_owned());
+            resource
+                .texts
+                .insert(text_key.to_owned(), TextContent::Plain(value.to_owned()));
+        }
+    }
+    Ok(())
+}
+
+fn insert_localized_body(
+    manifest: &ProjectManifest,
+    locales: &mut BTreeMap<String, RuntimeLocaleResource>,
+    key: &str,
+    text: &LocalizedBody,
+    id: &str,
+) -> Result<(), CompileError> {
+    for locale in &manifest.locales {
+        let (value, _) =
+            resolve_body(text, locale, &manifest.default_locale).map_err(|message| {
+                CompileError::InvalidNode {
+                    node_id: id.to_owned(),
+                    message: message.to_owned(),
+                }
+            })?;
+        if let Some(resource) = locales.get_mut(locale) {
+            resource.texts.insert(key.to_owned(), value.clone());
         }
     }
     Ok(())

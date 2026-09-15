@@ -13,7 +13,7 @@
     "dialogues"
   ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "enum": [1, 2] },
     "defaultLocale": { "$ref": "runtime.schema.json#/$defs/locale" },
     "locales": {
       "type": "array",

@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": 1
+      "enum": [1, 2]
     },
     "id": {
       "$ref": "#/$defs/uuid"
@@ -220,7 +220,7 @@
               "type": "string"
             },
             "text": {
-              "$ref": "#/$defs/localizedText"
+              "$ref": "#/$defs/localizedBody"
             },
             "condition": {
               "$ref": "#/$defs/conditionExpression"
@@ -276,6 +276,92 @@
           "minLength": 1
         }
       }
+    },
+    "richText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "runs"],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text"],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "style": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "bold": {
+                    "type": "boolean"
+                  },
+                  "italic": {
+                    "type": "boolean"
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "localizedBody": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "$ref": "#/$defs/richText"
+          }
+        ]
+      }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": 1
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "text": {
+                      "$ref": "#/$defs/localizedText"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      }
+    }
+  ]
 }

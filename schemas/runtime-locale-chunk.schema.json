@@ -6,12 +6,89 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "locale", "texts"],
   "properties": {
-    "schemaVersion": { "const": 1 },
-    "locale": { "$ref": "runtime.schema.json#/$defs/locale" },
+    "schemaVersion": {
+      "enum": [1, 2]
+    },
+    "locale": {
+      "$ref": "runtime.schema.json#/$defs/locale"
+    },
     "texts": {
       "type": "object",
       "minProperties": 1,
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "$ref": "#/$defs/richText"
+          }
+        ]
+      }
     }
-  }
+  },
+  "$defs": {
+    "richText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "runs"],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text"],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "style": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "bold": {
+                    "type": "boolean"
+                  },
+                  "italic": {
+                    "type": "boolean"
+                  },
+                  "color": {
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": 1
+          }
+        },
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "texts": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      }
+    }
+  ]
 }

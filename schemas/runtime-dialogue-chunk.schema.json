@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "dialogues"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "enum": [1, 2] },
     "dialogues": {
       "type": "object",
       "minProperties": 1,
