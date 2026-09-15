@@ -157,3 +157,34 @@ test("project schema accepts optional character groups and rejects malformed gro
   project.characterGroups[0].name = "   ";
   expect(validate(project)).toBe(false);
 });
+
+test("v2 body schema accepts supported runs and rejects unknown versions or styles", () => {
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  addFormats(ajv);
+  const validate = ajv.compile(readJson("schemas/dialogue.schema.json"));
+  const dialogue = readJson("fixtures/minimal-project/dialogues/intro.json");
+  dialogue.schemaVersion = 2;
+  const node = dialogue.nodes.find(
+    (node: { type: string }) => node.type === "dialogue",
+  );
+  const rich = {
+    version: 1,
+    runs: [
+      { text: "中文\n", style: { bold: true, italic: true, color: "#123ABC" } },
+    ],
+  };
+  node.data.text = { "zh-CN": rich };
+  expect(validate(dialogue)).toBe(true);
+  dialogue.schemaVersion = 1;
+  expect(validate(dialogue)).toBe(false);
+  dialogue.schemaVersion = 2;
+  for (const value of [
+    { ...rich, version: 99 },
+    { version: 1, runs: [{ text: "x", style: { color: "red" } }] },
+    { version: 1, runs: [{ text: "x", style: { bold: null } }] },
+    { version: 1, runs: [{ text: "x", style: { font: "html" } }] },
+  ]) {
+    node.data.text = { "zh-CN": value };
+    expect(validate(dialogue)).toBe(false);
+  }
+});

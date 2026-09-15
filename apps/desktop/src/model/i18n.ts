@@ -1,3 +1,4 @@
+import { plainText } from "./richText";
 import type { DialogueDocument, ProjectSnapshot } from "./types";
 
 export function dialogueHasMissingTranslation(
@@ -10,7 +11,7 @@ export function dialogueHasMissingTranslation(
       ...(node.data.choices?.map((choice) => choice.text) ?? []),
     ];
     return fields.some((field) =>
-      locales.some((locale) => !field[locale]?.trim()),
+      locales.some((locale) => !plainText(field[locale]).trim()),
     );
   });
 }
@@ -28,6 +29,8 @@ export function translationCompletion(
     ),
     ...project.resources.characters.map((character) => character.name),
   ];
-  const translated = fields.filter((field) => field[locale]?.trim()).length;
+  const translated = fields.filter((field) =>
+    plainText(field[locale]).trim(),
+  ).length;
   return fields.length ? Math.round((translated / fields.length) * 100) : 100;
 }

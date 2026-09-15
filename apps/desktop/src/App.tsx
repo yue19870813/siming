@@ -244,6 +244,7 @@ export default function App() {
     const keydown = (event: KeyboardEvent) => {
       const command = event.metaKey || event.ctrlKey;
       if (!command) return;
+      if (event.defaultPrevented) return;
       const target = event.target;
       if (target instanceof Element && target.closest('[role="dialog"]'))
         return;

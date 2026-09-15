@@ -1,3 +1,5 @@
+import { RichTextView } from "./RichTextView";
+import { plainText, resolveBody } from "../model/richText";
 import { CornerDownRight, GitMerge, RotateCcw } from "lucide-react";
 import type { DialogueDocument, DialogueNode } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
@@ -91,8 +93,11 @@ export function TableView() {
           <tbody>
             {rows.map((row, index) => {
               const text =
-                row.node.data.text?.[locale] ??
-                Object.values(row.node.data.text ?? {})[0] ??
+                resolveBody(
+                  row.node.data.text,
+                  locale,
+                  project.manifest.defaultLocale,
+                ) ??
                 (row.node.type === "choice"
                   ? `${row.node.data.choices?.length ?? 0} 个选项`
                   : "");
@@ -136,8 +141,15 @@ export function TableView() {
                     {row.node.data.speakerId && (
                       <strong>{row.node.data.speakerId} · </strong>
                     )}
-                    {text ||
-                      (row.node.type === "dialogue" ? "输入对话内容…" : "")}
+                    <RichTextView
+                      value={
+                        plainText(text)
+                          ? text
+                          : row.node.type === "dialogue"
+                            ? "输入对话内容…"
+                            : ""
+                      }
+                    />
                   </td>
                   <td>{row.marker ? `引用 ${row.node.key}` : next || "—"}</td>
                 </tr>

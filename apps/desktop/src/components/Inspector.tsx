@@ -1,3 +1,4 @@
+import { RichTextEditor } from "./RichTextEditor";
 import { SpeakerSelect } from "./SpeakerSelect";
 import { confirmDiscardHostDraft } from "../lib/hostDraftGuard";
 import { HostEventsEditor } from "./HostEventsEditor";
@@ -279,14 +280,18 @@ function NodeInspector({
                 })
               }
             />
-            <LocalizedField
+            <RichTextEditor
+              key={locale}
               label={`正文 · ${locale}`}
               value={node.data.text?.[locale] ?? ""}
-              onChange={(value) =>
-                update((draft) => {
-                  draft.data.text ??= {};
-                  draft.data.text[locale] = value;
-                })
+              onChange={(value, typing) =>
+                update(
+                  (draft) => {
+                    draft.data.text ??= {};
+                    draft.data.text[locale] = value;
+                  },
+                  `${typing ? "输入正文" : "设置正文格式"}:${node.id}:${locale}`,
+                )
               }
             />
           </>
@@ -655,31 +660,5 @@ function Field({
       <span>{label}</span>
       {children}
     </label>
-  );
-}
-
-function LocalizedField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Field label={label}>
-      <textarea
-        rows={5}
-        className="dialogue-text-input"
-        placeholder="输入对话内容…"
-        value={value}
-        onFocus={() => {
-          // Older nodes stored the editing hint as dialogue content.
-          if (value === "输入对话内容…") onChange("");
-        }}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </Field>
   );
 }

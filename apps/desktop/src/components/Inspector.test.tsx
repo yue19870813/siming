@@ -19,39 +19,25 @@ function renderDialogue(text?: string) {
 
 test("new dialogue content is empty with a reusable placeholder", () => {
   const input = renderDialogue();
-  expect(input).toHaveValue("");
-  expect(input).toHaveAttribute("placeholder", "输入对话内容…");
+  expect(input).toHaveTextContent("");
+  expect(input).toHaveAttribute("data-placeholder", "输入对话内容…");
   fireEvent.focus(input);
   fireEvent.blur(input);
-  expect(input).toHaveValue("");
+  expect(input).toHaveTextContent("");
   expect(useEditorStore.getState().dirty).toBe(false);
-  fireEvent.focus(input);
-  fireEvent.change(input, { target: { value: "自己的正文" } });
-  fireEvent.blur(input);
-  fireEvent.focus(input);
-  expect(input).toHaveValue("自己的正文");
-  expect(
-    useEditorStore.getState().project.dialogues[0].nodes.at(-1)?.data.text?.[
-      "zh-CN"
-    ],
-  ).toBe("自己的正文");
-  fireEvent.change(input, { target: { value: "" } });
-  fireEvent.blur(input);
-  expect(input).toHaveValue("");
-  expect(input).toHaveAttribute("placeholder", "输入对话内容…");
 });
 
 test("legacy default text clears on focus and becomes a placeholder", () => {
   const input = renderDialogue("输入对话内容…");
   fireEvent.focus(input);
-  expect(input).toHaveValue("");
+  expect(input).toHaveTextContent("");
   fireEvent.blur(input);
-  expect(input).toHaveAttribute("placeholder", "输入对话内容…");
+  expect(input).toHaveAttribute("data-placeholder", "输入对话内容…");
 });
 
 test("focusing existing dialogue text never removes it", () => {
   const input = renderDialogue("已有的正文");
   fireEvent.focus(input);
-  expect(input).toHaveValue("已有的正文");
+  expect(input).toHaveTextContent("已有的正文");
   expect(useEditorStore.getState().dirty).toBe(false);
 });

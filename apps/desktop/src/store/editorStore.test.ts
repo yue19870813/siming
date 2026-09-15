@@ -174,3 +174,33 @@ test("unapplied source draft blocks view switching until discarded", () => {
   expect(useEditorStore.getState().sourceDraftDirty).toBe(false);
   confirm.mockRestore();
 });
+
+test("rich body history coalesces typing, isolates formatting and retains source v2", () => {
+  const node = useEditorStore
+    .getState()
+    .project.dialogues[0].nodes.find((n) => n.type === "dialogue")!;
+  useEditorStore.getState().setSelectedNode(node.id);
+  const edit = (label: string, text: typeof node.data.text) =>
+    useEditorStore.getState().commit(label, (p) => {
+      p.dialogues[0].nodes.find((n) => n.id === node.id)!.data.text = text;
+    });
+  edit(`输入正文:${node.id}:zh-CN`, { "zh-CN": "A" });
+  edit(`输入正文:${node.id}:zh-CN`, { "zh-CN": "AB" });
+  expect(useEditorStore.getState().past).toHaveLength(1);
+  edit(`设置正文格式:${node.id}:zh-CN`, {
+    "zh-CN": { version: 1, runs: [{ text: "AB", style: { bold: true } }] },
+  });
+  useEditorStore.getState().markSaved();
+  useEditorStore.getState().undo();
+  expect(useEditorStore.getState().selectedNodeId).toBe(node.id);
+  expect(useEditorStore.getState().project.manifest.schemaVersion).toBe(2);
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].nodes.find((n) => n.id === node.id)!.data.text![
+      "zh-CN"
+    ],
+  ).toBe("AB");
+  useEditorStore.getState().redo();
+  expect(useEditorStore.getState().dirty).toBe(false);
+});

@@ -22,6 +22,7 @@ import type {
 type HistoryEntry = {
   label: string;
   project: ProjectSnapshot;
+  timestamp?: number;
 };
 
 type EditorState = {
@@ -243,6 +244,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const before = structuredClone(state.project);
     const after = structuredClone(state.project);
     recipe(after);
+    for (const dialogue of after.dialogues) {
+      if (
+        dialogue.nodes.some(
+          (node) =>
+            node.data.text &&
+            Object.values(node.data.text).some(
+              (value) => typeof value !== "string",
+            ),
+        )
+      ) {
+        after.manifest.schemaVersion = 2;
+        dialogue.schemaVersion = 2;
+      }
+    }
+    after.manifest.schemaVersion = Math.max(
+      after.manifest.schemaVersion,
+      before.manifest.schemaVersion,
+    );
+    after.dialogues.forEach((dialogue) => {
+      dialogue.schemaVersion = Math.max(
+        dialogue.schemaVersion,
+        before.dialogues.find((old) => old.id === dialogue.id)?.schemaVersion ??
+          1,
+      );
+    });
     const activeNode = (project: ProjectSnapshot) =>
       project.dialogues
         .find((dialogue) => dialogue.id === state.selectedDialogueId)
@@ -259,9 +285,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       project: after,
       dirty: fingerprint(after) !== state.savedProjectFingerprint,
-      past: [...state.past.slice(-49), { label, project: before }],
+      past:
+        label.startsWith("输入正文:") &&
+        state.past.at(-1)?.label === label &&
+        !state.future.length &&
+        Date.now() - (state.past.at(-1)?.timestamp ?? 0) < 1000
+          ? [
+              ...state.past.slice(0, -1),
+              { ...state.past.at(-1)!, timestamp: Date.now() },
+            ]
+          : [
+              ...state.past.slice(-49),
+              { label, project: before, timestamp: Date.now() },
+            ],
       future: [],
-      notice: label,
+      notice: label.split(":")[0],
     });
   },
   undo: () => {
@@ -269,6 +307,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const state = get();
     const entry = state.past.at(-1);
     if (!entry) return;
+    entry.project = structuredClone(entry.project);
+    entry.project.manifest.schemaVersion = Math.max(
+      entry.project.manifest.schemaVersion,
+      state.project.manifest.schemaVersion,
+    );
+    entry.project.dialogues.forEach((dialogue) => {
+      dialogue.schemaVersion = Math.max(
+        dialogue.schemaVersion,
+        state.project.dialogues.find((current) => current.id === dialogue.id)
+          ?.schemaVersion ?? 1,
+      );
+    });
     set({
       project: entry.project,
       past: state.past.slice(0, -1),
@@ -277,8 +327,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...state.future,
       ],
       dirty: fingerprint(entry.project) !== state.savedProjectFingerprint,
-      selectedNodeId: null,
-      notice: `已撤销：${entry.label}`,
+      selectedNodeId: entry.project.dialogues.some((dialogue) =>
+        dialogue.nodes.some((node) => node.id === state.selectedNodeId),
+      )
+        ? state.selectedNodeId
+        : null,
+      notice: `已撤销：${entry.label.split(":")[0]}`,
     });
   },
   redo: () => {
@@ -286,6 +340,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const state = get();
     const entry = state.future[0];
     if (!entry) return;
+    entry.project = structuredClone(entry.project);
+    entry.project.manifest.schemaVersion = Math.max(
+      entry.project.manifest.schemaVersion,
+      state.project.manifest.schemaVersion,
+    );
+    entry.project.dialogues.forEach((dialogue) => {
+      dialogue.schemaVersion = Math.max(
+        dialogue.schemaVersion,
+        state.project.dialogues.find((current) => current.id === dialogue.id)
+          ?.schemaVersion ?? 1,
+      );
+    });
     set({
       project: entry.project,
       past: [
@@ -294,8 +360,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ],
       future: state.future.slice(1),
       dirty: fingerprint(entry.project) !== state.savedProjectFingerprint,
-      selectedNodeId: null,
-      notice: `已重做：${entry.label}`,
+      selectedNodeId: entry.project.dialogues.some((dialogue) =>
+        dialogue.nodes.some((node) => node.id === state.selectedNodeId),
+      )
+        ? state.selectedNodeId
+        : null,
+      notice: `已重做：${entry.label.split(":")[0]}`,
     });
   },
   copySelectedNode: () => {

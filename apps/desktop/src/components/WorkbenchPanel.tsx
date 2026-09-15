@@ -1,3 +1,5 @@
+import { RichTextView } from "./RichTextView";
+import { plainText, type TextContent } from "../model/richText";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -373,7 +375,11 @@ function Simulator() {
             <strong>
               {speakerName(node.data.speakerId, project, session.locale)}
             </strong>
-            <p>{text?.value ?? simulatorFallback(node.type)}</p>
+            <p>
+              <RichTextView
+                value={text?.value ?? simulatorFallback(node.type)}
+              />
+            </p>
             {text?.fallback && (
               <span className="locale-fallback">
                 已回退到 {project.manifest.defaultLocale}
@@ -559,13 +565,14 @@ function localizedNodeText(
   return localizedValue(node.data.text, locale, project.manifest.defaultLocale);
 }
 
-function localizedValue(
-  text: Record<string, string>,
+function localizedValue<T extends TextContent>(
+  text: Record<string, T>,
   locale: string,
   defaultLocale: string,
 ) {
-  if (text[locale]?.trim()) return { value: text[locale], fallback: false };
-  if (text[defaultLocale]?.trim())
+  if (plainText(text[locale]).trim())
+    return { value: text[locale], fallback: false };
+  if (plainText(text[defaultLocale]).trim())
     return { value: text[defaultLocale], fallback: true };
   return { value: "缺失文本", fallback: true };
 }

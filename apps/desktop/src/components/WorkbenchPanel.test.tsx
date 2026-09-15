@@ -109,3 +109,50 @@ test("simulator starts from shared IPC and submits player choices", async () => 
     ),
   );
 });
+
+test("simulator displays complete fallback body with safe combined styles", async () => {
+  const project = createDemoProject();
+  const node = project.dialogues[0].nodes.find(
+    (node) => node.type === "dialogue",
+  )!;
+  node.data.text = {
+    "zh-CN": {
+      version: 1,
+      runs: [
+        {
+          text: "<b>中文正文</b>",
+          style: { bold: true, italic: true, color: "#123ABC" },
+        },
+      ],
+    },
+    "en-US": "",
+  };
+  useEditorStore.getState().setProject(project);
+  api.simulateStep.mockResolvedValue({
+    currentNodeId: node.id,
+    status: "waitingDialogue",
+    locale: "en-US",
+    variables: {},
+    consecutiveSteps: 0,
+    visitSequence: 1,
+    trace: [],
+  });
+  render(
+    <WorkbenchPanel
+      mode="simulator"
+      height={430}
+      onModeChange={vi.fn()}
+      onClose={vi.fn()}
+      onResizeStart={vi.fn()}
+      onResizeBy={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /开始模拟/ }));
+  const body = await screen.findByText("<b>中文正文</b>");
+  expect(body).toHaveStyle({
+    fontWeight: 700,
+    fontStyle: "italic",
+    color: "#123ABC",
+  });
+  expect(body.querySelector("b")).toBeNull();
+});

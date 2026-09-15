@@ -1,3 +1,6 @@
+import { resolveBody } from "../model/richText";
+import { RichTextView } from "./RichTextView";
+import { plainText } from "../model/richText";
 import {
   Background,
   Connection,
@@ -49,6 +52,7 @@ type CanvasNodeData = {
   node: DialogueNode;
   locale: string;
   projectRoot: string;
+  defaultLocale: string;
   character?: CharacterDefinition;
 };
 
@@ -58,13 +62,11 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
   data,
   selected,
 }: NodeProps) {
-  const { node, locale, projectRoot, character } = data as CanvasNodeData;
+  const { node, locale, projectRoot, character, defaultLocale } =
+    data as CanvasNodeData;
   const meta = typeMeta[node.type];
   const Icon = meta.icon;
-  const text =
-    node.data.text?.[locale] ??
-    Object.values(node.data.text ?? {})[0] ??
-    meta.label;
+  const text = resolveBody(node.data.text, locale, defaultLocale) ?? meta.label;
   const speakerName = character
     ? (character.name[locale] ??
       Object.values(character.name)[0] ??
@@ -98,7 +100,11 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
             />
             <div>
               <strong>{speakerName}</strong>
-              <p>{text || "输入对话内容…"}</p>
+              <p>
+                <RichTextView
+                  value={plainText(text) ? text : "输入对话内容…"}
+                />
+              </p>
             </div>
           </div>
         )}
@@ -201,6 +207,7 @@ export function CanvasView() {
           node,
           locale,
           projectRoot: project.rootPath,
+          defaultLocale: project.manifest.defaultLocale,
           character: project.resources.characters.find(
             (item) => item.key === node.data.speakerId,
           ),
@@ -211,6 +218,7 @@ export function CanvasView() {
       locale,
       project.resources.characters,
       project.rootPath,
+      project.manifest.defaultLocale,
       selectedNodeId,
     ],
   );

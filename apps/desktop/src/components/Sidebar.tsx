@@ -1,3 +1,4 @@
+import { plainText } from "../model/richText";
 import { withinDialogueRoot } from "../lib/dialogueDirectoryMigration";
 import { collectDialogueDirectories } from "../lib/dialogueCreation";
 import { CreationDialog } from "./CreationDialog";
@@ -449,7 +450,9 @@ function SearchPanel() {
         .includes(needle);
       const nodes = dialogue.nodes
         .filter((node) =>
-          `${node.key} ${JSON.stringify(node.data)}`
+          `${node.key} ${Object.values(node.data.text ?? {})
+            .map(plainText)
+            .join(" ")} ${JSON.stringify({ ...node.data, text: undefined })}`
             .toLowerCase()
             .includes(needle),
         )

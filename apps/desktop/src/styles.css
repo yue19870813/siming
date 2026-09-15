@@ -3570,3 +3570,67 @@ html[data-theme="light"] .cm-editor {
 .tree-file-group--root .tree-file {
   margin-left: 0;
 }
+
+.rich-text-view {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rich-text-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.rich-text-toolbar button,
+.rich-text-toolbar label {
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rich-text-toolbar button[aria-pressed="true"] {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.rich-text-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.rich-text-toolbar input[type="color"] {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+}
+.dialogue-rich-input {
+  min-height: 130px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dialogue-rich-input p {
+  margin: 0;
+  min-height: 1.4em;
+}
+.dialogue-rich-input:focus {
+  outline: 1px solid var(--primary);
+}
+.dialogue-rich-input:not(:focus):has(> p:only-child > br:only-child)::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  pointer-events: none;
+  color: var(--muted);
+}
+.dialogue-rich-input strong {
+  font-weight: 700;
+}
+.dialogue-rich-input em {
+  font-style: italic;
+}

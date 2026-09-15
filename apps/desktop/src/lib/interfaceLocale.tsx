@@ -4,6 +4,11 @@ import type { SystemSettings } from "../model/types";
 type InterfaceLocale = SystemSettings["interfaceLocale"];
 
 const english = new Map<string, string>([
+  ["正文格式", "Body formatting"],
+  ["加粗", "Bold"],
+  ["斜体", "Italic"],
+  ["文字颜色", "Text color"],
+  ["清除格式", "Clear formatting"],
   ["修改对话目录", "Change Dialogue Directory"],
   [
     "是否将原根目录下的已有对话迁移到新目录？",
@@ -383,7 +388,12 @@ const english = new Map<string, string>([
   ],
 ]);
 
-const attributes = ["aria-label", "placeholder", "title"] as const;
+const attributes = [
+  "aria-label",
+  "placeholder",
+  "data-placeholder",
+  "title",
+] as const;
 
 function translateInterfaceText(source: string, locale: InterfaceLocale) {
   if (locale !== "en-US") return source;
@@ -428,7 +438,9 @@ export function InterfaceLocaleEffect({ locale }: { locale: InterfaceLocale }) {
 
     const shouldSkip = (element: Element | null) =>
       Boolean(
-        element?.closest("input, textarea, .cm-editor, .flow-node-content"),
+        element?.closest(
+          "input, textarea, [contenteditable], .rich-text-view, .cm-editor, .flow-node-content",
+        ),
       );
 
     const localizeText = (node: Text) => {

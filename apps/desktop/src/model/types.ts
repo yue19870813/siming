@@ -1,3 +1,4 @@
+import type { LocalizedBody } from "./richText";
 export type NodeType =
   "start" | "dialogue" | "choice" | "condition" | "event" | "end";
 
@@ -26,7 +27,7 @@ export type ConditionExpression =
   | { not: ConditionExpression };
 
 export type DialogueNodeData = {
-  text?: LocalizedText;
+  text?: LocalizedBody;
   speakerId?: string;
   choices?: ChoiceOption[];
   condition?: ConditionExpression;
