@@ -4,6 +4,13 @@ import type { SystemSettings } from "../model/types";
 type InterfaceLocale = SystemSettings["interfaceLocale"];
 
 const english = new Map<string, string>([
+  ["画布连线样式", "Canvas connection style"],
+  ["自动避让（圆角折线）", "Automatic routing (rounded orthogonal)"],
+  ["经典曲线（原样式）", "Classic curves (original style)"],
+  [
+    "自动避让会绕开节点并分隔平行连线；经典曲线使用原来的贝塞尔连线。",
+    "Automatic routing avoids nodes and separates parallel connections; classic curves use the original Bezier paths.",
+  ],
   ["条件显示", "Conditional visibility"],
   ["设置变量（variable.set）", "Set variable (variable.set)"],
   ["增加变量（variable.add）", "Add variable (variable.add)"],

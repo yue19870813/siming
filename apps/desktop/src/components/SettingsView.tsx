@@ -19,6 +19,7 @@ const systemDefaults: SystemSettings = {
   interfaceLocale: "zh-CN",
   uiFontSize: "medium",
   editorFontSize: 13,
+  canvasEdgeStyle: "routed",
   keymap: "system",
   autoSaveDelaySeconds: 30,
   recoverySnapshotIntervalSeconds: 60,
@@ -627,6 +628,25 @@ export function SettingsView({
                         {size} px
                       </option>
                     ))}
+                  </select>
+                </SettingsRow>
+                <SettingsRow
+                  title="画布连线样式"
+                  help="自动避让会绕开节点并分隔平行连线；经典曲线使用原来的贝塞尔连线。"
+                >
+                  <select
+                    aria-label="画布连线样式"
+                    value={systemDraft.canvasEdgeStyle ?? "routed"}
+                    onChange={(event) =>
+                      setSystemDraft({
+                        ...systemDraft,
+                        canvasEdgeStyle: event.target
+                          .value as SystemSettings["canvasEdgeStyle"],
+                      })
+                    }
+                  >
+                    <option value="routed">自动避让（圆角折线）</option>
+                    <option value="bezier">经典曲线（原样式）</option>
                   </select>
                 </SettingsRow>
                 <SettingsRow

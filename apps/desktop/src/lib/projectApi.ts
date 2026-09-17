@@ -166,6 +166,8 @@ export async function readSystemSettings(): Promise<SystemSettings> {
         return {
           ...defaults,
           ...saved,
+          canvasEdgeStyle:
+            saved.canvasEdgeStyle === "bezier" ? "bezier" : "routed",
           uiFontSize: ["small", "medium", "large"].includes(
             saved.uiFontSize ?? "",
           )
@@ -199,6 +201,7 @@ function browserSystemSettings(theme: SystemSettings["theme"]): SystemSettings {
     interfaceLocale: "zh-CN",
     uiFontSize: "medium",
     editorFontSize: 13,
+    canvasEdgeStyle: "routed",
     keymap: "system",
     autoSaveDelaySeconds: 30,
     recoverySnapshotIntervalSeconds: 60,

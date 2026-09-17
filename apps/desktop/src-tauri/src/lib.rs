@@ -39,6 +39,14 @@ impl From<siming_storage::DeliveryError> for CommandError {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+enum CanvasEdgeStyle {
+    #[default]
+    Routed,
+    Bezier,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SystemSettings {
@@ -51,6 +59,8 @@ struct SystemSettings {
     #[serde(default = "default_ui_font_size")]
     ui_font_size: String,
     editor_font_size: u8,
+    #[serde(default)]
+    canvas_edge_style: CanvasEdgeStyle,
     #[serde(default = "default_keymap")]
     keymap: String,
     #[serde(default = "default_auto_save_delay")]
@@ -72,6 +82,7 @@ impl Default for SystemSettings {
             interface_locale: default_interface_locale(),
             ui_font_size: default_ui_font_size(),
             editor_font_size: 13,
+            canvas_edge_style: CanvasEdgeStyle::default(),
             keymap: default_keymap(),
             auto_save_delay_seconds: default_auto_save_delay(),
             recovery_snapshot_interval_seconds: 60,
@@ -319,6 +330,19 @@ mod tests {
     #[test]
     fn ipc_version_comes_from_shared_core() {
         assert_eq!(super::core_version(), siming_core::VERSION);
+    }
+
+    #[test]
+    fn canvas_style_defaults_for_old_settings_and_round_trips() {
+        let mut old = serde_json::to_value(super::SystemSettings::default()).unwrap();
+        old.as_object_mut().unwrap().remove("canvasEdgeStyle");
+        let mut settings: super::SystemSettings = serde_json::from_value(old).unwrap();
+        assert_eq!(settings.canvas_edge_style, super::CanvasEdgeStyle::Routed);
+        settings.canvas_edge_style = super::CanvasEdgeStyle::Bezier;
+        let saved = serde_json::to_value(settings).unwrap();
+        assert_eq!(saved["canvasEdgeStyle"], "bezier");
+        let restored: super::SystemSettings = serde_json::from_value(saved).unwrap();
+        assert_eq!(restored.canvas_edge_style, super::CanvasEdgeStyle::Bezier);
     }
 
     #[test]

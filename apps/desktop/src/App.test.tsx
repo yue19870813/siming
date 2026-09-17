@@ -732,3 +732,32 @@ test("directory tree hides the configured root and shows root dialogues directly
     expect(document.documentElement.dataset.theme).toBe("dark"),
   );
 });
+
+test("canvas style is saved and restored in system settings", async () => {
+  openTestProject();
+  const view = render(<App />);
+  await act(async () => undefined);
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.click(screen.getByRole("button", { name: "系统设置" }));
+  expect(screen.getByRole("combobox", { name: "画布连线样式" })).toHaveValue(
+    "routed",
+  );
+  fireEvent.change(screen.getByRole("combobox", { name: "画布连线样式" }), {
+    target: { value: "bezier" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存系统设置" }));
+  await waitFor(() =>
+    expect(
+      JSON.parse(localStorage.getItem("siming.system-settings") ?? "{}")
+        .canvasEdgeStyle,
+    ).toBe("bezier"),
+  );
+  view.unmount();
+  render(<App />);
+  await act(async () => undefined);
+  fireEvent.click(screen.getByRole("button", { name: "设置" }));
+  fireEvent.click(screen.getByRole("button", { name: "系统设置" }));
+  expect(screen.getByRole("combobox", { name: "画布连线样式" })).toHaveValue(
+    "bezier",
+  );
+});

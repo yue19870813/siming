@@ -156,6 +156,7 @@ export type SystemSettings = {
   interfaceLocale: "zh-CN" | "en-US";
   uiFontSize: "small" | "medium" | "large";
   editorFontSize: number;
+  canvasEdgeStyle: "routed" | "bezier";
   keymap: "system" | "macos" | "windows";
   autoSaveDelaySeconds: number;
   recoverySnapshotIntervalSeconds: number;

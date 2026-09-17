@@ -30,6 +30,7 @@ import type {
   CharacterDefinition,
   DialogueNode,
   NodeType,
+  SystemSettings,
 } from "../model/types";
 import {
   nodeDragCancelEvent,
@@ -190,7 +191,11 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
 const nodeTypes = { siming: DialogueNodeCard };
 const edgeTypes = { routed: RoutedEdge };
 
-export function CanvasView() {
+export function CanvasView({
+  edgeStyle = "routed",
+}: {
+  edgeStyle?: SystemSettings["canvasEdgeStyle"];
+}) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const flowInstanceRef = useRef<{
     screenToFlowPosition: (position: { x: number; y: number }) => {
@@ -307,7 +312,7 @@ export function CanvasView() {
         sourceHandle: edge.sourcePort,
         target: edge.targetNodeId,
         targetHandle: edge.targetPort,
-        type: "routed",
+        type: edgeStyle === "bezier" ? "default" : "routed",
         interactionWidth: 24,
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -318,7 +323,7 @@ export function CanvasView() {
         animated: false,
         className: "siming-edge",
       })),
-    [dialogue, selectedEdgeIds],
+    [dialogue, selectedEdgeIds, edgeStyle],
   );
 
   useEffect(() => {
@@ -443,7 +448,11 @@ export function CanvasView() {
         fitView
         minZoom={0.2}
         maxZoom={2}
-        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineType={
+          edgeStyle === "bezier"
+            ? ConnectionLineType.Bezier
+            : ConnectionLineType.SmoothStep
+        }
         elevateEdgesOnSelect
         deleteKeyCode={["Backspace", "Delete"]}
       >

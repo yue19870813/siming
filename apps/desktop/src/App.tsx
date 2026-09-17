@@ -49,6 +49,7 @@ const defaultSettings: SystemSettings = {
   interfaceLocale: "zh-CN",
   uiFontSize: "medium",
   editorFontSize: 13,
+  canvasEdgeStyle: "routed",
   keymap: "system",
   autoSaveDelaySeconds: 30,
   recoverySnapshotIntervalSeconds: 60,
@@ -625,7 +626,7 @@ export default function App() {
         >
           {editorActivity &&
             (viewMode === "canvas" ? (
-              <CanvasView />
+              <CanvasView edgeStyle={settings.canvasEdgeStyle} />
             ) : viewMode === "table" ? (
               <TableView />
             ) : (
