@@ -109,6 +109,24 @@ test("the dialogue entry node cannot be deleted", () => {
   expect(state.notice).toBe("入口节点不能直接删除，请先修改对话入口。");
 });
 
+test("deleting edges is recorded in history and can be undone", () => {
+  const edge = useEditorStore.getState().project.dialogues[0].edges[0];
+
+  useEditorStore.getState().deleteEdges([edge.id]);
+
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].edges.some((item) => item.id === edge.id),
+  ).toBe(false);
+  useEditorStore.getState().undo();
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].edges.some((item) => item.id === edge.id),
+  ).toBe(true);
+});
+
 test("markSaved establishes a new clean history point", () => {
   useEditorStore.getState().commit("rename", (draft) => {
     draft.manifest.name = "已保存名称";

@@ -68,6 +68,7 @@ type EditorState = {
   pasteCopiedNode: () => void;
   addNode: (type: NodeType, position?: { x: number; y: number }) => void;
   deleteNodes: (ids: string[]) => void;
+  deleteEdges: (ids: string[]) => void;
   addDialogue: (
     folder?: string,
     options?: DialogueCreationOptions,
@@ -474,6 +475,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (state.selectedNodeId !== null && deletedIds.has(state.selectedNodeId)) {
       set({ selectedNodeId: null });
     }
+  },
+  deleteEdges: (ids) => {
+    const state = get();
+    const deletedIds = new Set(ids);
+    if (deletedIds.size === 0) return;
+    const dialogue = state.project.dialogues.find(
+      (item) => item.id === state.selectedDialogueId,
+    );
+    if (!dialogue?.edges.some((edge) => deletedIds.has(edge.id))) return;
+
+    state.commit(
+      deletedIds.size === 1 ? "删除连线" : `删除 ${deletedIds.size} 条连线`,
+      (draft) => {
+        const target = draft.dialogues.find(
+          (item) => item.id === state.selectedDialogueId,
+        );
+        if (target) {
+          target.edges = target.edges.filter(
+            (edge) => !deletedIds.has(edge.id),
+          );
+        }
+      },
+    );
   },
   addDialogue: (folder, options = {}) => {
     if (!confirmDiscardHostDraft())

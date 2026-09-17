@@ -1779,6 +1779,30 @@ html.is-dragging-node * {
   box-shadow: var(--shadow);
 }
 
+.siming-edge .react-flow__edge-path {
+  stroke: color-mix(in srgb, var(--muted) 78%, var(--canvas));
+  stroke-width: 2;
+  filter: drop-shadow(0 0 2px var(--canvas));
+  transition:
+    stroke 120ms ease,
+    stroke-width 120ms ease;
+}
+
+.siming-edge:hover .react-flow__edge-path {
+  stroke: var(--text);
+  stroke-width: 2.5;
+}
+
+.siming-edge.selected .react-flow__edge-path {
+  stroke: var(--primary-hover);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 3px var(--canvas));
+}
+
+.siming-edge .react-flow__edge-interaction {
+  stroke-width: 24;
+}
+
 .flow-node {
   position: relative;
   width: 210px;

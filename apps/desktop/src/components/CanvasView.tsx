@@ -3,22 +3,25 @@ import { RichTextView } from "./RichTextView";
 import { plainText } from "../model/richText";
 import {
   Background,
+  type Edge,
   Connection,
+  ConnectionLineType,
   Controls,
   EdgeChange,
   Handle,
+  MarkerType,
   MiniMap,
   type Node as FlowNode,
   type NodeChange,
   NodeProps,
   Position,
   ReactFlow,
-  applyEdgeChanges,
   useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { GitBranch, MessageCircle, Play, Square, Zap } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { RoutedEdge } from "./RoutedEdge";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 import { formatCondition } from "../model/conditions";
@@ -185,6 +188,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
 });
 
 const nodeTypes = { siming: DialogueNodeCard };
+const edgeTypes = { routed: RoutedEdge };
 
 export function CanvasView() {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -196,6 +200,9 @@ export function CanvasView() {
   } | null>(null);
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 });
   const [nodeDragOver, setNodeDragOver] = useState(false);
+  const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const project = useEditorStore((state) => state.project);
   const dialogueId = useEditorStore((state) => state.selectedDialogueId);
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
@@ -206,6 +213,7 @@ export function CanvasView() {
   );
   const addNode = useEditorStore((state) => state.addNode);
   const deleteNodes = useEditorStore((state) => state.deleteNodes);
+  const deleteProjectEdges = useEditorStore((state) => state.deleteEdges);
   const commit = useEditorStore((state) => state.commit);
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
 
@@ -216,6 +224,7 @@ export function CanvasView() {
         type: "siming",
         position: node.position,
         selected: node.id === selectedNodeId,
+        deletable: node.id !== dialogue?.entryNodeId,
         data: {
           node,
           locale,
@@ -290,7 +299,7 @@ export function CanvasView() {
     };
   }, [addNode]);
 
-  const edges = useMemo(
+  const edges = useMemo<Edge[]>(
     () =>
       (dialogue?.edges ?? []).map((edge) => ({
         id: edge.id,
@@ -298,11 +307,23 @@ export function CanvasView() {
         sourceHandle: edge.sourcePort,
         target: edge.targetNodeId,
         targetHandle: edge.targetPort,
+        type: "routed",
+        interactionWidth: 24,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 14,
+          height: 14,
+        },
+        selected: selectedEdgeIds.has(edge.id),
         animated: false,
         className: "siming-edge",
       })),
-    [dialogue],
+    [dialogue, selectedEdgeIds],
   );
+
+  useEffect(() => {
+    setSelectedEdgeIds(new Set());
+  }, [dialogueId]);
 
   if (!dialogue) return <div className="empty-state">请选择对话文件</div>;
 
@@ -329,14 +350,29 @@ export function CanvasView() {
   };
 
   const edgesChange = (changes: EdgeChange[]) => {
-    const next = applyEdgeChanges(changes, edges);
-    const nextIds = new Set(next.map((edge) => edge.id));
-    if (nextIds.size === edges.length) return;
-    commit("删除连线", (draft) => {
-      const target = draft.dialogues.find((item) => item.id === dialogueId);
-      if (target) {
-        target.edges = target.edges.filter((edge) => nextIds.has(edge.id));
-      }
+    const removedIds = changes
+      .filter((change) => change.type === "remove")
+      .map((change) => change.id);
+    if (removedIds.length > 0) {
+      deleteProjectEdges(removedIds);
+      setSelectedEdgeIds(
+        (current) =>
+          new Set([...current].filter((id) => !removedIds.includes(id))),
+      );
+    }
+
+    const selectionChanges = changes.filter(
+      (change) => change.type === "select",
+    );
+    if (selectionChanges.length === 0) return;
+    setSelectedEdgeIds((current) => {
+      const next = new Set(current);
+      selectionChanges.forEach((change) => {
+        if (change.type !== "select") return;
+        if (change.selected) next.add(change.id);
+        else next.delete(change.id);
+      });
+      return next;
     });
   };
 
@@ -362,14 +398,22 @@ export function CanvasView() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onInit={(instance) => {
           flowInstanceRef.current = instance;
         }}
         onNodesChange={nodesChange}
         onConnect={connect}
         onEdgesChange={edgesChange}
-        onNodeClick={(_event, node) => setSelectedNode(node.id)}
-        onPaneClick={() => setSelectedNode(null)}
+        onEdgeClick={() => setSelectedNode(null)}
+        onNodeClick={(_event, node) => {
+          setSelectedEdgeIds(new Set());
+          setSelectedNode(node.id);
+        }}
+        onPaneClick={() => {
+          setSelectedEdgeIds(new Set());
+          setSelectedNode(null);
+        }}
         onMoveEnd={(_event, viewport) => {
           viewportRef.current = viewport;
           const bounds = canvasRef.current?.getBoundingClientRect();
@@ -399,6 +443,8 @@ export function CanvasView() {
         fitView
         minZoom={0.2}
         maxZoom={2}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        elevateEdgesOnSelect
         deleteKeyCode={["Backspace", "Delete"]}
       >
         <Background gap={22} size={1} />
