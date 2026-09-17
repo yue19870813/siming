@@ -1092,6 +1092,23 @@ pub fn simulate_step(request: SimulationRequest) -> Result<SimulationSession, Si
                 .iter()
                 .find(|node| node.id == node_id)
                 .ok_or_else(|| SimulationError::NodeMissing(node_id.clone()))?;
+            let choice = node
+                .data
+                .get("choices")
+                .and_then(Value::as_array)
+                .and_then(|choices| {
+                    choices.iter().find(|choice| {
+                        choice.get("id").and_then(Value::as_str) == Some(option_id.as_str())
+                    })
+                })
+                .ok_or(SimulationError::InvalidAction)?;
+            if let Some(value) = choice.get("visibleWhen") {
+                let expression = serde_json::from_value::<ConditionExpression>(value.clone())
+                    .map_err(|error| SimulationError::InvalidCondition(error.to_string()))?;
+                if !evaluate_condition(&expression, &session.variables)? {
+                    return Err(SimulationError::InvalidAction);
+                }
+            }
             push_log(
                 &mut session,
                 SimulationLogKind::Choice,
@@ -1176,6 +1193,33 @@ fn advance_simulation(
                 session.status = SimulationStatus::WaitingContinue;
             }
             NodeType::Choice => {
+                let choices = node
+                    .data
+                    .get("choices")
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| {
+                        SimulationError::InvalidCondition("选项节点未配置选项".to_owned())
+                    })?;
+                let mut visible_count = 0;
+                for choice in choices {
+                    let visible = match choice.get("visibleWhen") {
+                        Some(value) => {
+                            let expression =
+                                serde_json::from_value::<ConditionExpression>(value.clone())
+                                    .map_err(|error| {
+                                        SimulationError::InvalidCondition(error.to_string())
+                                    })?;
+                            evaluate_condition(&expression, &session.variables)?
+                        }
+                        None => true,
+                    };
+                    visible_count += usize::from(visible);
+                }
+                if visible_count == 0 {
+                    return Err(SimulationError::InvalidCondition(
+                        "当前没有可显示的选项".to_owned(),
+                    ));
+                }
                 session.status = SimulationStatus::WaitingChoice;
             }
             NodeType::Condition => {
@@ -1403,6 +1447,38 @@ fn validate_node_data(
     }
     validate_localized_node_text(node, manifest, file, field_base, diagnostics);
     validate_host_events(node, file, field_base, diagnostics);
+
+    if node.node_type == NodeType::Choice {
+        for (index, choice) in node
+            .data
+            .get("choices")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .enumerate()
+        {
+            if let Some(value) = choice.get("visibleWhen") {
+                match serde_json::from_value::<ConditionExpression>(value.clone()) {
+                    Ok(expression) => validate_condition_expression(
+                        &expression,
+                        variable_by_key,
+                        used_variables,
+                        file,
+                        node,
+                        &format!("{field_base}/data/choices/{index}/visibleWhen"),
+                        diagnostics,
+                    ),
+                    Err(_) => diagnostics.push(node_error(
+                        "CHOICE_VISIBILITY_INVALID",
+                        "选项显示条件结构无效",
+                        file,
+                        node,
+                        format!("{field_base}/data/choices/{index}/visibleWhen"),
+                    )),
+                }
+            }
+        }
+    }
 
     if node.node_type == NodeType::Condition {
         match node
@@ -2393,6 +2469,138 @@ mod tests {
         })
         .unwrap();
         assert_eq!(session.status, SimulationStatus::Completed);
+    }
+
+    #[test]
+    fn choice_unlock_survives_a_branch_and_exports_its_condition() {
+        let (manifest, mut dialogue, resources) = simulation_fixture();
+        let id = |key: &str| {
+            dialogue
+                .nodes
+                .iter()
+                .find(|node| node.key == key)
+                .unwrap()
+                .id
+                .clone()
+        };
+        let choice_id = id("choice");
+        let event_id = id("event");
+        let line_id = id("line");
+        let end_id = id("end");
+        let start_id = id("start");
+        dialogue
+            .nodes
+            .retain(|node| node.node_type != NodeType::Condition);
+        dialogue.nodes.iter_mut().find(|node| node.id == choice_id).unwrap().data.insert("choices".to_owned(), serde_json::json!([
+            {"id":"b","text":{"zh-CN":"B"}},
+            {"id":"d","text":{"zh-CN":"D"},"visibleWhen":{"variable":"favor","operator":">=","value":2}}
+        ]));
+        dialogue.edges = vec![
+            edge(&start_id, "next", &choice_id),
+            edge(&choice_id, "b", &event_id),
+            edge(&choice_id, "d", &end_id),
+            edge(&event_id, "next", &line_id),
+            edge(&line_id, "next", &choice_id),
+        ];
+        let run = |session, action| {
+            simulate_step(SimulationRequest {
+                manifest: manifest.clone(),
+                dialogue: dialogue.clone(),
+                resources: resources.clone(),
+                session,
+                action,
+            })
+        };
+        let initial = run(
+            None,
+            SimulationAction::Start {
+                start_node_id: None,
+                locale: "zh-CN".to_owned(),
+            },
+        )
+        .unwrap();
+        assert!(
+            run(
+                Some(initial.clone()),
+                SimulationAction::Choose {
+                    option_id: "d".to_owned()
+                }
+            )
+            .is_err()
+        );
+        let branch = run(
+            Some(initial),
+            SimulationAction::Choose {
+                option_id: "b".to_owned(),
+            },
+        )
+        .unwrap();
+        assert_eq!(branch.status, SimulationStatus::WaitingContinue);
+        let returned = run(Some(branch), SimulationAction::Continue).unwrap();
+        assert_eq!(returned.current_node_id, Some(choice_id));
+        assert_eq!(
+            run(
+                Some(returned),
+                SimulationAction::Choose {
+                    option_id: "d".to_owned()
+                }
+            )
+            .unwrap()
+            .status,
+            SimulationStatus::Completed
+        );
+        // Exercise the same source decoder used by JSON, XML and binary compilation.
+        let compiled = compile_runtime(&manifest, &[dialogue], &resources).unwrap();
+        let serialized = serde_json::to_string(&compiled).unwrap();
+        assert!(serialized.contains("visibleWhen"));
+        assert!(!serialized.contains("visible_when"));
+    }
+
+    #[test]
+    fn simulation_rejects_a_choice_node_when_every_option_is_hidden() {
+        let (manifest, mut dialogue, resources) = simulation_fixture();
+        let choice = dialogue
+            .nodes
+            .iter_mut()
+            .find(|node| node.node_type == NodeType::Choice)
+            .unwrap();
+        choice
+            .data
+            .get_mut("choices")
+            .and_then(Value::as_array_mut)
+            .unwrap()[0]["visibleWhen"] =
+            serde_json::json!({"variable":"favor","operator":">","value":20});
+        let mut session = simulate_step(SimulationRequest {
+            manifest: manifest.clone(),
+            dialogue: dialogue.clone(),
+            resources: resources.clone(),
+            session: None,
+            action: SimulationAction::Start {
+                start_node_id: None,
+                locale: "zh-CN".to_owned(),
+            },
+        })
+        .unwrap();
+        session = simulate_step(SimulationRequest {
+            manifest: manifest.clone(),
+            dialogue: dialogue.clone(),
+            resources: resources.clone(),
+            session: Some(session),
+            action: SimulationAction::SetVariable {
+                key: "favor".to_owned(),
+                value: serde_json::json!(10),
+            },
+        })
+        .unwrap();
+        let error = simulate_step(SimulationRequest {
+            manifest,
+            dialogue,
+            resources,
+            session: Some(session.clone()),
+            action: SimulationAction::Continue,
+        })
+        .unwrap_err();
+        assert!(error.to_string().contains("当前没有可显示的选项"));
     }
 
     #[test]

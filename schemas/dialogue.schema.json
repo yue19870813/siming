@@ -225,6 +225,20 @@
             "condition": {
               "$ref": "#/$defs/conditionExpression"
             },
+            "choices": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "text"],
+                "properties": {
+                  "id": { "type": "string", "minLength": 1 },
+                  "text": { "$ref": "#/$defs/localizedText" },
+                  "visibleWhen": { "$ref": "#/$defs/conditionExpression" }
+                }
+              }
+            },
             "hostEvents": {
               "type": "array",
               "items": {

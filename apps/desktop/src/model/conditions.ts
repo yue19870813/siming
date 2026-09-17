@@ -29,6 +29,36 @@ export function formatCondition(expression?: ConditionExpression): string {
   return `NOT ${formatCondition(expression.not)}`;
 }
 
+export function evaluateCondition(
+  expression: ConditionExpression,
+  variables: Record<string, boolean | number | string>,
+): boolean {
+  if ("variable" in expression) {
+    const actual = variables[expression.variable];
+    if (actual === undefined || typeof actual !== typeof expression.value)
+      return false;
+    switch (expression.operator) {
+      case "==":
+        return actual === expression.value;
+      case "!=":
+        return actual !== expression.value;
+      case ">":
+        return actual > expression.value;
+      case ">=":
+        return actual >= expression.value;
+      case "<":
+        return actual < expression.value;
+      case "<=":
+        return actual <= expression.value;
+    }
+  }
+  if ("all" in expression)
+    return expression.all.every((item) => evaluateCondition(item, variables));
+  if ("any" in expression)
+    return expression.any.some((item) => evaluateCondition(item, variables));
+  return !evaluateCondition(expression.not, variables);
+}
+
 export function conditionUsesVariable(
   expression: ConditionExpression | undefined,
   key: string,

@@ -994,6 +994,71 @@ mod tests {
     use quick_xml::{Reader, events::Event};
 
     #[test]
+    fn dynamic_choice_condition_survives_every_export_format_and_layout() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/minimal-project");
+        let mut snapshot = open_project(&fixture).unwrap();
+        snapshot.resources.variables.push(
+            serde_json::from_value(serde_json::json!({
+                "id": Uuid::new_v4().to_string(), "key": "unlocked", "type": "boolean",
+                "defaultValue": false, "description": ""
+            }))
+            .unwrap(),
+        );
+        let dialogue = &mut snapshot.dialogues[0];
+        let line_id = dialogue
+            .nodes
+            .iter()
+            .find(|node| node.node_type == siming_core::NodeType::Dialogue)
+            .unwrap()
+            .id
+            .clone();
+        let end_id = dialogue
+            .nodes
+            .iter()
+            .find(|node| node.node_type == siming_core::NodeType::End)
+            .unwrap()
+            .id
+            .clone();
+        let choice_id = Uuid::new_v4().to_string();
+        dialogue
+            .edges
+            .iter_mut()
+            .find(|edge| edge.source_node_id == line_id)
+            .unwrap()
+            .target_node_id = choice_id.clone();
+        dialogue.nodes.push(
+            serde_json::from_value(serde_json::json!({
+                "id": choice_id, "key": "choice", "type": "choice", "position": {"x": 0, "y": 0},
+                "data": {"choices": [{"id":"unlock","text":{"zh-CN":"解锁"},
+                    "visibleWhen":{"variable":"unlocked","operator":"==","value":true}}]}
+            }))
+            .unwrap(),
+        );
+        dialogue.edges.push(
+            serde_json::from_value(serde_json::json!({
+                "id": Uuid::new_v4().to_string(), "sourceNodeId": choice_id, "sourcePort": "unlock",
+                "targetNodeId": end_id, "targetPort": "in"
+            }))
+            .unwrap(),
+        );
+        let root = test_directory("dynamic-choice-export");
+        for format in [ExportFormat::Json, ExportFormat::Xml, ExportFormat::Binary] {
+            for layout in [ExportLayout::Bundled, ExportLayout::DirectoryChunks] {
+                let output = root.join(format!("{format:?}-{layout:?}"));
+                let report =
+                    export_project(&snapshot, Some(&output), format, Some(layout), false).unwrap();
+                assert!(report.files.iter().any(|file| {
+                    fs::read(output.join(&file.path))
+                        .unwrap()
+                        .windows(b"visibleWhen".len())
+                        .any(|window| window == b"visibleWhen")
+                }));
+            }
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn rich_text_v2_exports_all_formats_and_layouts_deterministically() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/minimal-project");
         let mut snapshot = open_project(&fixture).unwrap();

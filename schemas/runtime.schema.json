@@ -4,7 +4,13 @@
   "title": "Siming Runtime Project",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "defaultLocale", "locales", "resources", "dialogues"],
+  "required": [
+    "schemaVersion",
+    "defaultLocale",
+    "locales",
+    "resources",
+    "dialogues"
+  ],
   "properties": {
     "schemaVersion": { "enum": [1, 2] },
     "defaultLocale": { "$ref": "#/$defs/locale" },
@@ -159,7 +165,8 @@
                     "properties": {
                       "id": { "type": "string", "minLength": 1 },
                       "textKey": { "type": "string", "minLength": 1 },
-                      "next": { "$ref": "#/$defs/uuid" }
+                      "next": { "$ref": "#/$defs/uuid" },
+                      "visibleWhen": { "$ref": "#/$defs/condition" }
                     }
                   }
                 }

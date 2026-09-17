@@ -4,6 +4,9 @@ import type { SystemSettings } from "../model/types";
 type InterfaceLocale = SystemSettings["interfaceLocale"];
 
 const english = new Map<string, string>([
+  ["条件显示", "Conditional visibility"],
+  ["设置变量（variable.set）", "Set variable (variable.set)"],
+  ["增加变量（variable.add）", "Add variable (variable.add)"],
   ["正文格式", "Body formatting"],
   ["加粗", "Bold"],
   ["斜体", "Italic"],

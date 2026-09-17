@@ -110,9 +110,22 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
         )}
         {node.type === "choice" &&
           node.data.choices?.map((choice, index) => (
-            <div className="node-option" key={choice.id}>
+            <div
+              className="node-option"
+              key={choice.id}
+              title={
+                choice.visibleWhen
+                  ? formatCondition(choice.visibleWhen)
+                  : undefined
+              }
+            >
               <span>{String.fromCharCode(65 + index)}</span>
               {choice.text[locale] ?? Object.values(choice.text)[0] ?? "空选项"}
+              {choice.visibleWhen && (
+                <small className="choice-condition-badge" aria-label="条件显示">
+                  ◆
+                </small>
+              )}
               <Handle
                 type="source"
                 position={Position.Right}

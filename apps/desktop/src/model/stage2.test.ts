@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   conditionUsesVariable,
+  evaluateCondition,
   formatCondition,
   renameConditionVariable,
 } from "./conditions";
@@ -21,6 +22,21 @@ test("formats and renames variables in recursive conditions", () => {
   expect(conditionUsesVariable(expression, "blocked")).toBe(true);
   renameConditionVariable(expression, "favor", "trust");
   expect(formatCondition(expression)).toContain("trust >= 10");
+});
+
+test("evaluates recursive choice visibility against current variables", () => {
+  const expression: ConditionExpression = {
+    all: [
+      { variable: "visited", operator: "==", value: true },
+      { not: { variable: "blocked", operator: "==", value: true } },
+    ],
+  };
+  expect(
+    evaluateCondition(expression, { visited: false, blocked: false }),
+  ).toBe(false);
+  expect(evaluateCondition(expression, { visited: true, blocked: false })).toBe(
+    true,
+  );
 });
 
 test("translation completion includes node text, choices, and characters", () => {

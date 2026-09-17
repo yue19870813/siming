@@ -644,7 +644,10 @@ function countReferences(
         count += 1;
       if (
         resourceKey === "variables" &&
-        conditionUsesVariable(node.data.condition, key)
+        (conditionUsesVariable(node.data.condition, key) ||
+          node.data.choices?.some((choice) =>
+            conditionUsesVariable(choice.visibleWhen, key),
+          ))
       )
         count += 1;
       if (resourceKey === "events" && node.data.event === key) count += 1;
@@ -672,6 +675,9 @@ function replaceReferences(
       }
       if (resourceKey === "variables") {
         renameConditionVariable(node.data.condition, previousKey, nextKey);
+        node.data.choices?.forEach((choice) =>
+          renameConditionVariable(choice.visibleWhen, previousKey, nextKey),
+        );
       }
       if (resourceKey === "events" && node.data.event === previousKey) {
         node.data.event = nextKey;

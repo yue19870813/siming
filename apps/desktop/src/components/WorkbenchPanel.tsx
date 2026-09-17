@@ -9,6 +9,7 @@ import {
   Terminal,
   X,
 } from "lucide-react";
+import { evaluateCondition } from "../model/conditions";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { simulateStep, validateProject } from "../lib/projectApi";
@@ -314,14 +315,20 @@ function Simulator() {
   const text = node ? localizedNodeText(node, project, session.locale) : null;
   const choices =
     node?.type === "choice"
-      ? (node.data.choices ?? []).map((choice) => ({
-          id: choice.id,
-          text: localizedValue(
-            choice.text,
-            session.locale,
-            project.manifest.defaultLocale,
-          ),
-        }))
+      ? (node.data.choices ?? [])
+          .filter(
+            (choice) =>
+              !choice.visibleWhen ||
+              evaluateCondition(choice.visibleWhen, session.variables),
+          )
+          .map((choice) => ({
+            id: choice.id,
+            text: localizedValue(
+              choice.text,
+              session.locale,
+              project.manifest.defaultLocale,
+            ),
+          }))
       : [];
 
   return (

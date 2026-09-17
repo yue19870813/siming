@@ -175,6 +175,8 @@ pub struct RuntimeChoice {
     pub id: String,
     pub text_key: String,
     pub next: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visible_when: Option<ConditionExpression>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -552,6 +554,7 @@ fn compile_node(
                     next: next(&choice.id)?,
                     id: choice.id,
                     text_key,
+                    visible_when: choice.visible_when,
                 });
             }
             Ok(RuntimeNode::Choice(RuntimeChoiceNode {
@@ -659,9 +662,12 @@ fn invalid_node(node: &Node, message: impl ToString) -> CompileError {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SourceChoice {
     id: String,
     text: LocalizedText,
+    #[serde(default)]
+    visible_when: Option<ConditionExpression>,
 }
 
 #[cfg(test)]

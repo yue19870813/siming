@@ -156,3 +156,44 @@ test("simulator displays complete fallback body with safe combined styles", asyn
   });
   expect(body.querySelector("b")).toBeNull();
 });
+
+test("simulator only presents choices whose conditions currently pass", async () => {
+  const project = createDemoProject();
+  const node = project.dialogues[0].nodes.find(
+    (node) => node.type === "choice",
+  )!;
+  node.data.choices![1].visibleWhen = {
+    variable: "favor",
+    operator: ">=",
+    value: 1,
+  };
+  useEditorStore.getState().setProject(project);
+  api.simulateStep.mockResolvedValue({
+    currentNodeId: node.id,
+    status: "waitingChoice",
+    locale: "zh-CN",
+    variables: { favor: 0 },
+    consecutiveSteps: 0,
+    visitSequence: 1,
+    trace: [],
+  });
+  render(
+    <WorkbenchPanel
+      mode="simulator"
+      height={430}
+      onModeChange={vi.fn()}
+      onClose={vi.fn()}
+      onResizeStart={vi.fn()}
+      onResizeBy={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /开始模拟/ }));
+  expect(
+    await screen.findByRole("button", {
+      name: node.data.choices![0].text["zh-CN"],
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: node.data.choices![1].text["zh-CN"] }),
+  ).not.toBeInTheDocument();
+});

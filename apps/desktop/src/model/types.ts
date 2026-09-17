@@ -12,6 +12,7 @@ export type HostEvent = {
 export type ChoiceOption = {
   id: string;
   text: LocalizedText;
+  visibleWhen?: ConditionExpression;
 };
 
 export type ComparisonOperator = "==" | "!=" | ">" | ">=" | "<" | "<=";

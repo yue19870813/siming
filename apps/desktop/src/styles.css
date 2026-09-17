@@ -2294,6 +2294,23 @@ html.is-dragging-node * {
   display: grid;
   gap: 6px;
 }
+.choice-editor-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.choice-editor-option > .choice-visibility-toggle,
+.choice-editor-option > .condition-expression {
+  grid-column: 2 / -1;
+}
+.choice-visibility-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
 
 .choice-editor > div {
   display: grid;
@@ -3633,4 +3650,15 @@ html[data-theme="light"] .cm-editor {
 }
 .dialogue-rich-input em {
   font-style: italic;
+}
+
+.choice-visibility-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+}
+.choice-condition-badge {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 10px;
 }

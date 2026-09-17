@@ -22,6 +22,7 @@ internal static class Program
             await Test(layout + ": rich text v2", () => RichTextContract(layout));
             await Test(layout + ": behavior contract", () => Behavior(layout));
             await Test(layout + ": state and language", () => StateAndLocale(layout));
+            await Test(layout + ": dynamic choice visibility", () => DynamicChoices(layout));
             await Test(layout + ": variables and invalid actions", () => Variables(layout));
             await Test(layout + ": events, cancellation, reentrancy", () => Events(layout));
             await Test(layout + ": corrupt data", () => Corruption(layout));
@@ -88,6 +89,26 @@ internal static class Program
         Assert(session.Current.Choices.Select(c => c.Id).SequenceEqual(new[] { "accept", "reject" }));
         using var other = project.CreateSession(); await other.RestoreStateAsync(initial);
         Assert(other.Current.VisitSequence == initial.VisitSequence && other.Current.Status == SessionStatus.WaitingDialogue);
+    }
+    private static async Task DynamicChoices(string layout)
+    {
+        var source = new MemorySource(layout);
+        source.Edit(source.StructurePath, structure =>
+        {
+            var node = Nodes(structure).Properties().First(p => p.Value["type"]!.Value<string>() == "choice").Value;
+            var option = ((JArray)node["choices"]!).First(choice => choice["id"]!.Value<string>() == "accept");
+            option["visibleWhen"] = JObject.Parse("{\"variable\":\"accepted\",\"operator\":\"==\",\"value\":true}");
+        });
+        using var project = await Open(source);
+        var variables = new MemoryVariableStore(project.Info.Variables.Values);
+        using var session = project.CreateSession(variables);
+        await session.StartByKeyAsync("sdk_demo"); await session.ContinueAsync();
+        var atChoice = session.CaptureState();
+        Assert(session.Current.Choices.Select(c => c.Id).SequenceEqual(new[] { "reject" }));
+        await Error("ChoiceHidden", () => session.ChooseAsync("accept"));
+        variables.Set("accepted", new VariableValue(true));
+        await session.RestoreStateAsync(atChoice);
+        Assert(session.Current.Choices.Select(c => c.Id).SequenceEqual(new[] { "accept", "reject" }));
     }
     private static async Task Variables(string layout)
     {

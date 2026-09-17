@@ -283,7 +283,8 @@ namespace Siming.Serialization.Json
                     {
                         var choice = Object(token); var choiceId = Text(choice, "id");
                         if (!unique.Add(choiceId)) throw Invalid("DuplicateChoice", choiceId);
-                        choices.Add(new Choice(choiceId, Text(choice, "textKey"), Text(choice, "next")));
+                        choices.Add(new Choice(choiceId, Text(choice, "textKey"), Text(choice, "next"),
+                            choice["visibleWhen"] == null ? null : ParseCondition(Obj(choice, "visibleWhen"))));
                     }
                     if (choices.Count == 0) throw Invalid("InvalidChoice", p.Name);
                 }

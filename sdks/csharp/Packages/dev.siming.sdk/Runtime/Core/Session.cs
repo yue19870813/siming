@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -170,6 +171,7 @@ namespace Siming
             CheckIdle(); Require(status == SessionStatus.WaitingChoice);
             Choice? selected = null; foreach (var choice in Node!.Choices) if (choice.Id == choiceId) selected = choice;
             if (selected == null) throw new SimingException("UnknownChoice", choiceId);
+            if (selected.VisibleWhen != null && !selected.VisibleWhen.Evaluate(Variables)) throw new SimingException("ChoiceHidden", choiceId);
             var target = selected.Next;
             return Run(async token => { nodeId = target; await Pump(token); }, cancellationToken);
         }
@@ -216,6 +218,8 @@ namespace Siming
                     if (!next.Dialogue.Nodes.TryGetValue(state.NodeId, out var node) || (node.Type != NodeType.Dialogue && node.Type != NodeType.Choice) ||
                         state.RemainingDelayMs > (node.AutoDelayMs ?? 0))
                         throw new SimingException("InvalidPlaybackState", "State is not a valid waiting point.");
+                    if (node.Type == NodeType.Choice && !node.Choices.Any(choice => choice.VisibleWhen == null || choice.VisibleWhen.Evaluate(Variables)))
+                        throw new SimingException("NoVisibleChoices", node.Key);
                     loaded?.Dispose(); loaded = next; next = null!;
                     nodeId = state.NodeId; locale = state.Locale; visit = state.VisitSequence; remaining = state.RemainingDelayMs; error = null;
                     status = node.Type == NodeType.Dialogue ? SessionStatus.WaitingDialogue : SessionStatus.WaitingChoice; Publish();
@@ -241,7 +245,10 @@ namespace Siming
                 {
                     case NodeType.Start: nodeId = node.Next; break;
                     case NodeType.Dialogue: remaining = node.AutoDelayMs ?? 0; status = SessionStatus.WaitingDialogue; Publish(); return;
-                    case NodeType.Choice: status = SessionStatus.WaitingChoice; Publish(); return;
+                    case NodeType.Choice:
+                        if (!node.Choices.Any(choice => choice.VisibleWhen == null || choice.VisibleWhen.Evaluate(Variables)))
+                            throw new SimingException("NoVisibleChoices", node.Key);
+                        status = SessionStatus.WaitingChoice; Publish(); return;
                     case NodeType.Condition: nodeId = node.Condition!.Evaluate(Variables) ? node.TrueTarget : node.FalseTarget; break;
                     case NodeType.Event:
                         status = SessionStatus.WaitingEvent; Publish(); token.ThrowIfCancellationRequested();
@@ -271,7 +278,9 @@ namespace Siming
             {
                 if (node.SpeakerId != null) speaker = loaded.Texts[project.Info.CharacterNameKeys[node.SpeakerId]];
                 if (node.TextKey != null) text = loaded.Texts[node.TextKey];
-                foreach (var c in node.Choices) choices.Add(new DisplayChoice(c.Id, loaded.Texts[c.TextKey]));
+                foreach (var c in node.Choices)
+                    if (c.VisibleWhen == null || c.VisibleWhen.Evaluate(Variables))
+                        choices.Add(new DisplayChoice(c.Id, loaded.Texts[c.TextKey]));
             }
             return new SessionSnapshot(status, loaded?.Dialogue.Id, nodeId, node, visit, locale, speaker, text, choices, remaining, error, node?.TextKey != null && loaded != null ? loaded.RichTexts[node.TextKey] : null);
         }

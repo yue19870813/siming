@@ -149,3 +149,8 @@ models. Names and choices remain plain strings. `TextMeshProFormatter.Format`
 converts the body to escaped TMP markup without Unity dependencies. Enable TMP
 rich text and configure font assets with the required glyphs, bold and italic
 faces. See [the v2 format and UE integration guide](../../docs/运行时格式.md).
+
+Choice entries may include `visibleWhen`. The session evaluates it against the
+current `IVariableStore` whenever the choice node is entered, exposes only
+visible choices, and rejects hidden choice IDs. Persist unlock variables through
+the host save system with `CaptureValues()` and `RestoreValues()`.

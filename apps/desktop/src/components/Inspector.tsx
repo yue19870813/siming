@@ -322,6 +322,8 @@ function NodeInspector({
                 }
               >
                 <option value="">选择事件</option>
+                <option value="variable.set">设置变量（variable.set）</option>
+                <option value="variable.add">增加变量（variable.add）</option>
                 {project.resources.events.map((event) => (
                   <option key={event.id} value={event.key}>
                     {event.name[locale] ??
@@ -331,26 +333,85 @@ function NodeInspector({
                 ))}
               </select>
             </Field>
-            <Field label="JSON 参数">
-              <textarea
-                rows={4}
-                value={JSON.stringify(node.data.params ?? {}, null, 2)}
-                onChange={(event) => {
-                  try {
-                    const params = JSON.parse(event.target.value);
-                    update((draft) => {
-                      draft.data.params = params;
-                    });
-                  } catch {
-                    // Keep the last valid object. The source editor exposes diagnostics.
-                  }
-                }}
-              />
-            </Field>
+            {node.data.event === "variable.set" ||
+            node.data.event === "variable.add" ? (
+              <>
+                <Field label="变量">
+                  <select
+                    value={String(node.data.params?.key ?? "")}
+                    onChange={(event) =>
+                      update((draft) => {
+                        const variable = project.resources.variables.find(
+                          (item) => item.key === event.target.value,
+                        );
+                        draft.data.params = {
+                          key: event.target.value,
+                          value:
+                            draft.data.event === "variable.add"
+                              ? 1
+                              : (variable?.defaultValue ?? true),
+                        };
+                      })
+                    }
+                  >
+                    <option value="">选择变量</option>
+                    {project.resources.variables
+                      .filter(
+                        (variable) =>
+                          node.data.event !== "variable.add" ||
+                          variable.type === "number",
+                      )
+                      .map((variable) => (
+                        <option key={variable.id} value={variable.key}>
+                          {variable.key}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                <Field label="值">
+                  <ConditionValueEditor
+                    variable={project.resources.variables.find(
+                      (item) => item.key === node.data.params?.key,
+                    )}
+                    value={
+                      (node.data.params?.value ?? true) as
+                        boolean | number | string
+                    }
+                    onChange={(value) =>
+                      update((draft) => {
+                        draft.data.params = { ...draft.data.params, value };
+                      })
+                    }
+                  />
+                </Field>
+              </>
+            ) : (
+              <Field label="JSON 参数">
+                <textarea
+                  rows={4}
+                  value={JSON.stringify(node.data.params ?? {}, null, 2)}
+                  onChange={(event) => {
+                    try {
+                      const params = JSON.parse(event.target.value);
+                      update((draft) => {
+                        draft.data.params = params;
+                      });
+                    } catch {
+                      // Keep the last valid object. The source editor exposes diagnostics.
+                    }
+                  }}
+                />
+              </Field>
+            )}
           </>
         )}
         {node.type === "choice" && (
-          <ChoiceEditor node={node} locale={locale} update={update} />
+          <ChoiceEditor
+            node={node}
+            locale={locale}
+            variables={project.resources.variables}
+            update={update}
+          />
         )}
       </Section>
       <HostEventsEditor events={node.data.hostEvents ?? []} update={update} />
@@ -565,10 +626,12 @@ function ConditionValueEditor({
 function ChoiceEditor({
   node,
   locale,
+  variables,
   update,
 }: {
   node: DialogueNode;
   locale: string;
+  variables: VariableDefinition[];
   update: (
     recipe: (draft: DialogueNode, dialogue: DialogueDocument) => void,
     label?: string,
@@ -577,7 +640,7 @@ function ChoiceEditor({
   return (
     <div className="choice-editor">
       {(node.data.choices ?? []).map((choice, index) => (
-        <div key={choice.id}>
+        <div key={choice.id} className="choice-editor-option">
           <span>{String.fromCharCode(65 + index)}</span>
           <input
             value={choice.text[locale] ?? ""}
@@ -608,6 +671,38 @@ function ChoiceEditor({
           >
             <Trash2 size={13} />
           </button>
+          <label className="choice-visibility-toggle">
+            <input
+              type="checkbox"
+              checked={Boolean(choice.visibleWhen)}
+              onChange={(event) =>
+                update((draft) => {
+                  const target = draft.data.choices?.find(
+                    (item) => item.id === choice.id,
+                  );
+                  if (!target) return;
+                  target.visibleWhen = event.target.checked
+                    ? createConditionLeaf(variables[0])
+                    : undefined;
+                }, "修改选项显示条件")
+              }
+            />
+            条件显示
+          </label>
+          {choice.visibleWhen && (
+            <ConditionEditor
+              expression={choice.visibleWhen}
+              variables={variables}
+              onChange={(expression) =>
+                update((draft) => {
+                  const target = draft.data.choices?.find(
+                    (item) => item.id === choice.id,
+                  );
+                  if (target) target.visibleWhen = expression;
+                }, "修改选项显示条件")
+              }
+            />
+          )}
         </div>
       ))}
       <button

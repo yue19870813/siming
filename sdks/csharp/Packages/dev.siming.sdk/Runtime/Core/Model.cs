@@ -55,7 +55,8 @@ namespace Siming
         public string Id { get; }
         public string TextKey { get; }
         public string Next { get; }
-        public Choice(string id, string textKey, string next) { Id = id; TextKey = textKey; Next = next; }
+        public Condition? VisibleWhen { get; }
+        public Choice(string id, string textKey, string next, Condition? visibleWhen = null) { Id = id; TextKey = textKey; Next = next; VisibleWhen = visibleWhen; }
     }
     public sealed class RuntimeNode
     {
