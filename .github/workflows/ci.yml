@@ -96,7 +96,13 @@ jobs:
             wget
       - run: npm ci
         working-directory: apps/desktop
-      - run: npm run tauri -- build
+      - name: Build Windows installers with verbose logging
+        if: runner.os == 'Windows'
+        run: npm run tauri -- build --verbose
+        working-directory: apps/desktop
+      - name: Build desktop installers
+        if: runner.os != 'Windows'
+        run: npm run tauri -- build
         working-directory: apps/desktop
       - run: cargo build --release -p siming-cli
       - run: cargo run -p siming-cli -- validate fixtures/minimal-project

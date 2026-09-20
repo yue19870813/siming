@@ -77,7 +77,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
         working-directory: apps/desktop
-      - run: npm run format:check && npm run lint && npm run typecheck && npm test && npm run tauri -- build
+      - run: npm run format:check && npm run lint && npm run typecheck && npm test
+        working-directory: apps/desktop
+      - name: Build Windows installers with verbose logging
+        if: runner.os == 'Windows'
+        run: npm run tauri -- build --verbose
+        working-directory: apps/desktop
+      - name: Build desktop installers
+        if: runner.os != 'Windows'
+        run: npm run tauri -- build
         working-directory: apps/desktop
       - uses: actions/upload-artifact@v4
         with:
