@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory(prefix='siming-sdk-') as temp:
     scenarios = []
     for choice in ['accept', 'reject']:
         request = {'request': {'manifest': manifest, 'dialogue': source, 'resources': resources, 'action': {'type':'start','locale':'en-US'}}, 'choice': choice}
-        reference = subprocess.run(['cargo','run','--quiet','--locked','--manifest-path',str(sdk / 'tests/RustReference/Cargo.toml'),'--target-dir',str(root / 'target')], input=json.dumps(request), text=True, capture_output=True, cwd=root, check=True)
+        reference = subprocess.run(['cargo','run','--quiet','--locked','--manifest-path',str(sdk / 'tests/RustReference/Cargo.toml'),'--target-dir',str(root / 'target')], input=json.dumps(request), text=True, stdout=subprocess.PIPE, cwd=root, check=True)
         scenarios.append(json.loads(reference.stdout))
     write(out / 'behavior.json', {'contractVersion':1,'dialogueKey':'sdk_demo','locale':'en-US','scenarios':scenarios})
 # Importable Unity sample data, always identical to the Rust-generated chunked export.

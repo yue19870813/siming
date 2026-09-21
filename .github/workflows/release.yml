@@ -20,6 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
+      - name: Test release preparation
+        run: python3 -B -m unittest discover -s scripts -p test_release.py -v
       - id: version
         env:
           VERSION: ${{ inputs.version }}
@@ -34,11 +36,15 @@ jobs:
         run: python3 scripts/release.py --version "$VERSION"
       - id: commit
         run: |
-          git add Cargo.toml apps/desktop/src-tauri/tauri.conf.json sdks/csharp/Directory.Build.props sdks/csharp/Packages/dev.siming.sdk/package.json
+          git add Cargo.toml Cargo.lock sdks/csharp/tests/RustReference/Cargo.lock apps/desktop/src-tauri/tauri.conf.json sdks/csharp/Directory.Build.props sdks/csharp/Packages/dev.siming.sdk/package.json
           git config user.name github-actions
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git commit -m "chore(release): prepare v${{ inputs.version }}"
-          git push origin HEAD:${{ github.ref_name }}
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): prepare v${{ inputs.version }}"
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "Version already prepared; reuse current commit."
+          fi
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
   sdk:
     needs: prepare
@@ -50,7 +56,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '8.0.x' }
       - uses: dtolnay/rust-toolchain@stable
-      - run: python3 sdks/csharp/scripts/generate-contracts.py && dotnet run --project sdks/csharp/tests/Siming.Tests -c Release && python3 sdks/csharp/scripts/package.py --version "${{ needs.prepare.outputs.version }}"
+      - name: Generate SDK contracts
+        run: python3 sdks/csharp/scripts/generate-contracts.py
+      - name: Test C# SDK
+        run: dotnet run --project sdks/csharp/tests/Siming.Tests -c Release
+      - name: Package SDK
+        run: python3 sdks/csharp/scripts/package.py --version "${{ needs.prepare.outputs.version }}"
       - uses: actions/upload-artifact@v4
         with:
           name: sdk
@@ -80,7 +91,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
         working-directory: apps/desktop
-      - run: npm run format:check && npm run lint && npm run typecheck && npm test
+      - name: Check formatting
+        run: npm run format:check
+        working-directory: apps/desktop
+      - name: Lint frontend
+        run: npm run lint
+        working-directory: apps/desktop
+      - name: Check frontend types
+        run: npm run typecheck
+        working-directory: apps/desktop
+      - name: Test frontend
+        run: npm test
         working-directory: apps/desktop
       - name: Build Windows installers with verbose logging
         if: runner.os == 'Windows'

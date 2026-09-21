@@ -17,12 +17,32 @@ def dirty() -> bool:
     return bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip())
 
 def replacements(version: str) -> dict[str, str]:
-    return {
+    updates = {
       "Cargo.toml": re.sub(r'(?m)^(version\s*=\s*)"[^"]+"', rf'\1"{version}"', (ROOT/"Cargo.toml").read_text(), count=1),
       "apps/desktop/src-tauri/tauri.conf.json": json.dumps({**json.loads((ROOT/"apps/desktop/src-tauri/tauri.conf.json").read_text()), "version": version}, indent=2)+"\n",
       "sdks/csharp/Directory.Build.props": re.sub(r'(<Version>)[^<]+(</Version>)', rf'\g<1>{version}\g<2>', (ROOT/"sdks/csharp/Directory.Build.props").read_text(), count=1),
       "sdks/csharp/Packages/dev.siming.sdk/package.json": json.dumps({**json.loads((ROOT/"sdks/csharp/Packages/dev.siming.sdk/package.json").read_text()), "version": version}, indent=2)+"\n",
     }
+
+
+    # Only update local workspace packages, retaining every registry dependency pin.
+    packages = {
+        "Cargo.lock": {"siming-cli", "siming-core", "siming-desktop", "siming-storage"},
+        "sdks/csharp/tests/RustReference/Cargo.lock": {"siming-core"},
+    }
+    for path, names in packages.items():
+        blocks = (ROOT / path).read_text().split("[[package]]")
+        found = set()
+        for index, block in enumerate(blocks[1:], 1):
+            match = re.search(r'^name = "([^"]+)"$', block, re.MULTILINE)
+            if match and match[1] in names and not re.search(r'^source = ', block, re.MULTILINE):
+                blocks[index], count = re.subn(r'^version = "[^"]+"$', f'version = "{version}"', block, count=1, flags=re.MULTILINE)
+                if count != 1: raise SystemExit(f"Missing package version in {path}: {match[1]}")
+                found.add(match[1])
+        if found != names: raise SystemExit(f"Missing workspace packages in {path}: {names - found}")
+        updates[path] = "[[package]]".join(blocks)
+    return updates
+
 
 def main() -> None:
     p=argparse.ArgumentParser(); p.add_argument("--version", required=True); p.add_argument("--check", action="store_true"); a=p.parse_args(); version=clean(a.version); tag="v"+version
