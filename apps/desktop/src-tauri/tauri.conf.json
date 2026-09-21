@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "司命（Siming）",
-  "version": "0.1.0",
+  "productName": "\u53f8\u547d\uff08Siming\uff09",
+  "version": "0.1.1",
   "identifier": "dev.siming.editor",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "司命（Siming）",
+        "title": "\u53f8\u547d\uff08Siming\uff09",
         "width": 1920,
         "height": 1080,
         "minWidth": 960,
@@ -40,6 +40,6 @@
       "icons/icon.ico"
     ],
     "category": "DeveloperTool",
-    "shortDescription": "剧情对话编辑器"
+    "shortDescription": "\u5267\u60c5\u5bf9\u8bdd\u7f16\u8f91\u5668"
   }
 }

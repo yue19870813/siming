@@ -1,6 +1,6 @@
 {
   "name": "dev.siming.sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "displayName": "Siming SDK",
   "description": "Engine-independent dialogue runtime and Unity 6 integration.",
   "unity": "6000.0",
