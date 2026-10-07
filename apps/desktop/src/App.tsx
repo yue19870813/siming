@@ -390,7 +390,8 @@ export default function App() {
     }
     try {
       setBusy(true);
-      await saveProject(project);
+      const savedFingerprint = await saveProject(project);
+      setProject({ ...project, savedFingerprint }, false);
       markSaved();
       try {
         await clearRecoverySnapshot(project.manifest.projectId);
@@ -398,7 +399,11 @@ export default function App() {
         setNotice(`项目已保存，但恢复快照清理失败：${errorMessage(error)}`);
       }
     } catch (error) {
-      setNotice(`保存失败：${errorMessage(error)}`);
+      setNotice(
+        errorCode(error) === "PROJECT_EXTERNAL_CHANGE"
+          ? "保存冲突：项目文件已在外部修改。请重新打开项目或先另存当前版本。"
+          : `保存失败：${errorMessage(error)}`,
+      );
     } finally {
       setBusy(false);
     }
@@ -723,6 +728,13 @@ function errorMessage(error: unknown) {
     return String(error.message);
   }
   return "发生未知错误";
+}
+
+function errorCode(error: unknown) {
+  if (error && typeof error === "object" && "code" in error) {
+    return String(error.code);
+  }
+  return "";
 }
 
 function isAbsolutePath(value: string) {

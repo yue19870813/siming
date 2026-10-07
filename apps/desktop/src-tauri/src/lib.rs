@@ -23,6 +23,13 @@ impl CommandError {
 
 impl From<siming_storage::StorageError> for CommandError {
     fn from(error: siming_storage::StorageError) -> Self {
+        if let siming_storage::StorageError::ExternalChange { .. } = &error {
+            return Self::new(
+                "PROJECT_EXTERNAL_CHANGE",
+                "项目文件已在外部修改。请重新打开项目或先另存当前版本。",
+                true,
+            );
+        }
         Self::new("PROJECT_STORAGE_ERROR", error, true)
     }
 }
@@ -140,8 +147,8 @@ fn open_project(root_path: String) -> Result<ProjectSnapshot, CommandError> {
 }
 
 #[tauri::command]
-fn save_project(snapshot: ProjectSnapshot) -> Result<(), CommandError> {
-    Ok(siming_storage::save_project(&snapshot)?)
+fn save_project(snapshot: ProjectSnapshot) -> Result<String, CommandError> {
+    Ok(siming_storage::save_project_checked(&snapshot)?)
 }
 
 #[tauri::command]

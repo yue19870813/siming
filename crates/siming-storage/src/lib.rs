@@ -1,6 +1,7 @@
 //! Filesystem boundary helpers shared by the desktop application and CLI.
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use sha2::{Digest, Sha256};
 use siming_core::{
     DialogueDocument, DialogueIndexEntry, Edge, ExportFormat, ExportLayout, Node, NodeType,
     Position, ProjectManifest, ProjectPaths, ProjectResources, validate_editable_project,
@@ -39,6 +40,8 @@ pub struct ProjectSnapshot {
     pub manifest: ProjectManifest,
     pub dialogues: Vec<DialogueDocument>,
     pub resources: ProjectResources,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saved_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -55,6 +58,8 @@ pub enum StorageError {
     ProjectNotFound(String),
     #[error("project contains invalid editable data: {0}")]
     InvalidProject(String),
+    #[error("project changed outside Siming since it was opened")]
+    ExternalChange { expected: String, actual: String },
     #[error("filesystem operation failed: {0}")]
     Io(#[from] std::io::Error),
     #[error("project JSON is invalid: {0}")]
@@ -186,13 +191,17 @@ pub fn create_project(
         manifest,
         dialogues: vec![dialogue],
         resources: ProjectResources::default(),
+        saved_fingerprint: None,
     };
     save_project(&snapshot)?;
+    let mut snapshot = snapshot;
+    snapshot.saved_fingerprint = Some(project_fingerprint(&root, &snapshot.manifest)?);
     Ok(snapshot)
 }
 
 pub fn open_project(root: &Path) -> StorageResult<ProjectSnapshot> {
     let root = project_root(root)?;
+    recover_pending_transactions(&root)?;
     let manifest_path = root.join(PROJECT_FILE);
     if !manifest_path.exists() {
         return Err(StorageError::ProjectNotFound(
@@ -227,11 +236,13 @@ pub fn open_project(root: &Path) -> StorageResult<ProjectSnapshot> {
         tags: read_definition(&root.join("definitions/tags.json"), "tags")?,
     };
 
+    let fingerprint = project_fingerprint(&root, &manifest)?;
     Ok(ProjectSnapshot {
         root_path: root.display().to_string(),
         manifest,
         dialogues,
         resources,
+        saved_fingerprint: Some(fingerprint),
     })
 }
 
@@ -295,7 +306,23 @@ pub fn read_project_asset(root: &Path, relative: &str) -> StorageResult<Vec<u8>>
 }
 
 pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
+    save_project_checked(snapshot).map(|_| ())
+}
+
+pub fn save_project_checked(snapshot: &ProjectSnapshot) -> StorageResult<String> {
     let root = absolute_path(Path::new(&snapshot.root_path))?;
+    recover_pending_transactions(&root)?;
+    if let Some(expected) = &snapshot.saved_fingerprint {
+        let manifest_path = root.join(PROJECT_FILE);
+        let manifest = read_json::<ProjectManifest>(&manifest_path)?;
+        let actual = project_fingerprint(&root, &manifest)?;
+        if &actual != expected {
+            return Err(StorageError::ExternalChange {
+                expected: expected.clone(),
+                actual,
+            });
+        }
+    }
     let manifest_path = root.join(PROJECT_FILE);
     let old = if manifest_path.exists() {
         Some(read_json::<ProjectManifest>(&manifest_path)?)
@@ -332,7 +359,8 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
         }
     }
     if !upgrading {
-        return save_project_inner(snapshot);
+        save_project_inner(snapshot)?;
+        return project_fingerprint(&root, &snapshot.manifest);
     }
     // Snapshot every affected file before the first v2 write. Originals remain recoverable
     // even if a later definition or manifest write fails.
@@ -374,7 +402,7 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
         originals.push((path, bytes));
     }
     match save_project_inner(snapshot) {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok(project_fingerprint(&root, &snapshot.manifest)?),
         Err(error) => {
             for (path, bytes) in originals {
                 if let Some(bytes) = bytes {
@@ -389,6 +417,21 @@ pub fn save_project(snapshot: &ProjectSnapshot) -> StorageResult<()> {
 }
 
 fn save_project_inner(snapshot: &ProjectSnapshot) -> StorageResult<()> {
+    let root = absolute_path(Path::new(&snapshot.root_path))?;
+    let transaction = begin_transaction(&root, snapshot)?;
+    match save_project_inner_untransactional(snapshot) {
+        Ok(()) => {
+            finish_transaction(&transaction)?;
+            Ok(())
+        }
+        Err(error) => {
+            let _ = rollback_transaction(&transaction);
+            Err(error)
+        }
+    }
+}
+
+fn save_project_inner_untransactional(snapshot: &ProjectSnapshot) -> StorageResult<()> {
     let root = absolute_path(Path::new(&snapshot.root_path))?;
     let diagnostics = validate_editable_project(&snapshot.manifest, &snapshot.dialogues);
     if let Some(diagnostic) = diagnostics.first() {
@@ -529,6 +572,137 @@ fn save_project_inner(snapshot: &ProjectSnapshot) -> StorageResult<()> {
     }
 
     Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TransactionJournal {
+    files: Vec<TransactionFile>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TransactionFile {
+    relative: String,
+    existed: bool,
+}
+
+fn transaction_root(root: &Path) -> PathBuf {
+    root.join(".siming/transactions")
+}
+
+fn begin_transaction(root: &Path, snapshot: &ProjectSnapshot) -> StorageResult<PathBuf> {
+    let old_manifest = root.join(PROJECT_FILE);
+    let old_manifest = if old_manifest.is_file() {
+        Some(read_json::<ProjectManifest>(&old_manifest)?)
+    } else {
+        None
+    };
+    let mut paths = BTreeSet::from([
+        PROJECT_FILE.to_owned(),
+        "definitions/characters.json".to_owned(),
+        "definitions/variables.json".to_owned(),
+        "definitions/events.json".to_owned(),
+        "definitions/tags.json".to_owned(),
+    ]);
+    for entry in &snapshot.manifest.dialogues {
+        paths.insert(entry.path.clone());
+    }
+    if let Some(manifest) = old_manifest {
+        for entry in &manifest.dialogues {
+            paths.insert(entry.path.clone());
+        }
+        paths.insert(project_marker_file_name(&manifest));
+    }
+    paths.insert(project_marker_file_name(&snapshot.manifest));
+
+    let dir = transaction_root(root).join(Uuid::new_v4().to_string());
+    let backup = dir.join("backup");
+    fs::create_dir_all(&backup)?;
+    let mut files = Vec::new();
+    for relative in paths {
+        let path = resolve_project_path(root, &relative)?;
+        let existed = path.is_file();
+        if existed {
+            let destination = backup.join(&relative);
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(&path, destination)?;
+        }
+        files.push(TransactionFile { relative, existed });
+    }
+    write_json_atomic(&dir.join("journal.json"), &TransactionJournal { files })?;
+    Ok(dir)
+}
+
+fn rollback_transaction(dir: &Path) -> StorageResult<()> {
+    let journal: TransactionJournal = read_json(&dir.join("journal.json"))?;
+    for file in journal.files {
+        let target = resolve_project_path(
+            dir.parent()
+                .and_then(Path::parent)
+                .and_then(Path::parent)
+                .unwrap_or(dir),
+            &file.relative,
+        )?;
+        let backup = dir.join("backup").join(&file.relative);
+        if file.existed {
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(backup, target)?;
+        } else if target.is_file() {
+            fs::remove_file(target)?;
+        }
+    }
+    fs::remove_dir_all(dir)?;
+    Ok(())
+}
+
+fn finish_transaction(dir: &Path) -> StorageResult<()> {
+    fs::remove_dir_all(dir)?;
+    Ok(())
+}
+
+fn recover_pending_transactions(root: &Path) -> StorageResult<()> {
+    let transactions = transaction_root(root);
+    if !transactions.is_dir() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(&transactions)? {
+        let path = entry?.path();
+        if path.is_dir() && path.join("journal.json").is_file() {
+            rollback_transaction(&path)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn project_fingerprint(root: &Path, manifest: &ProjectManifest) -> StorageResult<String> {
+    let root = absolute_path(root)?;
+    let mut paths = BTreeSet::from([
+        PROJECT_FILE.to_owned(),
+        "definitions/characters.json".to_owned(),
+        "definitions/variables.json".to_owned(),
+        "definitions/events.json".to_owned(),
+        "definitions/tags.json".to_owned(),
+    ]);
+    for entry in &manifest.dialogues {
+        paths.insert(entry.path.clone());
+    }
+    paths.insert(project_marker_file_name(manifest));
+    let mut hasher = Sha256::new();
+    for relative in paths {
+        hasher.update(relative.as_bytes());
+        let path = resolve_project_path(&root, &relative)?;
+        if path.is_file() {
+            hasher.update(fs::read(path)?);
+        } else {
+            hasher.update([0]);
+        }
+    }
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn project_root(path: &Path) -> StorageResult<PathBuf> {
@@ -827,6 +1001,50 @@ mod tests {
         assert!(relative.starts_with("assets/characters/"));
         assert_eq!(read_project_asset(&root, &relative).unwrap(), b"fake-png");
         fs::remove_file(source).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn save_rejects_external_changes_using_open_baseline() {
+        let root = std::env::temp_dir().join(format!("siming-conflict-{}", Uuid::new_v4()));
+        create_project(&root, "Conflict", "zh-CN").unwrap();
+        let mut opened = open_project(&root).unwrap();
+        fs::write(
+            root.join("definitions/variables.json"),
+            b"{\"schemaVersion\":1,\"variables\":[]}",
+        )
+        .unwrap();
+        opened.manifest.name = "edited in Siming".to_owned();
+        let error = save_project_checked(&opened).unwrap_err();
+        assert!(matches!(error, StorageError::ExternalChange { .. }));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn opening_project_rolls_back_an_interrupted_transaction() {
+        let root = std::env::temp_dir().join(format!("siming-recovery-{}", Uuid::new_v4()));
+        let snapshot = create_project(&root, "Recovery", "zh-CN").unwrap();
+        let transaction = transaction_root(&root).join("interrupted");
+        fs::create_dir_all(transaction.join("backup/dialogues")).unwrap();
+        let original = fs::read(root.join("dialogues/intro.json")).unwrap();
+        fs::write(transaction.join("backup/dialogues/intro.json"), &original).unwrap();
+        fs::write(root.join("dialogues/intro.json"), b"broken").unwrap();
+        write_json_atomic(
+            &transaction.join("journal.json"),
+            &TransactionJournal {
+                files: vec![TransactionFile {
+                    relative: "dialogues/intro.json".to_owned(),
+                    existed: true,
+                }],
+            },
+        )
+        .unwrap();
+        let reopened = open_project(&root).unwrap();
+        assert_eq!(
+            reopened.saved_fingerprint,
+            Some(project_fingerprint(&root, &snapshot.manifest).unwrap())
+        );
+        assert!(!transaction.exists());
         fs::remove_dir_all(root).unwrap();
     }
 }

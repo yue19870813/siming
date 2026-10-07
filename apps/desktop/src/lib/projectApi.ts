@@ -44,7 +44,7 @@ export async function openProject(rootPath: string) {
 }
 
 export async function saveProject(snapshot: ProjectSnapshot) {
-  return invoke<void>("save_project", { snapshot });
+  return invoke<string>("save_project", { snapshot });
 }
 
 export async function chooseCharacterAvatarFile() {

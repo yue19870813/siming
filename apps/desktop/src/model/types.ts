@@ -124,6 +124,7 @@ export type TagDefinition = {
 
 export type ProjectSnapshot = {
   rootPath: string;
+  savedFingerprint?: string;
   manifest: {
     schemaVersion: number;
     projectId: string;
