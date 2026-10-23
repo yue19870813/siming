@@ -1,0 +1,36 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+      - ignore-release-notes
+    authors:
+      - dependabot
+      - dependabot[bot]
+  categories:
+    - title: "🚀 新功能"
+      labels:
+        - feature
+        - enhancement
+    - title: "🐛 修复"
+      labels:
+        - bug
+        - fix
+    - title: "⚡ 性能与体验"
+      labels:
+        - performance
+        - ux
+    - title: "♻️ 重构与工程"
+      labels:
+        - refactor
+        - chore
+        - ci
+    - title: "📚 文档"
+      labels:
+        - documentation
+        - docs
+    - title: "📦 依赖更新"
+      labels:
+        - dependencies
+    - title: "其他变更"
+      labels:
+        - "*"
