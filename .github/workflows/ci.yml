@@ -104,6 +104,9 @@ jobs:
         if: runner.os != 'Windows'
         run: npm run tauri -- build
         working-directory: apps/desktop
+      - name: Verify macOS app signatures inside installers
+        if: runner.os == 'macOS'
+        run: python3 scripts/verify-macos-bundle.py target/release/bundle
       - run: cargo build --release -p siming-cli
       - run: cargo run -p siming-cli -- validate fixtures/minimal-project
       - name: Upload desktop installers
