@@ -3730,3 +3730,27 @@ html[data-theme="light"] .cm-editor {
   color: var(--muted);
   font-size: 10px;
 }
+
+.update-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+}
+.update-control [role="status"] {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+.update-notes {
+  max-height: 40vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+.update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

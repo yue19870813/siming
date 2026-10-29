@@ -6,9 +6,9 @@ from pathlib import Path
 
 
 GROUPS = {
-    "desktop-windows-x64": {".msi", ".exe"},
-    "desktop-macos-arm64": {".dmg"},
-    "desktop-macos-x64": {".dmg"},
+    "desktop-windows-x64": {".msi", ".exe", ".sig"},
+    "desktop-macos-arm64": {".dmg", ".gz", ".sig"},
+    "desktop-macos-x64": {".dmg", ".gz", ".sig"},
     "sdk": {".tgz", ".nupkg"},
 }
 
@@ -26,6 +26,10 @@ def collect(source: Path, destination: Path) -> list[Path]:
         )
         if not files:
             raise ValueError(f"Missing release assets: {group}")
+        if group.startswith("desktop-macos") and not any(p.suffix == ".dmg" for p in files):
+            raise ValueError(f"Missing DMG installer: {group}")
+        if group == "desktop-windows-x64" and not any(p.suffix in {".exe", ".msi"} for p in files):
+            raise ValueError(f"Missing Windows installer: {group}")
         if group == "sdk":
             if sum(p.suffix == ".tgz" for p in files) != 1 or sum(p.suffix == ".nupkg" for p in files) != 2:
                 raise ValueError("SDK must contain one UPM tarball and two NuGet packages")

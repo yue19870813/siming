@@ -6,9 +6,15 @@
   "permissions": [
     "core:default",
     "dialog:default",
+    "updater:default",
+    "process:allow-restart",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://github.com/yue19870813/siming" }]
+      "allow": [
+        {
+          "url": "https://github.com/yue19870813/siming"
+        }
+      ]
     }
   ]
 }

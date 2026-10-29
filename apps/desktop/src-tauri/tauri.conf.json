@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "\u53f8\u547d\uff08Siming\uff09",
+  "productName": "司命（Siming）",
   "version": "0.1.2",
   "identifier": "dev.siming.editor",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "\u53f8\u547d\uff08Siming\uff09",
+        "title": "司命（Siming）",
         "width": 1920,
         "height": 1080,
         "minWidth": 960,
@@ -43,6 +43,17 @@
       "icons/icon.ico"
     ],
     "category": "DeveloperTool",
-    "shortDescription": "\u5267\u60c5\u5bf9\u8bdd\u7f16\u8f91\u5668"
+    "shortDescription": "剧情对话编辑器"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcwMkRFRTQ1Q0NBOThENzQKUldSMGphbk1SZTR0Y0wyeEZxY3VRRnZVRDFUMWVVZ2RrQXJDZTJtclFVQWo0NHZ1VzRrVUVGVUwK",
+      "endpoints": [
+        "https://github.com/yue19870813/siming/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

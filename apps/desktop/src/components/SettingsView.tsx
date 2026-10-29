@@ -1,3 +1,4 @@
+import { UpdateControl } from "./UpdateControl";
 import { Modal } from "./Modal";
 import {
   migrateDialogueDirectory,
@@ -517,6 +518,9 @@ export function SettingsView({
                 title="系统设置"
                 description="这些偏好仅保存在当前设备，不会写入项目文件，也不会影响其他协作者。"
               />
+              <SettingsGroup title="版本与更新">
+                <UpdateControl />
+              </SettingsGroup>
               <SettingsGroup title="默认位置">
                 <SettingsRow
                   title="新项目保存位置"
