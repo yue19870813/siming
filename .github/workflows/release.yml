@@ -119,9 +119,9 @@ jobs:
         if: runner.os == 'Windows'
         run: npm run tauri -- build --verbose --config src-tauri/tauri.release.conf.json
         working-directory: apps/desktop
-      - name: Build desktop installers
+      - name: Build macOS installers with verbose logging
         if: runner.os != 'Windows'
-        run: npm run tauri -- build --config src-tauri/tauri.release.conf.json
+        run: npm run tauri -- build --verbose --config src-tauri/tauri.release.conf.json
         working-directory: apps/desktop
       - name: Verify macOS app signatures inside installers
         if: runner.os == 'macOS'
