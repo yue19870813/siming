@@ -42,8 +42,12 @@ const activities: Array<{
   { id: "variables", label: "变量", icon: Variable },
   { id: "events", label: "业务事件", icon: Zap },
   { id: "tags", label: "标签", icon: Tags },
-  { id: "settings", label: "设置", icon: Settings },
 ];
+const settingsActivity = {
+  id: "settings",
+  label: "设置",
+  icon: Settings,
+} as const;
 
 const nodePalette: Array<{
   type: NodeType;
@@ -101,6 +105,16 @@ export function Sidebar({
             </button>
           );
         })}
+        <button
+          className={`activity-settings ${
+            activity === "settings" ? "is-active" : ""
+          }`}
+          title="设置"
+          aria-label="设置"
+          onClick={() => setActivity("settings")}
+        >
+          <Settings size={17} />
+        </button>
       </nav>
       {activity !== "welcome" && (
         <div className="sidebar-panel">
@@ -498,7 +512,10 @@ function SearchPanel() {
 }
 
 function ActivitySummary({ activity }: { activity: Activity }) {
-  const item = activities.find((entry) => entry.id === activity)!;
+  const item =
+    activity === settingsActivity.id
+      ? settingsActivity
+      : activities.find((entry) => entry.id === activity)!;
   const Icon = item.icon;
   return (
     <div className="activity-summary">

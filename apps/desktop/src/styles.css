@@ -605,6 +605,10 @@ textarea {
   background: var(--bg);
 }
 
+.activity-rail .activity-settings {
+  margin-top: auto;
+}
+
 .activity-rail .activity-brand {
   display: grid;
   place-items: center;
