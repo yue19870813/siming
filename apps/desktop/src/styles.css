@@ -2559,6 +2559,25 @@ html.is-dragging-node * {
   font-size: var(--ui-font-10, 10px);
 }
 
+.resource-delete-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-bottom: 10px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: 6px;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, var(--panel));
+  font-size: var(--ui-font-11, 11px);
+  line-height: 1.45;
+}
+
+.resource-delete-error svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
 .character-avatar-editor {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);

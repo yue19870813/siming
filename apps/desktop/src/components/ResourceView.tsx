@@ -68,6 +68,7 @@ export function ResourceView({ activity }: { activity: Activity }) {
       : "all";
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const selected = resources.find((item) => item.id === selectedId);
   const selectedCharacter =
     resourceKey === "characters" && selected
@@ -285,7 +286,10 @@ export function ResourceView({ activity }: { activity: Activity }) {
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  onClick={() => setSelectedId(item.id)}
+                  onClick={() => {
+                    setDeleteError("");
+                    setSelectedId(item.id);
+                  }}
                 >
                   {resourceKey === "characters" ? (
                     <CharacterAvatar
@@ -351,9 +355,9 @@ export function ResourceView({ activity }: { activity: Activity }) {
                     title="删除"
                     onClick={() => {
                       if (referenceCount) {
-                        setNotice(
-                          `无法删除：${selected.key} 仍有 ${referenceCount} 处引用。`,
-                        );
+                        const message = `无法删除“${resourceName(selected, locale)}”：仍有 ${referenceCount} 处引用，请先移除引用。`;
+                        setDeleteError(message);
+                        setNotice(message);
                         return;
                       }
                       if (
@@ -362,6 +366,7 @@ export function ResourceView({ activity }: { activity: Activity }) {
                         )
                       )
                         return;
+                      setDeleteError("");
                       commit(`删除${meta.singular}`, (draft) => {
                         draft.resources[resourceKey] = (
                           draft.resources[resourceKey] as Resource[]
@@ -373,6 +378,12 @@ export function ResourceView({ activity }: { activity: Activity }) {
                   </button>
                 </div>
               </div>
+              {deleteError && (
+                <div className="resource-delete-error" role="alert">
+                  <ShieldAlert size={15} />
+                  <span>{deleteError}</span>
+                </div>
+              )}
               {referenceCount > 0 && (
                 <div className="reference-banner">
                   <ShieldAlert size={15} />

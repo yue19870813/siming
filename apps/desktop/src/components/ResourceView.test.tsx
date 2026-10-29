@@ -62,6 +62,20 @@ test("imports a selected character avatar into the project", async () => {
   });
 });
 
+test("shows a visible warning when deleting a referenced resource", () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(<ResourceView activity="tags" />);
+
+  fireEvent.click(screen.getByTitle("删除"));
+
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "无法删除“主线”：仍有 1 处引用，请先移除引用。",
+  );
+  expect(useEditorStore.getState().project.resources.tags).toHaveLength(2);
+  expect(confirm).not.toHaveBeenCalled();
+  confirm.mockRestore();
+});
+
 test("groups support creation, inherited membership, batch movement and safe deletion", () => {
   render(<ResourceView activity="characters" />);
   fireEvent.click(screen.getByText("新建分组"));
