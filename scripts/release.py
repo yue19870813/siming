@@ -6,6 +6,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ["Cargo.toml", "apps/desktop/src-tauri/tauri.conf.json", "sdks/csharp/Directory.Build.props", "sdks/csharp/Packages/dev.siming.sdk/package.json"]
+CONTRACT_MANIFESTS = [
+    "sdks/csharp/contracts/bundled/manifest.json",
+    "sdks/csharp/contracts/directory-chunks/manifest.json",
+    "sdks/csharp/Packages/dev.siming.sdk/Samples~/BasicDialogue/RuntimeData/manifest.json",
+]
+FILES += CONTRACT_MANIFESTS
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$")
 
 def clean(version: str) -> str:
@@ -24,6 +30,12 @@ def replacements(version: str) -> dict[str, str]:
       "sdks/csharp/Packages/dev.siming.sdk/package.json": json.dumps({**json.loads((ROOT/"sdks/csharp/Packages/dev.siming.sdk/package.json").read_text()), "version": version}, indent=2)+"\n",
     }
 
+
+    # The exporter embeds its workspace version; keep checked-in contracts in sync
+    # without changing payload hashes, schema versions, or JSON formatting.
+    for path in CONTRACT_MANIFESTS:
+        updates[path], count = re.subn(r'("generatorVersion"\s*:\s*)"[^"]+"', rf'\1"{version}"', (ROOT / path).read_text())
+        if count != 1: raise SystemExit(f"Missing or duplicate generatorVersion in {path}")
 
     # Only update local workspace packages, retaining every registry dependency pin.
     packages = {

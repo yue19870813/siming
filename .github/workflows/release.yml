@@ -38,6 +38,7 @@ jobs:
       - id: commit
         run: |
           git add Cargo.toml Cargo.lock sdks/csharp/tests/RustReference/Cargo.lock apps/desktop/src-tauri/tauri.conf.json sdks/csharp/Directory.Build.props sdks/csharp/Packages/dev.siming.sdk/package.json
+          git add sdks/csharp/contracts/bundled/manifest.json sdks/csharp/contracts/directory-chunks/manifest.json sdks/csharp/Packages/dev.siming.sdk/Samples~/BasicDialogue/RuntimeData/manifest.json
           git config user.name github-actions
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           if ! git diff --cached --quiet; then

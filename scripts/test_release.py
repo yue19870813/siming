@@ -1,5 +1,6 @@
 """Release regression tests using isolated repositories, never the real index."""
 import importlib.util
+import json
 import re
 import shutil
 import subprocess
@@ -61,6 +62,18 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("tag already exists", self.run_release("--version", "0.1.1", "--check").stderr)
         (self.root / "untracked.txt").write_text("dirty")
         self.assertIn("clean git worktree", self.run_release("--version", "0.1.2", "--check").stderr)
+
+    def test_upgrade_contract_manifests(self):
+        for version in ["99.0.1", "99.0.2-beta.1"]:
+            updates = release.replacements(version)
+            for path in release.CONTRACT_MANIFESTS:
+                original = json.loads((self.root / path).read_text())
+                actual = json.loads(updates[path])
+                self.assertEqual(actual, {**original, "generatorVersion": version})
+            self.assertEqual(
+                updates[release.CONTRACT_MANIFESTS[1]],
+                updates[release.CONTRACT_MANIFESTS[2]],
+            )
 
     def test_windows_checkout_uses_lf(self):
         path = self.root / "apps/desktop/src-tauri/tauri.conf.json"
