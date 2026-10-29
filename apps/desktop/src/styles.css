@@ -1729,6 +1729,10 @@ html.is-dragging-node * {
   overflow: hidden;
 }
 
+.workspace--resources {
+  overflow: hidden;
+}
+
 .canvas-view,
 .react-flow {
   width: 100%;
@@ -2400,6 +2404,14 @@ html.is-dragging-node * {
   padding: 24px;
 }
 
+.resource-view {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .workspace-heading {
   display: flex;
   align-items: flex-start;
@@ -2429,7 +2441,8 @@ html.is-dragging-node * {
 .resource-layout {
   display: grid;
   grid-template-columns: minmax(190px, 250px) minmax(360px, 680px);
-  min-height: 480px;
+  min-height: 0;
+  flex: 1;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -2438,6 +2451,10 @@ html.is-dragging-node * {
 }
 
 .resource-list {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
   border-right: 1px solid var(--border);
 }
 
@@ -2447,8 +2464,13 @@ html.is-dragging-node * {
 
 .resource-list-items {
   display: grid;
+  min-height: 0;
+  flex: 1;
   gap: 2px;
   padding: 0 8px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .resource-list-items .resource-selection-row > button {
@@ -2535,7 +2557,10 @@ html.is-dragging-node * {
 }
 
 .resource-editor {
+  min-height: 0;
   padding: 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .editor-section-title {

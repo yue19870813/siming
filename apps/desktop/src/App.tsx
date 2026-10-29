@@ -620,7 +620,7 @@ export default function App() {
         />
         <section
           ref={workspaceRef}
-          className={`workspace ${editorActivity ? "workspace--editor" : ""}`}
+          className={`workspace ${editorActivity ? "workspace--editor" : ""} ${resourceActivity ? "workspace--resources" : ""}`}
           style={
             {
               "--workbench-height": workbenchPanel
