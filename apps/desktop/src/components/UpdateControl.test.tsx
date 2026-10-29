@@ -55,7 +55,7 @@ async function downloadUpdate() {
 test("shows current version and no-update result", async () => {
   vi.mocked(check).mockResolvedValue(null);
   render(<UpdateControl />);
-  expect(await screen.findByText("司命 v0.1.2")).toBeInTheDocument();
+  expect(await screen.findByText("v0.1.2")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
   expect(await screen.findByText("当前已是最新版本。")).toBeInTheDocument();
 });

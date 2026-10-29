@@ -50,6 +50,7 @@ test("starts on the welcome page without a demo project", async () => {
   ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "新建项目" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "打开项目" })).toBeInTheDocument();
+  expect(screen.queryByText("版本与更新")).not.toBeInTheDocument();
   const repositoryLink = screen.getByRole("link", {
     name: "欢迎使用司命。",
   });
@@ -349,6 +350,16 @@ test("project and system settings are separate pages", async () => {
   expect(screen.getByRole("heading", { name: "系统设置" })).toBeInTheDocument();
   expect(screen.getByText("新项目保存位置")).toBeInTheDocument();
   expect(screen.queryByText("项目配置文件")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "关于" }));
+  expect(screen.getByRole("heading", { name: "关于" })).toBeInTheDocument();
+  expect(screen.getByText("司命 Siming")).toBeInTheDocument();
+  expect(screen.getByText("应用版本")).toBeInTheDocument();
+  expect(
+    screen.getByText("应用版本").closest(".about-detail-row"),
+  ).toContainElement(screen.getByRole("button", { name: "检查更新" }));
+  expect(screen.getByRole("button", { name: "检查更新" })).toBeDisabled();
+  expect(screen.getByText("请在桌面应用中检查更新。")).toBeInTheDocument();
   await waitFor(() =>
     expect(document.documentElement.dataset.theme).toBe("dark"),
   );

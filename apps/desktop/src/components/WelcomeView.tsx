@@ -1,4 +1,3 @@
-import { UpdateControl } from "./UpdateControl";
 import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -100,8 +99,6 @@ export function WelcomeView({
             <p>项目文件适合版本控制，运行时数据可由不同宿主消费。</p>
           </article>
         </div>
-
-        <UpdateControl />
 
         <footer className="welcome-footer">
           <Play size={12} />

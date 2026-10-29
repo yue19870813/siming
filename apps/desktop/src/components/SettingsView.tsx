@@ -4,14 +4,23 @@ import {
   migrateDialogueDirectory,
   withinDialogueRoot,
 } from "../lib/dialogueDirectoryMigration";
-import { FolderCog, MonitorCog, RotateCcw } from "lucide-react";
+import { FolderCog, Info, MonitorCog, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { chooseProjectDirectory } from "../lib/projectApi";
 import { DEFAULT_PROJECT_LOCALES, localeName } from "../model/locales";
 import type { SystemSettings } from "../model/types";
 import { useEditorStore } from "../store/editorStore";
 
-type SettingsScope = "project" | "system";
+type SettingsScope = "project" | "system" | "about";
+const appIconUrl = new URL("../../assets/app-icon.svg", import.meta.url).href;
+
+function operatingSystem() {
+  const userAgent = navigator.userAgent;
+  if (/Macintosh|Mac OS X/i.test(userAgent)) return "macOS";
+  if (/Windows/i.test(userAgent)) return "Windows";
+  if (/Linux/i.test(userAgent)) return "Linux";
+  return "未知";
+}
 
 const systemDefaults: SystemSettings = {
   schemaVersion: 1,
@@ -227,7 +236,9 @@ export function SettingsView({
         <span>
           {scope === "project"
             ? "项目设置保存到项目配置，可随版本控制共享"
-            : "系统设置仅保存在本机，不影响项目成员"}
+            : scope === "system"
+              ? "系统设置仅保存在本机，不影响项目成员"
+              : "司命应用信息与软件更新"}
         </span>
       </header>
       <div className="settings-body">
@@ -245,8 +256,16 @@ export function SettingsView({
           >
             <MonitorCog size={14} /> 系统设置
           </button>
+          <button
+            className={scope === "about" ? "is-active" : undefined}
+            onClick={() => setScope("about")}
+          >
+            <Info size={14} /> 关于
+          </button>
         </aside>
-        <main className="settings-page">
+        <main
+          className={`settings-page ${scope === "about" ? "settings-page--about" : ""}`}
+        >
           {scope === "project" ? (
             <>
               <SettingsPageHeading
@@ -512,15 +531,12 @@ export function SettingsView({
                 saveLabel="应用项目设置"
               />
             </>
-          ) : (
+          ) : scope === "system" ? (
             <>
               <SettingsPageHeading
                 title="系统设置"
                 description="这些偏好仅保存在当前设备，不会写入项目文件，也不会影响其他协作者。"
               />
-              <SettingsGroup title="版本与更新">
-                <UpdateControl />
-              </SettingsGroup>
               <SettingsGroup title="默认位置">
                 <SettingsRow
                   title="新项目保存位置"
@@ -719,6 +735,31 @@ export function SettingsView({
                 onSave={() => onSettingsChange(systemDraft)}
                 saveLabel="保存系统设置"
               />
+            </>
+          ) : (
+            <>
+              <h2 className="about-heading">关于</h2>
+              <div className="about-identity">
+                <img src={appIconUrl} alt="" />
+                <div>
+                  <strong>司命 Siming</strong>
+                  <span>游戏与互动叙事对话编辑器</span>
+                </div>
+              </div>
+              <p className="about-description">
+                编排对话、选项与条件分支，将剧情数据交付给游戏运行时。
+              </p>
+              <dl className="about-details">
+                <UpdateControl />
+                <div className="about-detail-row">
+                  <dt>运行环境</dt>
+                  <dd>{operatingSystem()}</dd>
+                </div>
+                <div className="about-detail-row">
+                  <dt>开源许可证</dt>
+                  <dd>Apache License 2.0</dd>
+                </div>
+              </dl>
             </>
           )}
         </main>

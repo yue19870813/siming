@@ -5,6 +5,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { isTauri } from "../lib/projectApi";
 import { hasInvalidHostDraft } from "../lib/hostDraftGuard";
 import { useEditorStore } from "../store/editorStore";
+import { RefreshCw } from "lucide-react";
 import { Modal } from "./Modal";
 
 type Phase =
@@ -127,19 +128,33 @@ export function UpdateControl() {
   }
 
   return (
-    <div className="update-control">
-      <span>司命{version ? ` v${version}` : ""}</span>
-      <button
-        disabled={!isTauri() || busy || phase === "installed"}
-        onClick={() => void checkUpdate()}
-      >
-        {phase === "checking" ? "正在检查…" : "检查更新"}
-      </button>
-      {(phase === "available" || phase === "ready") && (
-        <button onClick={() => setShowDetails(true)}>查看更新</button>
-      )}
-      {!showDetails && message && <span role="status">{message}</span>}
-      {!isTauri() && <span>请在桌面应用中检查更新。</span>}
+    <>
+      <div className="about-detail-row">
+        <dt>应用版本</dt>
+        <dd className="update-control">
+          <span className="update-version">
+            {version ? `v${version}` : "—"}
+          </span>
+          <button
+            className="button button--ghost"
+            disabled={!isTauri() || busy || phase === "installed"}
+            onClick={() => void checkUpdate()}
+          >
+            <RefreshCw size={15} aria-hidden="true" />
+            {phase === "checking" ? "正在检查…" : "检查更新"}
+          </button>
+          {(phase === "available" || phase === "ready") && (
+            <button
+              className="button button--ghost"
+              onClick={() => setShowDetails(true)}
+            >
+              查看更新
+            </button>
+          )}
+          {!showDetails && message && <span role="status">{message}</span>}
+          {!isTauri() && <span>请在桌面应用中检查更新。</span>}
+        </dd>
+      </div>
       {showDetails && (
         <Modal
           title={`更新司命至 v${update.current?.version ?? ""}`}
@@ -177,6 +192,6 @@ export function UpdateControl() {
           </div>
         </Modal>
       )}
-    </div>
+    </>
   );
 }
