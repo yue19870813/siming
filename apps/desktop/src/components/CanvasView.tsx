@@ -11,6 +11,7 @@ import {
   Handle,
   MarkerType,
   MiniMap,
+  SelectionMode,
   type Node as FlowNode,
   type NodeChange,
   NodeProps,
@@ -208,6 +209,8 @@ export function CanvasView({
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const selectedNodeIds = useRef(new Set<string>());
+  const selectionDialogueId = useRef<string | null>(null);
   const project = useEditorStore((state) => state.project);
   const dialogueId = useEditorStore((state) => state.selectedDialogueId);
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
@@ -222,39 +225,67 @@ export function CanvasView({
   const commit = useEditorStore((state) => state.commit);
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
 
-  const derivedNodes = useMemo<CanvasFlowNode[]>(
-    () =>
-      (dialogue?.nodes ?? []).map((node) => ({
-        id: node.id,
-        type: "siming",
-        position: node.position,
-        selected: node.id === selectedNodeId,
-        deletable: node.id !== dialogue?.entryNodeId,
-        data: {
-          node,
-          locale,
-          projectRoot: project.rootPath,
-          defaultLocale: project.manifest.defaultLocale,
-          character: project.resources.characters.find(
-            (item) => item.key === node.data.speakerId,
-          ),
-        },
-      })),
-    [
-      dialogue,
-      locale,
-      project.resources.characters,
-      project.rootPath,
-      project.manifest.defaultLocale,
-      selectedNodeId,
-    ],
-  );
+  const derivedNodes = useMemo<CanvasFlowNode[]>(() => {
+    const canvasSelection =
+      selectionDialogueId.current === dialogueId
+        ? selectedNodeIds.current
+        : new Set(selectedNodeId ? [selectedNodeId] : []);
+    return (dialogue?.nodes ?? []).map((node) => ({
+      id: node.id,
+      type: "siming",
+      position: node.position,
+      selected: canvasSelection.has(node.id),
+      deletable: node.id !== dialogue?.entryNodeId,
+      data: {
+        node,
+        locale,
+        projectRoot: project.rootPath,
+        defaultLocale: project.manifest.defaultLocale,
+        character: project.resources.characters.find(
+          (item) => item.key === node.data.speakerId,
+        ),
+      },
+    }));
+  }, [
+    dialogue,
+    locale,
+    project.resources.characters,
+    project.rootPath,
+    project.manifest.defaultLocale,
+    dialogueId,
+    selectedNodeId,
+  ]);
   const [nodes, setNodes, onNodesChange] =
     useNodesState<CanvasFlowNode>(derivedNodes);
 
   useEffect(() => {
     setNodes(derivedNodes);
   }, [derivedNodes, setNodes]);
+
+  useEffect(() => {
+    selectedNodeIds.current.clear();
+    selectionDialogueId.current = dialogueId;
+  }, [dialogueId]);
+
+  useEffect(() => {
+    if (selectionDialogueId.current !== dialogueId) return;
+    if (!selectedNodeId && selectedNodeIds.current.size > 0) {
+      selectedNodeIds.current.clear();
+      setNodes((current) =>
+        current.map((node) => ({ ...node, selected: false })),
+      );
+      return;
+    }
+    if (selectedNodeId && !selectedNodeIds.current.has(selectedNodeId)) {
+      selectedNodeIds.current = new Set([selectedNodeId]);
+      setNodes((current) =>
+        current.map((node) => ({
+          ...node,
+          selected: node.id === selectedNodeId,
+        })),
+      );
+    }
+  }, [dialogueId, selectedNodeId, setNodes]);
 
   useEffect(() => {
     const insideCanvas = (detail: NodeDragDetail) => {
@@ -390,6 +421,14 @@ export function CanvasView({
         change.type !== "remove" || change.id !== dialogue.entryNodeId,
     );
 
+    for (const change of localChanges) {
+      if (change.type === "select") {
+        if (change.selected) selectedNodeIds.current.add(change.id);
+        else selectedNodeIds.current.delete(change.id);
+      }
+      if (change.type === "remove") selectedNodeIds.current.delete(change.id);
+    }
+
     onNodesChange(localChanges);
     if (removedIds.length > 0) deleteNodes(removedIds);
   };
@@ -408,16 +447,33 @@ export function CanvasView({
           flowInstanceRef.current = instance;
         }}
         onNodesChange={nodesChange}
+        selectionOnDrag
+        selectionMode={SelectionMode.Partial}
+        panOnDrag={[1, 2]}
+        multiSelectionKeyCode={["Meta", "Control"]}
         onConnect={connect}
         onEdgesChange={edgesChange}
-        onEdgeClick={() => setSelectedNode(null)}
+        onEdgeClick={() => {
+          selectedNodeIds.current.clear();
+          setSelectedNode(null);
+        }}
         onNodeClick={(_event, node) => {
           setSelectedEdgeIds(new Set());
-          setSelectedNode(node.id);
+          setSelectedNode(
+            selectedNodeIds.current.has(node.id)
+              ? node.id
+              : (selectedNodeIds.current.values().next().value ?? null),
+          );
         }}
         onPaneClick={() => {
           setSelectedEdgeIds(new Set());
+          selectedNodeIds.current.clear();
           setSelectedNode(null);
+        }}
+        onSelectionEnd={() => {
+          setSelectedNode(
+            selectedNodeIds.current.values().next().value ?? null,
+          );
         }}
         onMoveEnd={(_event, viewport) => {
           viewportRef.current = viewport;
@@ -430,20 +486,30 @@ export function CanvasView({
             }),
           );
         }}
-        onNodeDragStop={(_event, moved) => {
-          const previous = dialogue.nodes.find((node) => node.id === moved.id);
-          if (
-            previous &&
-            previous.position.x === moved.position.x &&
-            previous.position.y === moved.position.y
-          )
-            return;
-          commit("移动节点", (draft) => {
-            const node = draft.dialogues
-              .find((item) => item.id === dialogueId)
-              ?.nodes.find((item) => item.id === moved.id);
-            if (node) node.position = moved.position;
+        onNodeDragStop={(_event, _moved, draggedNodes) => {
+          const positions = new Map(
+            draggedNodes.map((node) => [node.id, node.position]),
+          );
+          const changed = dialogue.nodes.some((node) => {
+            const position = positions.get(node.id);
+            return (
+              position &&
+              (node.position.x !== position.x || node.position.y !== position.y)
+            );
           });
+          if (!changed) return;
+          commit(
+            draggedNodes.length > 1 ? "移动多个节点" : "移动节点",
+            (draft) => {
+              const target = draft.dialogues.find(
+                (item) => item.id === dialogueId,
+              );
+              for (const node of target?.nodes ?? []) {
+                const position = positions.get(node.id);
+                if (position) node.position = position;
+              }
+            },
+          );
         }}
         fitView
         minZoom={0.2}

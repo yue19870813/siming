@@ -1762,6 +1762,8 @@ html.is-dragging-node * {
   --xy-background-color: var(--canvas);
   --xy-edge-stroke: #62677d;
   --xy-edge-stroke-selected: var(--primary);
+  --xy-selection-background-color: var(--primary-soft);
+  --xy-selection-border: 1px solid var(--primary-border);
   --xy-controls-button-background-color: var(--panel-raised);
   --xy-controls-button-background-color-hover: var(--primary-soft);
   --xy-controls-button-color: var(--text);
