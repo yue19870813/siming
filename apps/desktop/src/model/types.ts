@@ -42,6 +42,7 @@ export type DialogueNodeData = {
 export type DialogueNode = {
   id: string;
   key: string;
+  alias?: string;
   type: NodeType;
   position: { x: number; y: number };
   data: DialogueNodeData;

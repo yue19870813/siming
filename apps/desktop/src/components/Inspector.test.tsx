@@ -41,3 +41,33 @@ test("focusing existing dialogue text never removes it", () => {
   expect(input).toHaveTextContent("已有的正文");
   expect(useEditorStore.getState().dirty).toBe(false);
 });
+
+test.each(["dialogue", "condition"] as const)(
+  "%s node alias can be set and cleared in the inspector",
+  (type) => {
+    const project = createDemoProject();
+    const node = createNode(type, { x: 0, y: 0 });
+    project.dialogues[0].nodes.push(node);
+    useEditorStore.getState().setProject(project);
+    useEditorStore.getState().setSelectedNode(node.id);
+    render(
+      <Inspector width={320} onResizeStart={() => {}} onResizeBy={() => {}} />,
+    );
+
+    const alias = screen.getByLabelText("别名");
+    fireEvent.change(alias, { target: { value: "关键转折" } });
+    expect(
+      useEditorStore
+        .getState()
+        .project.dialogues[0].nodes.find((item) => item.id === node.id)?.alias,
+    ).toBe("关键转折");
+    expect(screen.getByText("关键转折")).toBeInTheDocument();
+    fireEvent.change(alias, { target: { value: "" } });
+    expect(
+      useEditorStore
+        .getState()
+        .project.dialogues[0].nodes.find((item) => item.id === node.id)?.alias,
+    ).toBeUndefined();
+    expect(screen.getByText(node.key)).toBeInTheDocument();
+  },
+);

@@ -132,6 +132,7 @@ pub fn create_project(
             Node {
                 id: start_id.clone(),
                 key: "start".to_owned(),
+                alias: None,
                 node_type: NodeType::Start,
                 position: Position { x: 100.0, y: 180.0 },
                 data: start_data,
@@ -139,6 +140,7 @@ pub fn create_project(
             Node {
                 id: end_id.clone(),
                 key: "end".to_owned(),
+                alias: None,
                 node_type: NodeType::End,
                 position: Position { x: 520.0, y: 180.0 },
                 data: end_data,

@@ -134,7 +134,11 @@ export function TableView() {
                         <CornerDownRight size={13} />
                       )}
                       <strong>{row.node.type}</strong>
-                      <small>{row.node.key}</small>
+                      <small title={row.node.key}>
+                        {row.node.alias?.trim()
+                          ? `${row.node.alias.trim()} · ${row.node.key}`
+                          : row.node.key}
+                      </small>
                     </div>
                   </td>
                   <td>

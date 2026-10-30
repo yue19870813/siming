@@ -73,7 +73,9 @@ export function Inspector({
       <header className="inspector-heading">
         <div>
           <small>{node ? "节点属性" : "对话文件属性"}</small>
-          <strong>{node?.key ?? dialogue.name}</strong>
+          <strong>
+            {node ? node.alias?.trim() || node.key : dialogue.name}
+          </strong>
         </div>
         <button
           title="复制 UUID"
@@ -268,6 +270,18 @@ function NodeInspector({
             }
           />
         </Field>
+        {(node.type === "dialogue" || node.type === "condition") && (
+          <Field label="别名">
+            <input
+              value={node.alias ?? ""}
+              onChange={(event) =>
+                update((draft) => {
+                  draft.alias = event.target.value || undefined;
+                }, "修改节点别名")
+              }
+            />
+          </Field>
+        )}
         {node.type === "dialogue" && (
           <>
             <SpeakerSelect

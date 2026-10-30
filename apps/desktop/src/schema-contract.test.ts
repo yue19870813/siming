@@ -55,6 +55,17 @@ test("dialogue schema accepts recursive structured conditions", () => {
   expect(validate.errors).toBeNull();
 });
 
+test("dialogue schema accepts optional node aliases", () => {
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  addFormats(ajv);
+  const validate = ajv.compile(readJson("schemas/dialogue.schema.json"));
+  const dialogue = readJson("fixtures/minimal-project/dialogues/intro.json");
+  dialogue.nodes[1].alias = "开场问候";
+  expect(validate(dialogue), JSON.stringify(validate.errors)).toBe(true);
+  dialogue.nodes[1].alias = 42;
+  expect(validate(dialogue)).toBe(false);
+});
+
 test("runtime schema accepts compiled editor-free nodes", () => {
   const ajv = new Ajv2020({ allErrors: true, strict: true });
   addFormats(ajv);

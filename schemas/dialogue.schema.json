@@ -197,6 +197,9 @@
         "key": {
           "$ref": "#/$defs/key"
         },
+        "alias": {
+          "type": "string"
+        },
         "type": {
           "enum": ["start", "dialogue", "choice", "condition", "event", "end"]
         },

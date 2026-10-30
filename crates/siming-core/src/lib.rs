@@ -88,6 +88,8 @@ pub struct DialogueDocument {
 pub struct Node {
     pub id: String,
     pub key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
     #[serde(rename = "type")]
     pub node_type: NodeType,
     pub position: Position,
@@ -2410,6 +2412,7 @@ mod tests {
         dialogue.nodes.push(Node {
             id: Uuid::new_v4().to_string(),
             key: "unreachable".to_owned(),
+            alias: None,
             node_type: NodeType::End,
             position: Position { x: 0.0, y: 0.0 },
             data: BTreeMap::new(),

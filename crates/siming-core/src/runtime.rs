@@ -679,6 +679,64 @@ mod tests {
     };
 
     #[test]
+    fn editor_node_aliases_round_trip_without_entering_runtime() {
+        let manifest = parse_project_manifest(include_str!(
+            "../../../fixtures/minimal-project/.siming/project.json"
+        ))
+        .unwrap();
+        let mut dialogue = parse_dialogue_document(include_str!(
+            "../../../fixtures/minimal-project/dialogues/intro.json"
+        ))
+        .unwrap();
+        let mut resources = fixture_resources();
+        resources.variables.push(
+            serde_json::from_value(serde_json::json!({
+                "id": "81156431-7db4-4b51-8306-812f49464f27",
+                "key": "story_flag",
+                "type": "boolean",
+                "defaultValue": false
+            }))
+            .unwrap(),
+        );
+        let condition_id = "15e8b49f-29a3-4089-8989-9d6c4abbbdd1";
+        dialogue.nodes.push(
+            serde_json::from_value(serde_json::json!({
+                "id": condition_id,
+                "key": "check_story",
+                "type": "condition",
+                "position": { "x": 190, "y": 160 },
+                "data": { "condition": { "variable": "story_flag", "operator": "==", "value": true } }
+            }))
+            .unwrap(),
+        );
+        dialogue.edges[0].target_node_id = condition_id.to_owned();
+        for port in ["true", "false"] {
+            dialogue.edges.push(crate::Edge {
+                id: format!("condition-{port}"),
+                source_node_id: condition_id.to_owned(),
+                source_port: port.to_owned(),
+                target_node_id: dialogue.nodes[1].id.clone(),
+                target_port: "in".to_owned(),
+            });
+        }
+        let before =
+            compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap();
+        dialogue.nodes[1].alias = Some("Greeting".to_owned());
+        dialogue.nodes.last_mut().unwrap().alias = Some("Story check".to_owned());
+        let source = serde_json::to_string(&dialogue).unwrap();
+        assert!(source.contains("Greeting"));
+        assert!(source.contains("Story check"));
+        let reopened = parse_dialogue_document(&source).unwrap();
+        assert_eq!(reopened, dialogue);
+        let after = compile_runtime(&manifest, &[reopened], &resources).unwrap();
+        assert_eq!(before.project, after.project);
+        assert_eq!(before.locales, after.locales);
+        let exported = serde_json::to_string(&after).unwrap();
+        assert!(!exported.contains("Greeting"));
+        assert!(!exported.contains("Story check"));
+    }
+
+    #[test]
     fn character_groups_validate_but_do_not_change_runtime_output() {
         let mut manifest = parse_project_manifest(include_str!(
             "../../../fixtures/minimal-project/.siming/project.json"

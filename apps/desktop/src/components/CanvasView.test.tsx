@@ -92,6 +92,20 @@ describe("CanvasView palette drop", () => {
     expect(content?.querySelector(".dialogue-node-avatar")).not.toBeNull();
     expect(narrator.parentElement).not.toHaveClass("dialogue-node-avatar");
   });
+
+  test("shows an alias on the canvas while retaining the node key", () => {
+    useEditorStore.getState().commit("设置节点别名", (project) => {
+      const node = project.dialogues[0].nodes.find(
+        (item) => item.type === "dialogue",
+      );
+      if (node) node.alias = "开场问候";
+    });
+    render(<CanvasView />);
+    expect(screen.getByText("开场问候")).toHaveAttribute(
+      "title",
+      "line-welcome",
+    );
+  });
 });
 
 test("host summaries show ordered names, overflow count and no payload", () => {

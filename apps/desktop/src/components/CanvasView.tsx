@@ -91,7 +91,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
           <Icon size={13} />
         </span>
         <span>{meta.label}</span>
-        <small>{node.key}</small>
+        <small title={node.key}>{node.alias?.trim() || node.key}</small>
       </header>
       <div className="flow-node-content">
         {node.type === "dialogue" && (
