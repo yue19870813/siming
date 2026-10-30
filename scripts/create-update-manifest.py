@@ -10,7 +10,6 @@ from urllib.parse import quote
 REPOSITORY = "https://github.com/yue19870813/siming"
 TARGETS = {
     "darwin-aarch64": ("macos-arm64-*.app.tar.gz",),
-    "darwin-x86_64": ("macos-x64-*.app.tar.gz",),
     "windows-x86_64": ("windows-x64-*.exe", "windows-x64-*.msi"),
 }
 

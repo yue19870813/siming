@@ -27,7 +27,6 @@ class ManifestTests(unittest.TestCase):
         for group, names in {
             "desktop-windows-x64": ["Siming_0.2.0_x64-setup.exe", "Siming_0.2.0_x64-setup.exe.sig", "Siming.msi", "Siming.msi.sig"],
             "desktop-macos-arm64": ["司命.app.tar.gz", "司命.app.tar.gz.sig", "Siming.dmg"],
-            "desktop-macos-x64": ["司命.app.tar.gz", "司命.app.tar.gz.sig", "Siming.dmg"],
             "sdk": ["unity.tgz", "core.nupkg", "sdk.nupkg"],
         }.items():
             directory = self.source / group
@@ -39,7 +38,7 @@ class ManifestTests(unittest.TestCase):
 
     def test_platforms_urls_signatures_and_notes(self):
         result = updater.manifest(self.assets, "0.2.0", "Release notes")
-        self.assertEqual(set(result["platforms"]), {"darwin-aarch64", "darwin-x86_64", "windows-x86_64"})
+        self.assertEqual(set(result["platforms"]), {"darwin-aarch64", "windows-x86_64"})
         self.assertEqual(result["notes"], "Release notes")
         self.assertEqual(result["version"], "0.2.0")
         for platform in result["platforms"].values():
@@ -65,12 +64,12 @@ class ManifestTests(unittest.TestCase):
             collector.collect(self.source, self.assets.with_name("incomplete"))
 
     def test_missing_platform_rejected(self):
-        next(self.assets.glob("macos-x64-*.app.tar.gz")).unlink()
+        next(self.assets.glob("macos-arm64-*.app.tar.gz")).unlink()
         with self.assertRaises(ValueError):
             updater.manifest(self.assets, "0.2.0")
 
     def test_ambiguous_package_rejected(self):
-        (self.assets / "macos-x64-extra.app.tar.gz").write_text("extra")
+        (self.assets / "macos-arm64-extra.app.tar.gz").write_text("extra")
         with self.assertRaises(ValueError):
             updater.manifest(self.assets, "0.2.0")
 

@@ -8,7 +8,6 @@ from pathlib import Path
 GROUPS = {
     "desktop-windows-x64": {".msi", ".exe", ".sig"},
     "desktop-macos-arm64": {".dmg", ".gz", ".sig"},
-    "desktop-macos-x64": {".dmg", ".gz", ".sig"},
     "sdk": {".tgz", ".nupkg"},
 }
 
