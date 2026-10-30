@@ -629,6 +629,49 @@ test("command copy and paste duplicates the selected canvas node", async () => {
   expect(state.notice).toMatch(/^已粘贴节点：/);
 });
 
+test("command save keeps the second dialogue and edit history selected", async () => {
+  const project = createDemoProject();
+  project.rootPath = "/tmp/save-selected-dialogue";
+  const second = structuredClone(project.dialogues[0]);
+  second.id = "dialogue-002";
+  second.key = "002";
+  second.name = "002-命案消息传来";
+  project.dialogues.push(second);
+  project.manifest.dialogues.push({
+    id: second.id,
+    key: second.key,
+    path: "dialogues/prologue/002.json",
+  });
+  useEditorStore.getState().setProject(project);
+  useEditorStore.getState().setSelectedDialogue(second.id);
+  useEditorStore.getState().setSelectedNode(second.nodes[0].id);
+  useEditorStore.getState().commit("编辑 002", (draft) => {
+    draft.dialogues[1].name = "002-已编辑";
+  });
+  const historyLength = useEditorStore.getState().past.length;
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === "save_project") return "saved-disk-fingerprint" as never;
+    return undefined as never;
+  });
+
+  render(<App />);
+  fireEvent.keyDown(window, { key: "s", metaKey: true });
+
+  await waitFor(() => expect(useEditorStore.getState().dirty).toBe(false));
+  const saved = useEditorStore.getState();
+  expect(saved.selectedDialogueId).toBe(second.id);
+  expect(saved.selectedNodeId).toBe(second.nodes[0].id);
+  expect(saved.past).toHaveLength(historyLength);
+  expect(saved.project.savedFingerprint).toBe("saved-disk-fingerprint");
+  expect(invoke).toHaveBeenCalledWith("save_project", {
+    snapshot: expect.objectContaining({
+      dialogues: expect.arrayContaining([
+        expect.objectContaining({ id: second.id, name: "002-已编辑" }),
+      ]),
+    }),
+  });
+});
+
 test("save and export protect invalid host drafts without writing files", async () => {
   openTestProject();
   const state = useEditorStore.getState();

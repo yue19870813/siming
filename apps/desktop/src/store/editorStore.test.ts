@@ -141,6 +141,31 @@ test("markSaved establishes a new clean history point", () => {
   expect(useEditorStore.getState().project.manifest.name).toBe("已保存名称");
 });
 
+test("save completion preserves newer edits and disk fingerprint through undo", () => {
+  const store = useEditorStore.getState();
+  store.commit("first edit", (draft) => {
+    draft.manifest.name = "保存中的版本";
+  });
+  const snapshot = useEditorStore.getState().project;
+  store.commit("second edit", (draft) => {
+    draft.manifest.name = "保存后继续编辑";
+  });
+  store.markSaved("new-disk-fingerprint", snapshot);
+
+  expect(useEditorStore.getState().project.manifest.name).toBe(
+    "保存后继续编辑",
+  );
+  expect(useEditorStore.getState().dirty).toBe(true);
+  expect(useEditorStore.getState().project.savedFingerprint).toBe(
+    "new-disk-fingerprint",
+  );
+  store.undo();
+  expect(useEditorStore.getState().dirty).toBe(false);
+  expect(useEditorStore.getState().project.savedFingerprint).toBe(
+    "new-disk-fingerprint",
+  );
+});
+
 test("dialogue directories are persisted and reused by new dialogues", () => {
   const store = useEditorStore.getState();
   store.addDialogueDirectory("dialogues/chapter-1");

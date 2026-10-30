@@ -391,8 +391,7 @@ export default function App() {
     try {
       setBusy(true);
       const savedFingerprint = await saveProject(project);
-      setProject({ ...project, savedFingerprint }, false);
-      markSaved();
+      markSaved(savedFingerprint, project);
       try {
         await clearRecoverySnapshot(project.manifest.projectId);
       } catch (error) {

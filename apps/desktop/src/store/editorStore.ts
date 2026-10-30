@@ -60,7 +60,10 @@ type EditorState = {
   clearSourceDraft: () => void;
   setBusy: (busy: boolean) => void;
   setNotice: (notice: string) => void;
-  markSaved: () => void;
+  markSaved: (
+    savedFingerprint?: string,
+    savedProject?: ProjectSnapshot,
+  ) => void;
   commit: (label: string, recipe: (draft: ProjectSnapshot) => void) => void;
   undo: () => void;
   redo: () => void;
@@ -105,7 +108,11 @@ const emptyProject = (): ProjectSnapshot => ({
 });
 
 const initialProject = emptyProject();
-const fingerprint = (project: ProjectSnapshot) => JSON.stringify(project);
+const fingerprint = (project: ProjectSnapshot) => {
+  const content = { ...project };
+  delete content.savedFingerprint;
+  return JSON.stringify(content);
+};
 
 function copiedNodeKey(sourceKey: string, dialogue: DialogueDocument) {
   const keys = new Set(dialogue.nodes.map((node) => node.key));
@@ -233,12 +240,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
   setBusy: (busy) => set({ busy }),
   setNotice: (notice) => set({ notice }),
-  markSaved: () =>
-    set((state) => ({
-      dirty: false,
-      savedProjectFingerprint: fingerprint(state.project),
-      notice: "项目已保存。",
-    })),
+  markSaved: (savedFingerprint, savedProject) =>
+    set((state) => {
+      if (
+        savedProject &&
+        (state.project.rootPath !== savedProject.rootPath ||
+          state.project.manifest.projectId !== savedProject.manifest.projectId)
+      )
+        return state;
+      const project = savedFingerprint
+        ? { ...state.project, savedFingerprint }
+        : state.project;
+      const savedProjectFingerprint = fingerprint(savedProject ?? project);
+      return {
+        project,
+        dirty: fingerprint(project) !== savedProjectFingerprint,
+        savedProjectFingerprint,
+        notice: "项目已保存。",
+      };
+    }),
 
   commit: (label, recipe) => {
     const state = get();
@@ -309,6 +329,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const entry = state.past.at(-1);
     if (!entry) return;
     entry.project = structuredClone(entry.project);
+    entry.project.savedFingerprint = state.project.savedFingerprint;
     entry.project.manifest.schemaVersion = Math.max(
       entry.project.manifest.schemaVersion,
       state.project.manifest.schemaVersion,
@@ -342,6 +363,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const entry = state.future[0];
     if (!entry) return;
     entry.project = structuredClone(entry.project);
+    entry.project.savedFingerprint = state.project.savedFingerprint;
     entry.project.manifest.schemaVersion = Math.max(
       entry.project.manifest.schemaVersion,
       state.project.manifest.schemaVersion,
