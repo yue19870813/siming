@@ -90,6 +90,7 @@ export type CharacterDefinition = {
 };
 
 export type VariableDefinition = {
+  groupId?: string;
   id: string;
   key: string;
   type: "boolean" | "number" | "string";
@@ -139,6 +140,7 @@ export type ProjectSnapshot = {
     locales: string[];
     dialogueDirectories: string[];
     characterGroups?: CharacterGroup[];
+    variableGroups?: CharacterGroup[];
     dialogues: DialogueIndexEntry[];
   };
   dialogues: DialogueDocument[];

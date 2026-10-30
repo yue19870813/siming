@@ -34,6 +34,8 @@ pub struct ProjectManifest {
     pub dialogue_directories: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub character_groups: Vec<CharacterGroup>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variable_groups: Vec<CharacterGroup>,
     pub dialogues: Vec<DialogueIndexEntry>,
 }
 
@@ -156,6 +158,8 @@ pub struct CharacterDefinition {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VariableDefinition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
     pub id: String,
     pub key: String,
     #[serde(rename = "type")]
@@ -477,6 +481,24 @@ pub fn validate_editable_project(
             diagnostics.push(error(
                 "CHARACTER_GROUP_INVALID",
                 "角色分组 ID 或名称无效、重复",
+                ".siming/project.json",
+                Some(group.id.clone()),
+            ));
+        }
+    }
+
+    let mut variable_group_ids = BTreeSet::new();
+    let mut variable_group_names = BTreeSet::new();
+    for group in &manifest.variable_groups {
+        if Uuid::parse_str(&group.id).is_err()
+            || !variable_group_ids.insert(&group.id)
+            || group.name.trim().is_empty()
+            || !variable_group_names.insert(group.name.trim())
+            || ["全部变量", "未分组"].contains(&group.name.trim())
+        {
+            diagnostics.push(error(
+                "VARIABLE_GROUP_INVALID",
+                "变量分组 ID 或名称无效、重复",
                 ".siming/project.json",
                 Some(group.id.clone()),
             ));
@@ -1982,6 +2004,17 @@ fn validate_resource_collections(
         }
     }
     for variable in &resources.variables {
+        if variable
+            .group_id
+            .as_ref()
+            .is_some_and(|id| !manifest.variable_groups.iter().any(|group| &group.id == id))
+        {
+            diagnostics.push(resource_error(
+                "VARIABLE_GROUP_MISSING",
+                "变量引用的分组不存在",
+                &variable.id,
+            ));
+        }
         if !value_matches_type(&variable.default_value, variable.variable_type) {
             diagnostics.push(resource_error(
                 "VARIABLE_DEFAULT_TYPE_MISMATCH",

@@ -179,6 +179,7 @@ pub fn create_project(
         locales,
         dialogue_directories: vec!["dialogues".to_owned()],
         character_groups: Vec::new(),
+        variable_groups: Vec::new(),
         dialogues: vec![DialogueIndexEntry {
             id: dialogue_id,
             key: "intro".to_owned(),
@@ -928,6 +929,31 @@ mod tests {
             snapshot.manifest.character_groups
         );
         assert_eq!(reopened.resources.characters, snapshot.resources.characters);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn variable_groups_and_membership_survive_save_and_reopen() {
+        let root = std::env::temp_dir().join(format!("siming-variable-groups-{}", Uuid::new_v4()));
+        let mut snapshot = create_project(&root, "Groups", "zh-CN").unwrap();
+        let group_id = Uuid::new_v4().to_string();
+        snapshot
+            .manifest
+            .variable_groups
+            .push(siming_core::CharacterGroup {
+                id: group_id.clone(),
+                name: "Story".to_owned(),
+            });
+        snapshot.resources.variables.push(serde_json::from_value(serde_json::json!({
+            "id": Uuid::new_v4().to_string(), "key": "story_flag", "type": "boolean", "defaultValue": false, "groupId": group_id
+        })).unwrap());
+        save_project(&snapshot).unwrap();
+        let reopened = open_project(&root).unwrap();
+        assert_eq!(
+            reopened.manifest.variable_groups,
+            snapshot.manifest.variable_groups
+        );
+        assert_eq!(reopened.resources.variables, snapshot.resources.variables);
         fs::remove_dir_all(root).unwrap();
     }
 

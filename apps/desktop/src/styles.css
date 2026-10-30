@@ -2470,6 +2470,8 @@ html.is-dragging-node * {
 
 .resource-list-items {
   display: grid;
+  align-content: start;
+  grid-auto-rows: max-content;
   min-height: 0;
   flex: 1;
   gap: 2px;

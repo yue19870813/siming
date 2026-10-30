@@ -143,3 +143,45 @@ test("group name validation and filtering respect the selected group", () => {
   fireEvent.click(screen.getByRole("button", { name: /^主角\s*1$/ }));
   expect(screen.getByLabelText("选择角色 杜尔")).toBeInTheDocument();
 });
+
+test("variable groups filter, inherit, move, and safely ungroup variables", () => {
+  render(<ResourceView activity="variables" />);
+  fireEvent.click(screen.getByText("新建分组"));
+  fireEvent.change(screen.getByLabelText("分组名称"), {
+    target: { value: "剧情状态" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  const group = useEditorStore.getState().project.manifest.variableGroups![0];
+  expect(group.name).toBe("剧情状态");
+  fireEvent.click(screen.getByRole("button", { name: "新增变量" }));
+  const variable = useEditorStore
+    .getState()
+    .project.resources.variables.at(-1)!;
+  expect(variable.groupId).toBe(group.id);
+  fireEvent.click(screen.getByRole("button", { name: /^未分组/ }));
+  expect(
+    screen.queryByLabelText(`选择变量 ${variable.key}`),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /^剧情状态/ }));
+  fireEvent.change(screen.getByLabelText("所属分组"), {
+    target: { value: "" },
+  });
+  expect(
+    useEditorStore.getState().project.resources.variables.at(-1)?.groupId,
+  ).toBeUndefined();
+  fireEvent.click(screen.getByRole("button", { name: /^未分组/ }));
+  expect(screen.getByLabelText(`选择变量 ${variable.key}`)).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText(`选择变量 ${variable.key}`));
+  fireEvent.change(screen.getByLabelText("批量移动变量"), {
+    target: { value: group.id },
+  });
+  expect(
+    useEditorStore.getState().project.resources.variables.at(-1)?.groupId,
+  ).toBe(group.id);
+  fireEvent.click(screen.getByLabelText("删除分组 剧情状态"));
+  fireEvent.click(screen.getByRole("button", { name: "删除分组" }));
+  expect(useEditorStore.getState().project.manifest.variableGroups).toEqual([]);
+  expect(
+    useEditorStore.getState().project.resources.variables.at(-1)?.groupId,
+  ).toBeUndefined();
+});

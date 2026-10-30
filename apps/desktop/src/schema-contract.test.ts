@@ -158,6 +158,19 @@ test("project schema accepts optional character groups and rejects malformed gro
   expect(validate(project)).toBe(false);
 });
 
+test("project schema accepts variable groups and rejects malformed groups", () => {
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  addFormats(ajv);
+  const validate = ajv.compile(readJson("schemas/project.schema.json"));
+  const project = readJson("fixtures/minimal-project/.siming/project.json");
+  project.variableGroups = [
+    { id: "2fd88ddc-aa3b-466f-92a2-48785adce71e", name: "剧情状态" },
+  ];
+  expect(validate(project)).toBe(true);
+  project.variableGroups[0].name = "   ";
+  expect(validate(project)).toBe(false);
+});
+
 test("v2 body schema accepts supported runs and rejects unknown versions or styles", () => {
   const ajv = new Ajv2020({ allErrors: true, strict: true });
   addFormats(ajv);

@@ -730,6 +730,59 @@ mod tests {
     }
 
     #[test]
+    fn variable_groups_validate_but_do_not_change_runtime_output() {
+        let mut manifest = parse_project_manifest(include_str!(
+            "../../../fixtures/minimal-project/.siming/project.json"
+        ))
+        .unwrap();
+        let dialogue = parse_dialogue_document(include_str!(
+            "../../../fixtures/minimal-project/dialogues/intro.json"
+        ))
+        .unwrap();
+        let mut resources = fixture_resources();
+        resources.variables.push(
+            serde_json::from_value(serde_json::json!({
+                "id": "81156431-7db4-4b51-8306-812f49464f27",
+                "key": "story_flag",
+                "type": "boolean",
+                "defaultValue": false
+            }))
+            .unwrap(),
+        );
+        let before =
+            compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap();
+        let id = "15e8b49f-29a3-4089-8989-9d6c4abbbdd1".to_owned();
+        manifest.variable_groups.push(crate::CharacterGroup {
+            id: id.clone(),
+            name: "Story".to_owned(),
+        });
+        resources.variables[0].group_id = Some(id.clone());
+        let after =
+            compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap();
+        assert_eq!(
+            serde_json::to_value(&before.project).unwrap(),
+            serde_json::to_value(&after.project).unwrap()
+        );
+        resources.variables[0].group_id = Some("missing".to_owned());
+        let mut diagnostics = Vec::new();
+        crate::validate_resource_collections(&manifest, &resources, &mut diagnostics);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == "VARIABLE_GROUP_MISSING")
+        );
+        manifest.variable_groups.push(crate::CharacterGroup {
+            id,
+            name: "Story".to_owned(),
+        });
+        assert!(
+            crate::validate_editable_project(&manifest, &[dialogue])
+                .iter()
+                .any(|item| item.code == "VARIABLE_GROUP_INVALID")
+        );
+    }
+
+    #[test]
     fn compiles_editor_source_into_runtime_and_locale_resources() {
         let manifest = parse_project_manifest(include_str!(
             "../../../fixtures/minimal-project/.siming/project.json"

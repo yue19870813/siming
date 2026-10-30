@@ -6,27 +6,34 @@ import { Modal } from "./Modal";
 export function CharacterGroups({
   selected,
   onSelect,
+  resourceKey = "characters",
 }: {
   selected: string;
   onSelect: (id: string) => void;
+  resourceKey?: "characters" | "variables";
 }) {
   const project = useEditorStore((state) => state.project);
   const commit = useEditorStore((state) => state.commit);
-  const groups = project.manifest.characterGroups ?? [];
+  const isVariable = resourceKey === "variables";
+  const label = isVariable ? "变量" : "角色";
+  const groups = isVariable
+    ? (project.manifest.variableGroups ?? [])
+    : (project.manifest.characterGroups ?? []);
+  const resources = project.resources[resourceKey];
   const [editing, setEditing] = useState<{ id?: string; name: string } | null>(
     null,
   );
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState("");
   const entries = [
-    { id: "all", name: "全部角色" },
+    { id: "all", name: `全部${label}` },
     { id: "ungrouped", name: "未分组" },
     ...groups,
   ];
   return (
-    <section className="character-groups" aria-label="角色分组">
+    <section className="character-groups" aria-label={`${label}分组`}>
       <div className="character-group-heading">
-        <strong>角色分组</strong>
+        <strong>{label}分组</strong>
         <button
           className="button button--ghost"
           onClick={() => {
@@ -48,12 +55,12 @@ export function CharacterGroups({
               <span>{group.name}</span>
               <small>
                 {
-                  project.resources.characters.filter(
-                    (character) =>
+                  resources.filter(
+                    (resource) =>
                       group.id === "all" ||
                       (group.id === "ungrouped"
-                        ? !character.groupId
-                        : character.groupId === group.id),
+                        ? !resource.groupId
+                        : resource.groupId === group.id),
                   ).length
                 }
               </small>
@@ -93,7 +100,7 @@ export function CharacterGroups({
               const name = editing.name.trim();
               if (
                 !name ||
-                name === "全部角色" ||
+                name === `全部${label}` ||
                 name === "未分组" ||
                 groups.some(
                   (group) =>
@@ -105,14 +112,17 @@ export function CharacterGroups({
               }
               const id = editing.id ?? createId();
               commit(
-                editing.id ? "重命名角色分组" : "新建角色分组",
+                editing.id ? `重命名${label}分组` : `新建${label}分组`,
                 (draft) => {
-                  draft.manifest.characterGroups ??= [];
-                  const group = draft.manifest.characterGroups.find(
+                  const groupKey = isVariable
+                    ? "variableGroups"
+                    : "characterGroups";
+                  draft.manifest[groupKey] ??= [];
+                  const group = draft.manifest[groupKey].find(
                     (item) => item.id === id,
                   );
                   if (group) group.name = name;
-                  else draft.manifest.characterGroups.push({ id, name });
+                  else draft.manifest[groupKey].push({ id, name });
                 },
               );
               onSelect(id);
@@ -154,7 +164,9 @@ export function CharacterGroups({
       )}
       {deleting && (
         <Modal title="删除分组" onClose={() => setDeleting(null)}>
-          <p>删除分组后，组内角色将移至“未分组”。角色及对话引用会保留。</p>
+          <p>
+            删除分组后，组内{label}将移至“未分组”。{label}及对话引用会保留。
+          </p>
           <div className="editor-modal-actions">
             <button
               className="button button--ghost"
@@ -165,14 +177,15 @@ export function CharacterGroups({
             <button
               className="button button--primary"
               onClick={() => {
-                commit("删除角色分组", (draft) => {
-                  draft.manifest.characterGroups =
-                    draft.manifest.characterGroups?.filter(
-                      (group) => group.id !== deleting,
-                    );
-                  draft.resources.characters.forEach((character) => {
-                    if (character.groupId === deleting)
-                      delete character.groupId;
+                commit(`删除${label}分组`, (draft) => {
+                  const groupKey = isVariable
+                    ? "variableGroups"
+                    : "characterGroups";
+                  draft.manifest[groupKey] = draft.manifest[groupKey]?.filter(
+                    (group) => group.id !== deleting,
+                  );
+                  draft.resources[resourceKey].forEach((resource) => {
+                    if (resource.groupId === deleting) delete resource.groupId;
                   });
                 });
                 if (selected === deleting) onSelect("ungrouped");

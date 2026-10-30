@@ -60,7 +60,12 @@ export function ResourceView({ activity }: { activity: Activity }) {
   const [selectedId, setSelectedId] = useState(resources[0]?.id ?? "");
   const [query, setQuery] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
-  const groups = project.manifest.characterGroups ?? [];
+  const groupedResource =
+    resourceKey === "characters" || resourceKey === "variables";
+  const groups =
+    resourceKey === "variables"
+      ? (project.manifest.variableGroups ?? [])
+      : (project.manifest.characterGroups ?? []);
   const currentGroup =
     groupFilter === "ungrouped" ||
     groups.some((group) => group.id === groupFilter)
@@ -83,11 +88,12 @@ export function ResourceView({ activity }: { activity: Activity }) {
 
   const filtered = resources.filter(
     (item) =>
-      (resourceKey !== "characters" ||
+      (!groupedResource ||
         currentGroup === "all" ||
         (currentGroup === "ungrouped"
-          ? !(item as CharacterDefinition).groupId
-          : (item as CharacterDefinition).groupId === currentGroup)) &&
+          ? !(item as CharacterDefinition | VariableDefinition).groupId
+          : (item as CharacterDefinition | VariableDefinition).groupId ===
+            currentGroup)) &&
       `${item.key} ${resourceName(item, locale)}`
         .toLowerCase()
         .includes(query.toLowerCase()),
@@ -109,11 +115,12 @@ export function ResourceView({ activity }: { activity: Activity }) {
     const key = `${resourceKey.slice(0, -1)}-${sequence}`;
     const resource = createResource(resourceKey, id, key, locale);
     if (
-      resourceKey === "characters" &&
+      groupedResource &&
       currentGroup !== "all" &&
       currentGroup !== "ungrouped"
     )
-      (resource as CharacterDefinition).groupId = currentGroup;
+      (resource as CharacterDefinition | VariableDefinition).groupId =
+        currentGroup;
     commit(`新增${meta.singular}`, (draft) => {
       (draft.resources[resourceKey] as Resource[]).push(resource);
     });
@@ -195,8 +202,9 @@ export function ResourceView({ activity }: { activity: Activity }) {
       </header>
       <div className="resource-layout">
         <aside className="resource-list">
-          {resourceKey === "characters" && (
+          {groupedResource && (
             <CharacterGroups
+              resourceKey={resourceKey as "characters" | "variables"}
               selected={currentGroup}
               onSelect={(id) => {
                 setGroupFilter(id);
@@ -212,12 +220,12 @@ export function ResourceView({ activity }: { activity: Activity }) {
               placeholder={meta.placeholder}
             />
           </label>
-          {resourceKey === "characters" && (
+          {groupedResource && (
             <div className="character-bulk-actions">
               <label>
                 <input
                   type="checkbox"
-                  aria-label="全选当前角色"
+                  aria-label={`全选当前${meta.title}`}
                   checked={
                     filtered.length > 0 &&
                     visibleChecked.length === filtered.length
@@ -233,14 +241,16 @@ export function ResourceView({ activity }: { activity: Activity }) {
                 全选
               </label>
               <select
-                aria-label="批量移动角色"
+                aria-label={`批量移动${meta.title}`}
                 disabled={!visibleChecked.length}
                 value=""
                 onChange={(event) => {
                   const groupId = event.target.value;
                   const ids = new Set(visibleChecked.map((item) => item.id));
-                  commit("批量移动角色", (draft) =>
-                    draft.resources.characters.forEach((character) => {
+                  commit(`批量移动${meta.title}`, (draft) =>
+                    draft.resources[
+                      resourceKey as "characters" | "variables"
+                    ].forEach((character) => {
                       if (!ids.has(character.id)) return;
                       if (groupId === "ungrouped") delete character.groupId;
                       else character.groupId = groupId;
@@ -250,7 +260,7 @@ export function ResourceView({ activity }: { activity: Activity }) {
                 }}
               >
                 <option value="" disabled>
-                  移动所选角色
+                  移动所选{meta.title}
                 </option>
                 <option value="ungrouped">未分组</option>
                 {groups.map((group) => (
@@ -264,10 +274,10 @@ export function ResourceView({ activity }: { activity: Activity }) {
           <div className="resource-list-items">
             {filtered.map((item) => (
               <div className="resource-selection-row" key={item.id}>
-                {resourceKey === "characters" && (
+                {groupedResource && (
                   <input
                     type="checkbox"
-                    aria-label={`选择角色 ${resourceName(item, locale)}`}
+                    aria-label={`选择${meta.title} ${resourceName(item, locale)}`}
                     checked={checked.has(item.id)}
                     onChange={(event) =>
                       setChecked((current) => {
@@ -403,6 +413,30 @@ export function ResourceView({ activity }: { activity: Activity }) {
                             event.target.value;
                         else delete (item as CharacterDefinition).groupId;
                       }, "移动角色分组")
+                    }
+                  >
+                    <option value="">未分组</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {resourceKey === "variables" && (
+                <label className="character-group-select">
+                  所属分组
+                  <select
+                    aria-label="所属分组"
+                    value={(selected as VariableDefinition).groupId ?? ""}
+                    onChange={(event) =>
+                      update((item) => {
+                        if (event.target.value)
+                          (item as VariableDefinition).groupId =
+                            event.target.value;
+                        else delete (item as VariableDefinition).groupId;
+                      }, "移动变量分组")
                     }
                   >
                     <option value="">未分组</option>
