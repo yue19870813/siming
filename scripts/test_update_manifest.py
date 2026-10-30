@@ -48,6 +48,12 @@ class ManifestTests(unittest.TestCase):
             self.assertTrue(platform["url"].isascii())
         self.assertTrue(result["platforms"]["windows-x86_64"]["url"].endswith(".exe"))
 
+    def test_macos_generated_names_are_stable_ascii_names(self):
+        self.assertTrue((self.assets / "macos-arm64-Siming.app.tar.gz").exists())
+        self.assertTrue((self.assets / "macos-arm64-Siming.app.tar.gz.sig").exists())
+        result = updater.manifest(self.assets, "0.2.2")
+        self.assertTrue(result["platforms"]["darwin-aarch64"]["url"].endswith("macos-arm64-Siming.app.tar.gz"))
+
     def test_missing_signature_rejected(self):
         next(self.assets.glob("macos-arm64-*.sig")).unlink()
         with self.assertRaises(FileNotFoundError):

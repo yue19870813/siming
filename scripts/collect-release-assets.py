@@ -13,6 +13,28 @@ GROUPS = {
 }
 
 
+def release_name(group: str, source_name: str) -> str:
+    """Return a stable ASCII name for assets consumed by the updater.
+
+    Tauri derives the macOS bundle name from ``productName`` and can sanitize
+    non-ASCII punctuation differently on different runners.  The updater
+    manifest must point at the exact name uploaded to GitHub, so normalize
+    these generated names while collecting the release assets.
+    """
+    if group.startswith("desktop-macos"):
+        if source_name.endswith(".app.tar.gz.sig"):
+            filename = "Siming.app.tar.gz.sig"
+        elif source_name.endswith(".app.tar.gz"):
+            filename = "Siming.app.tar.gz"
+        elif source_name.endswith(".dmg"):
+            filename = "Siming.dmg"
+        else:
+            filename = source_name
+    else:
+        filename = source_name
+    return f"{group.removeprefix('desktop-')}-{filename}"
+
+
 def collect(source: Path, destination: Path) -> list[Path]:
     if destination.exists() and any(destination.iterdir()):
         raise ValueError("Asset destination must be empty")
@@ -35,7 +57,7 @@ def collect(source: Path, destination: Path) -> list[Path]:
                 raise ValueError("SDK must contain one UPM tarball and two NuGet packages")
         for path in files:
             # Include the platform even when Tauri uses the same installer filename.
-            name = path.name if group == "sdk" else f"{group.removeprefix('desktop-')}-{path.name}"
+            name = path.name if group == "sdk" else release_name(group, path.name)
             if name.casefold() in names:
                 raise ValueError(f"Duplicate release asset: {name}")
             names.add(name.casefold())
