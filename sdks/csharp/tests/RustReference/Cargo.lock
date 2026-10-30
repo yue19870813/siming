@@ -165,7 +165,7 @@ dependencies = [
 
 [[package]]
 name = "siming-core"
-version = "0.2.3"
+version = "0.2.5"
 dependencies = [
  "serde",
  "serde_json",
