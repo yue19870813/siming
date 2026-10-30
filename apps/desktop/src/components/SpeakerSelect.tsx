@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { CharacterDefinition } from "../model/types";
+import { speakerSelectionCounts } from "./speakerSelectionCounts";
 
 export function SpeakerSelect({
   characters,
@@ -20,15 +21,23 @@ export function SpeakerSelect({
   const [active, setActive] = useState(0);
   const options = [
     { id: "narrator", key: "", name: "旁白", search: "旁白 narrator" },
-    ...characters.map((character) => ({
-      id: character.id,
-      key: character.key,
-      name:
-        character.name[locale] ||
-        Object.values(character.name).find(Boolean) ||
-        character.key,
-      search: `${Object.values(character.name).join(" ")} ${character.key}`,
-    })),
+    ...characters
+      .map((character, index) => ({ character, index }))
+      .sort(
+        (a, b) =>
+          (speakerSelectionCounts.get(b.character.id) ?? 0) -
+            (speakerSelectionCounts.get(a.character.id) ?? 0) ||
+          a.index - b.index,
+      )
+      .map(({ character }) => ({
+        id: character.id,
+        key: character.key,
+        name:
+          character.name[locale] ||
+          Object.values(character.name).find(Boolean) ||
+          character.key,
+        search: `${Object.values(character.name).join(" ")} ${character.key}`,
+      })),
   ];
   const selected = options.find((option) => option.key === value);
   const filtered = options.filter((option) =>
@@ -44,6 +53,12 @@ export function SpeakerSelect({
       });
   }, [activeIndex, open, query]);
   const choose = (key: string) => {
+    const character = characters.find((item) => item.key === key);
+    if (character)
+      speakerSelectionCounts.set(
+        character.id,
+        (speakerSelectionCounts.get(character.id) ?? 0) + 1,
+      );
     onChange(key);
     input.current?.focus();
     setOpen(false);

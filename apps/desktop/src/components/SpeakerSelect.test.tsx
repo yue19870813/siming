@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { expect, test } from "vitest";
+import { beforeEach, expect, test } from "vitest";
 import { SpeakerSelect } from "./SpeakerSelect";
+import { speakerSelectionCounts } from "./speakerSelectionCounts";
+
+beforeEach(() => speakerSelectionCounts.clear());
 
 const characters = [
   {
@@ -75,4 +78,32 @@ test("supports localized names, escape cancellation, keyboard navigation and nar
   fireEvent.click(screen.getByRole("option", { name: "旁白" }));
   expect(screen.getByTestId("value")).toBeEmptyDOMElement();
   expect(input).toHaveValue("旁白");
+});
+
+test("ranks frequently selected characters first while keeping narrator and stable ties", () => {
+  const { unmount } = render(<Harness />);
+  const input = screen.getByRole("combobox");
+  const optionKeys = () =>
+    screen.getAllByRole("option").map((option) => option.textContent);
+
+  fireEvent.focus(input);
+  expect(optionKeys()).toEqual(["旁白", "杜尔hero.dur", "北门守卫guard.north"]);
+  fireEvent.click(screen.getByRole("option", { name: /北门守卫/ }));
+  fireEvent.click(input);
+  expect(optionKeys()).toEqual(["旁白", "北门守卫guard.north", "杜尔hero.dur"]);
+  fireEvent.click(screen.getByRole("option", { name: /杜尔/ }));
+  fireEvent.click(input);
+  expect(optionKeys()).toEqual(["旁白", "杜尔hero.dur", "北门守卫guard.north"]);
+  fireEvent.click(screen.getByRole("option", { name: /北门守卫/ }));
+  fireEvent.click(input);
+  expect(optionKeys()).toEqual(["旁白", "北门守卫guard.north", "杜尔hero.dur"]);
+  unmount();
+
+  render(<Harness />);
+  fireEvent.focus(screen.getByRole("combobox"));
+  expect(optionKeys()).toEqual(["旁白", "北门守卫guard.north", "杜尔hero.dur"]);
+  speakerSelectionCounts.clear();
+  fireEvent.blur(screen.getByRole("combobox"));
+  fireEvent.focus(screen.getByRole("combobox"));
+  expect(optionKeys()).toEqual(["旁白", "杜尔hero.dur", "北门守卫guard.north"]);
 });
