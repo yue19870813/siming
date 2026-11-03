@@ -247,3 +247,30 @@ test("rich body history coalesces typing, isolates formatting and retains source
   useEditorStore.getState().redo();
   expect(useEditorStore.getState().dirty).toBe(false);
 });
+
+test("pasted switch nodes receive fresh case ports without changing values", () => {
+  useEditorStore.getState().addNode("condition");
+  const id = useEditorStore.getState().selectedNodeId;
+  useEditorStore.getState().commit("配置枚举分支", (draft) => {
+    const node = draft.dialogues[0].nodes.find((item) => item.id === id)!;
+    delete node.data.condition;
+    node.data.switch = {
+      variable: "favor",
+      cases: [
+        { id: "low", value: 0 },
+        { id: "high", value: 10 },
+      ],
+    };
+  });
+  useEditorStore.getState().copySelectedNode();
+  useEditorStore.getState().pasteCopiedNode();
+  const state = useEditorStore.getState();
+  const node = state.project.dialogues[0].nodes.find(
+    (item) => item.id === state.selectedNodeId,
+  )!;
+  expect(node.data.switch!.cases.map((item) => item.value)).toEqual([0, 10]);
+  expect(node.data.switch!.cases.map((item) => item.id)).not.toEqual([
+    "low",
+    "high",
+  ]);
+});

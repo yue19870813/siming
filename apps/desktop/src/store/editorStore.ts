@@ -418,6 +418,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       x: node.position.x + pasteCount * 32,
       y: node.position.y + pasteCount * 32,
     };
+    if (node.data.switch) {
+      node.data.switch.cases = node.data.switch.cases.map((item) => ({
+        ...item,
+        id: createId(),
+      }));
+    }
     if (node.data.choices) {
       node.data.choices = node.data.choices.map((choice) => ({
         ...choice,

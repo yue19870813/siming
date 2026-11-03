@@ -32,6 +32,10 @@ export type DialogueNodeData = {
   speakerId?: string;
   choices?: ChoiceOption[];
   condition?: ConditionExpression;
+  switch?: {
+    variable: string;
+    cases: { id: string; value: boolean | number | string }[];
+  };
   event?: string;
   params?: Record<string, unknown>;
   hostEvents?: HostEvent[];

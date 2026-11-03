@@ -39,6 +39,13 @@ function orderedRows(dialogue: DialogueDocument): Row[] {
     rows.push({ node, path, depth });
 
     const edges = [...(outgoing.get(id) ?? [])].sort((a, b) => {
+      if (node.type === "condition" && node.data.switch) {
+        const order = [
+          ...node.data.switch.cases.map((item) => item.id),
+          "default",
+        ];
+        return order.indexOf(a.sourcePort) - order.indexOf(b.sourcePort);
+      }
       if (node.type === "condition") {
         return a.sourcePort === "true" ? -1 : b.sourcePort === "true" ? 1 : 0;
       }
@@ -51,7 +58,11 @@ function orderedRows(dialogue: DialogueDocument): Row[] {
     edges.forEach((edge, index) => {
       const branch =
         node.type === "condition"
-          ? edge.sourcePort.toUpperCase()
+          ? node.data.switch
+            ? edge.sourcePort === "default"
+              ? "默认"
+              : `case ${JSON.stringify(node.data.switch.cases.find((item) => item.id === edge.sourcePort)?.value)}`
+            : edge.sourcePort.toUpperCase()
           : node.type === "choice"
             ? String.fromCharCode(65 + index)
             : path;
@@ -103,7 +114,13 @@ export function TableView() {
                   : "");
               const next = dialogue.edges
                 .filter((edge) => edge.sourceNodeId === row.node.id)
-                .map((edge) => edge.sourcePort)
+                .map((edge) =>
+                  row.node.data.switch
+                    ? edge.sourcePort === "default"
+                      ? "默认"
+                      : `case ${JSON.stringify(row.node.data.switch.cases.find((item) => item.id === edge.sourcePort)?.value)}`
+                    : edge.sourcePort,
+                )
                 .join(" / ");
               return (
                 <tr

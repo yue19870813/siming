@@ -185,3 +185,20 @@ test("variable groups filter, inherit, move, and safely ungroup variables", () =
     useEditorStore.getState().project.resources.variables.at(-1)?.groupId,
   ).toBeUndefined();
 });
+
+test("switch variable references are protected and follow key changes", () => {
+  const project = useEditorStore.getState().project;
+  const key = project.resources.variables[0].key;
+  const node = project.dialogues[0].nodes[0];
+  node.data.switch = { variable: key, cases: [{ id: "one", value: 1 }] };
+  render(<ResourceView activity="variables" />);
+  fireEvent.change(screen.getByLabelText("Key"), {
+    target: { value: "renamed" },
+  });
+  expect(
+    useEditorStore.getState().project.dialogues[0].nodes[0].data.switch
+      ?.variable,
+  ).toBe("renamed");
+  fireEvent.click(screen.getByTitle("删除"));
+  expect(screen.getByRole("alert")).toHaveTextContent("无法删除");
+});

@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test } from "vitest";
-import { createDemoProject } from "../model/demo";
+import { createDemoProject, createNode } from "../model/demo";
 import { nodeDropEvent } from "../lib/nodeDrag";
 import { useEditorStore } from "../store/editorStore";
 import { CanvasView } from "./CanvasView";
@@ -126,4 +126,26 @@ test("host summaries show ordered names, overflow count and no payload", () => {
   expect(summary).toHaveTextContent("+1");
   expect(summary).toHaveAttribute("title", "ui.first\n未命名消息\nui.third");
   expect(summary.outerHTML).not.toContain("body-must-not-appear");
+});
+
+test("switch nodes render independent case handles plus a default handle", () => {
+  const project = createDemoProject();
+  const node = createNode("condition", { x: 0, y: 0 });
+  delete node.data.condition;
+  node.data.switch = {
+    variable: "stage",
+    cases: [
+      { id: "ready", value: "ready" },
+      { id: "done", value: "done" },
+    ],
+  };
+  project.dialogues[0].nodes.push(node);
+  useEditorStore.getState().setProject(project);
+  const { container } = render(<CanvasView />);
+  const card = container.querySelector(".flow-node--condition")!;
+  expect(card).toHaveTextContent('case "ready"');
+  expect(card).toHaveTextContent('case "done"');
+  expect(card.querySelectorAll(".react-flow__handle.source")).toHaveLength(3);
+  expect(card.querySelector('[data-handleid="default"]')).not.toBeNull();
+  expect(card.querySelector('[data-handleid="true"]')).toBeNull();
 });

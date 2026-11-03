@@ -9,7 +9,7 @@ Siming is a cross-platform dialogue editor for games and interactive narratives.
 ## Features
 
 - **Visual dialogue editing**: Build dialogue, choice, condition, event, and end nodes as connected graphs.
-- **Branching and conditions**: Drive narrative branches with variables and player choices.
+- **Branching and conditions**: Drive narrative branches with variables and player choices. Condition nodes support both TRUE/FALSE expressions and switch/case branches with a default exit.
 - **Localization**: Configure multiple locales and export separate localized resources.
 - **Host and business events**: Send presentation notifications or invoke asynchronous events implemented by the game host.
 - **Runtime export**: Export JSON, XML, or binary data in bundled or directory-chunked layouts.

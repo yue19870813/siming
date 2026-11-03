@@ -17,6 +17,7 @@ import {
   NodeProps,
   Position,
   ReactFlow,
+  useUpdateNodeInternals,
   useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -70,6 +71,13 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
   const { node, locale, projectRoot, character, defaultLocale } =
     data as CanvasNodeData;
   const meta = typeMeta[node.type];
+  const updateNodeInternals = useUpdateNodeInternals();
+  const switchPorts = JSON.stringify(
+    node.data.switch?.cases.map((item) => item.id),
+  );
+  useEffect(() => {
+    updateNodeInternals(node.id);
+  }, [node.id, switchPorts, updateNodeInternals]);
   const Icon = meta.icon;
   const text = resolveBody(node.data.text, locale, defaultLocale) ?? meta.label;
   const speakerName = character
@@ -139,8 +147,30 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
               />
             </div>
           ))}
-        {node.type === "condition" && (
+        {node.type === "condition" && !node.data.switch && (
           <code>{formatCondition(node.data.condition)}</code>
+        )}
+        {node.type === "condition" && node.data.switch && (
+          <div className="switch-node-cases">
+            <code>switch {node.data.switch.variable || "选择变量"}</code>
+            {[
+              ...node.data.switch.cases.map((item) => ({
+                id: item.id,
+                label: `case ${JSON.stringify(item.value)}`,
+              })),
+              { id: "default", label: "默认" },
+            ].map((item) => (
+              <div className="switch-node-case" key={item.id}>
+                <span title={item.label}>{item.label}</span>
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={item.id}
+                  style={{ top: "50%" }}
+                />
+              </div>
+            ))}
+          </div>
         )}
         {node.type === "event" && (
           <code>{node.data.event || "选择业务事件"}</code>
@@ -164,7 +194,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
           )}
         </footer>
       )}
-      {node.type === "condition" && (
+      {node.type === "condition" && !node.data.switch && (
         <>
           <span className="branch-label branch-label--true">TRUE</span>
           <Handle

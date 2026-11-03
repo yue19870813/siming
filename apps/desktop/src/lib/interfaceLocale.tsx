@@ -4,6 +4,17 @@ import type { SystemSettings } from "../model/types";
 type InterfaceLocale = SystemSettings["interfaceLocale"];
 
 const english = new Map<string, string>([
+  ["分支模式", "Branch mode"],
+  ["布尔判断（TRUE / FALSE）", "Boolean (TRUE / FALSE)"],
+  ["枚举分支（Switch / Case）", "Switch / Case"],
+  ["判断变量", "Switch variable"],
+  ["添加 Case", "Add Case"],
+  ["默认", "Default"],
+  [
+    "未匹配任何 Case 时，走默认出口。",
+    "Use the default exit when no case matches.",
+  ],
+  ["Case 值不能重复。", "Case values must be unique."],
   ["画布连线样式", "Canvas connection style"],
   ["自动避让（圆角折线）", "Automatic routing (rounded orthogonal)"],
   ["经典曲线（原样式）", "Classic curves (original style)"],

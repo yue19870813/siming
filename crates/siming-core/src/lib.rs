@@ -308,6 +308,20 @@ pub enum ConditionExpression {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SwitchCondition {
+    pub variable: String,
+    pub cases: Vec<SwitchCase>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SwitchCase {
+    pub id: String,
+    pub value: Value,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ComparisonOperator {
     #[serde(rename = "==")]
@@ -1246,6 +1260,30 @@ fn advance_simulation(
                 }
                 session.status = SimulationStatus::WaitingChoice;
             }
+            NodeType::Condition if node.data.contains_key("switch") => {
+                let switch: SwitchCondition =
+                    serde_json::from_value(node.data["switch"].clone())
+                        .map_err(|error| SimulationError::InvalidCondition(error.to_string()))?;
+                let actual = session.variables.get(&switch.variable).ok_or_else(|| {
+                    SimulationError::InvalidCondition(format!("未定义变量 {}", switch.variable))
+                })?;
+                let mut port = "default";
+                for case in &switch.cases {
+                    if compare_values(actual, ComparisonOperator::Equal, &case.value)? {
+                        port = &case.id;
+                        break;
+                    }
+                }
+                push_log(
+                    session,
+                    SimulationLogKind::Condition,
+                    Some(&node.id),
+                    Some(&node.key),
+                    format!("枚举分支：{port}"),
+                    serde_json::json!({ "port": port, "switch": switch }),
+                );
+                session.current_node_id = outgoing_target(dialogue, &node.id, port);
+            }
             NodeType::Condition => {
                 let expression: ConditionExpression =
                     serde_json::from_value(node.data.get("condition").cloned().ok_or_else(
@@ -1504,7 +1542,71 @@ fn validate_node_data(
         }
     }
 
-    if node.node_type == NodeType::Condition {
+    if node.node_type == NodeType::Condition && node.data.contains_key("switch") {
+        let field = format!("{field_base}/data/switch");
+        match serde_json::from_value::<SwitchCondition>(node.data["switch"].clone()) {
+            Ok(switch) => {
+                let mut ids = BTreeSet::new();
+                let invalid = switch.cases.is_empty()
+                    || node.data.contains_key("condition")
+                    || switch.cases.iter().enumerate().any(|(index, case)| {
+                        case.id.trim().is_empty()
+                            || case.id == "default"
+                            || !ids.insert(&case.id)
+                            || switch.cases[..index].iter().any(|previous| {
+                                compare_values(
+                                    &previous.value,
+                                    ComparisonOperator::Equal,
+                                    &case.value,
+                                )
+                                .unwrap_or(false)
+                            })
+                    });
+                if invalid {
+                    diagnostics.push(node_error(
+                        "SWITCH_INVALID",
+                        "枚举分支至少需要一个 case；出口 ID 和值不能重复，也不能同时配置布尔条件",
+                        file,
+                        node,
+                        field.clone(),
+                    ));
+                }
+                for (index, case) in switch.cases.iter().enumerate() {
+                    validate_condition_expression(
+                        &ConditionExpression::Compare {
+                            variable: switch.variable.clone(),
+                            operator: ComparisonOperator::Equal,
+                            value: case.value.clone(),
+                        },
+                        variable_by_key,
+                        used_variables,
+                        file,
+                        node,
+                        &format!("{field}/cases/{index}/value"),
+                        diagnostics,
+                    );
+                }
+                if switch.cases.is_empty()
+                    && !variable_by_key.contains_key(switch.variable.as_str())
+                {
+                    diagnostics.push(node_error(
+                        "CONDITION_VARIABLE_MISSING",
+                        "条件引用了未定义变量",
+                        file,
+                        node,
+                        field,
+                    ));
+                }
+            }
+            Err(_) => diagnostics.push(node_error(
+                "SWITCH_INVALID",
+                "枚举分支结构无效",
+                file,
+                node,
+                field,
+            )),
+        }
+    } else if node.node_type == NodeType::Condition {
         match node
             .data
             .get("condition")
@@ -1604,6 +1706,22 @@ fn validate_node_ports(
             ports.len() == 1 && ports[0] == "next"
         }
         NodeType::End => ports.is_empty(),
+        NodeType::Condition if node.data.contains_key("switch") => {
+            serde_json::from_value::<SwitchCondition>(node.data["switch"].clone()).is_ok_and(
+                |switch| {
+                    let expected: BTreeSet<_> = switch
+                        .cases
+                        .iter()
+                        .map(|case| case.id.as_str())
+                        .chain(std::iter::once("default"))
+                        .collect();
+                    ports.len() == expected.len()
+                        && expected
+                            .iter()
+                            .all(|id| ports.iter().filter(|port| *port == id).count() == 1)
+                },
+            )
+        }
         NodeType::Condition => {
             ports.len() == 2
                 && ports.iter().filter(|port| **port == "true").count() == 1
@@ -2637,6 +2755,203 @@ mod tests {
         })
         .unwrap_err();
         assert!(error.to_string().contains("当前没有可显示的选项"));
+    }
+
+    #[test]
+    fn switch_cases_simulate_and_compile_to_compatible_conditions() {
+        for (variable_type, values, unmatched) in [
+            (
+                VariableType::Number,
+                vec![serde_json::json!(0), serde_json::json!(10)],
+                serde_json::json!(99),
+            ),
+            (
+                VariableType::String,
+                vec![serde_json::json!("ready"), serde_json::json!("done")],
+                serde_json::json!("unknown"),
+            ),
+        ] {
+            let (manifest, mut dialogue, mut resources) = simulation_fixture();
+            resources.variables[0].variable_type = variable_type;
+            resources.variables[0].default_value = unmatched.clone();
+            dialogue
+                .nodes
+                .retain(|node| matches!(node.key.as_str(), "start" | "line" | "condition" | "end"));
+            let line = dialogue
+                .nodes
+                .iter()
+                .find(|node| node.key == "line")
+                .unwrap()
+                .id
+                .clone();
+            let end = dialogue
+                .nodes
+                .iter()
+                .find(|node| node.key == "end")
+                .unwrap()
+                .id
+                .clone();
+            let start = dialogue.entry_node_id.clone();
+            let node = dialogue
+                .nodes
+                .iter_mut()
+                .find(|node| node.key == "condition")
+                .unwrap();
+            let switch_id = node.id.clone();
+            node.data.remove("condition");
+            node.data.insert(
+                "switch".to_owned(),
+                serde_json::json!({"variable": "favor", "cases": [
+                    {"id": "first", "value": values[0]}, {"id": "second", "value": values[1]}
+                ]}),
+            );
+            node.data.insert(
+                "hostEvents".to_owned(),
+                serde_json::json!([{"name": "switch.enter", "payload": {}}]),
+            );
+            dialogue.edges = vec![
+                edge(&start, "next", &switch_id),
+                edge(&switch_id, "first", &line),
+                edge(&switch_id, "second", &end),
+                edge(&switch_id, "default", &line),
+                edge(&line, "next", &end),
+            ];
+            let compiled =
+                compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap();
+            assert_eq!(
+                compiled,
+                compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap()
+            );
+            let source = serde_json::to_string(&dialogue).unwrap();
+            assert_eq!(parse_dialogue_document(&source).unwrap(), dialogue);
+            let runtime = &compiled.project.dialogues[&dialogue.id];
+            assert_eq!(runtime.nodes.len(), dialogue.nodes.len() + 1);
+            for (actual, port, expected) in [
+                (values[0].clone(), "first", &line),
+                (values[1].clone(), "second", &end),
+                (unmatched, "default", &line),
+            ] {
+                resources.variables[0].default_value = actual.clone();
+                let session = simulate_step(SimulationRequest {
+                    manifest: manifest.clone(),
+                    dialogue: dialogue.clone(),
+                    resources: resources.clone(),
+                    session: None,
+                    action: SimulationAction::Start {
+                        start_node_id: Some(switch_id.clone()),
+                        locale: "zh-CN".to_owned(),
+                    },
+                })
+                .unwrap();
+                assert_eq!(session.current_node_id.as_ref(), Some(expected));
+                assert!(
+                    session
+                        .trace
+                        .iter()
+                        .any(|log| log.details.get("port").and_then(Value::as_str) == Some(port))
+                );
+                assert_eq!(
+                    session
+                        .trace
+                        .iter()
+                        .filter(|log| log
+                            .details
+                            .get("event")
+                            .and_then(|event| event.get("name"))
+                            .and_then(Value::as_str)
+                            == Some("switch.enter"))
+                        .count(),
+                    1
+                );
+                let mut id = switch_id.clone();
+                let mut host_count = 0;
+                while let RuntimeNode::Condition(node) = &runtime.nodes[&id] {
+                    host_count += node.host_events.len();
+                    id = if evaluate_condition(
+                        &node.condition,
+                        &BTreeMap::from([("favor".to_owned(), actual.clone())]),
+                    )
+                    .unwrap()
+                    {
+                        node.branches.true_branch.clone()
+                    } else {
+                        node.branches.false_branch.clone()
+                    };
+                }
+                assert_eq!(&id, expected);
+                assert_eq!(host_count, 1);
+            }
+            let switch_node = dialogue
+                .nodes
+                .iter_mut()
+                .find(|node| node.id == switch_id)
+                .unwrap();
+            switch_node.data.get_mut("switch").unwrap()["cases"][1]["value"] = values[0].clone();
+            assert!(
+                validate_project(&manifest, std::slice::from_ref(&dialogue), &resources)
+                    .iter()
+                    .any(|item| item.code == "SWITCH_INVALID")
+            );
+            dialogue.edges.retain(|edge| edge.source_port != "default");
+            assert!(
+                validate_project(&manifest, &[dialogue], &resources)
+                    .iter()
+                    .any(|item| item.code == "NODE_INVALID_PORTS")
+            );
+        }
+    }
+
+    #[test]
+    fn switch_validation_rejects_ambiguous_or_mistyped_cases() {
+        let (manifest, mut dialogue, resources) = simulation_fixture();
+        let node = dialogue
+            .nodes
+            .iter_mut()
+            .find(|node| node.node_type == NodeType::Condition)
+            .unwrap();
+        node.data.remove("condition");
+        let id = node.id.clone();
+        for (switch, code) in [
+            (
+                serde_json::json!({"variable": "favor", "cases": []}),
+                "SWITCH_INVALID",
+            ),
+            (
+                serde_json::json!({"variable": "favor", "cases": [{"id": "default", "value": 1}]}),
+                "SWITCH_INVALID",
+            ),
+            (
+                serde_json::json!({"variable": "favor", "cases": [{"id": "same", "value": 1}, {"id": "same", "value": 2}]}),
+                "SWITCH_INVALID",
+            ),
+            (
+                serde_json::json!({"variable": "favor", "cases": [{"id": "a", "value": 1}, {"id": "b", "value": 1.0}]}),
+                "SWITCH_INVALID",
+            ),
+            (
+                serde_json::json!({"variable": "favor", "cases": [{"id": "a", "value": "1"}]}),
+                "CONDITION_VALUE_TYPE_MISMATCH",
+            ),
+            (
+                serde_json::json!({"variable": "missing", "cases": [{"id": "a", "value": 1}]}),
+                "CONDITION_VARIABLE_MISSING",
+            ),
+            (serde_json::Value::Null, "SWITCH_INVALID"),
+        ] {
+            dialogue
+                .nodes
+                .iter_mut()
+                .find(|node| node.id == id)
+                .unwrap()
+                .data
+                .insert("switch".to_owned(), switch);
+            assert!(
+                validate_project(&manifest, std::slice::from_ref(&dialogue), &resources)
+                    .iter()
+                    .any(|item| item.code == code),
+                "expected {code}"
+            );
+        }
     }
 
     #[test]

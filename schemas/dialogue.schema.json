@@ -228,6 +228,27 @@
             "condition": {
               "$ref": "#/$defs/conditionExpression"
             },
+            "switch": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["variable", "cases"],
+              "properties": {
+                "variable": { "$ref": "#/$defs/key" },
+                "cases": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "value"],
+                    "properties": {
+                      "id": { "type": "string", "minLength": 1, "not": { "const": "default" } },
+                      "value": { "anyOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }] }
+                    }
+                  }
+                }
+              }
+            },
             "choices": {
               "type": "array",
               "minItems": 1,

@@ -689,7 +689,8 @@ function countReferences(
         count += 1;
       if (
         resourceKey === "variables" &&
-        (conditionUsesVariable(node.data.condition, key) ||
+        (node.data.switch?.variable === key ||
+          conditionUsesVariable(node.data.condition, key) ||
           node.data.choices?.some((choice) =>
             conditionUsesVariable(choice.visibleWhen, key),
           ))
@@ -719,6 +720,8 @@ function replaceReferences(
         node.data.speakerId = nextKey;
       }
       if (resourceKey === "variables") {
+        if (node.data.switch?.variable === previousKey)
+          node.data.switch.variable = nextKey;
         renameConditionVariable(node.data.condition, previousKey, nextKey);
         node.data.choices?.forEach((choice) =>
           renameConditionVariable(choice.visibleWhen, previousKey, nextKey),

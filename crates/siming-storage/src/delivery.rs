@@ -994,6 +994,46 @@ mod tests {
     use quick_xml::{Reader, events::Event};
 
     #[test]
+    fn switch_exports_deterministically_in_all_formats_and_layouts() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/minimal-project");
+        let mut snapshot = open_project(&fixture).unwrap();
+        snapshot.resources.variables.push(serde_json::from_value(serde_json::json!({
+            "id": Uuid::new_v4().to_string(), "key": "stage", "type": "string", "defaultValue": "ready"
+        })).unwrap());
+        let dialogue = &mut snapshot.dialogues[0];
+        let line = dialogue.nodes[1].id.clone();
+        let end = dialogue.nodes[2].id.clone();
+        let id = Uuid::new_v4().to_string();
+        dialogue.edges[0].target_node_id = id.clone();
+        dialogue.nodes.push(serde_json::from_value(serde_json::json!({
+            "id": id, "key": "stage_switch", "type": "condition", "position": {"x": 0, "y": 0},
+            "data": {"switch": {"variable": "stage", "cases": [{"id": "ready", "value": "ready"}, {"id": "done", "value": "done"}]}}
+        })).unwrap());
+        for (port, target) in [("ready", &line), ("done", &end), ("default", &line)] {
+            dialogue.edges.push(serde_json::from_value(serde_json::json!({
+                "id": Uuid::new_v4().to_string(), "sourceNodeId": id, "sourcePort": port, "targetNodeId": target, "targetPort": "in"
+            })).unwrap());
+        }
+        let root = test_directory("switch-export");
+        for format in [ExportFormat::Json, ExportFormat::Xml, ExportFormat::Binary] {
+            for layout in [ExportLayout::Bundled, ExportLayout::DirectoryChunks] {
+                let first = root.join(format!("{format:?}-{layout:?}-first"));
+                let second = root.join(format!("{format:?}-{layout:?}-second"));
+                let report =
+                    export_project(&snapshot, Some(&first), format, Some(layout), false).unwrap();
+                export_project(&snapshot, Some(&second), format, Some(layout), false).unwrap();
+                for file in report.files {
+                    assert_eq!(
+                        fs::read(first.join(&file.path)).unwrap(),
+                        fs::read(second.join(&file.path)).unwrap()
+                    );
+                }
+            }
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn dynamic_choice_condition_survives_every_export_format_and_layout() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/minimal-project");
         let mut snapshot = open_project(&fixture).unwrap();

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { expect, test, vi } from "vitest";
 import { createDemoProject, createNode } from "../model/demo";
 import { useEditorStore } from "../store/editorStore";
 import { Inspector } from "./Inspector";
@@ -71,3 +71,68 @@ test.each(["dialogue", "condition"] as const)(
     expect(screen.getByText(node.key)).toBeInTheDocument();
   },
 );
+
+test("switch cases keep stable ports when edited and remove only deleted connections", () => {
+  const project = createDemoProject();
+  const node = createNode("condition", { x: 0, y: 0 });
+  project.dialogues[0].nodes.push(node);
+  const target = project.dialogues[0].nodes[0].id;
+  useEditorStore.getState().setProject(project);
+  useEditorStore.getState().setSelectedNode(node.id);
+  render(
+    <Inspector width={320} onResizeStart={() => {}} onResizeBy={() => {}} />,
+  );
+  fireEvent.change(screen.getByLabelText("分支模式"), {
+    target: { value: "switch" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "添加 Case" }));
+  const getNode = () =>
+    useEditorStore
+      .getState()
+      .project.dialogues[0].nodes.find((item) => item.id === node.id)!;
+  const first = getNode().data.switch!.cases[0].id;
+  const second = getNode().data.switch!.cases[1].id;
+  act(() =>
+    useEditorStore.getState().commit("连接 case", (draft) => {
+      draft.dialogues[0].edges.push(
+        ...[first, second, "default"].map((port) => ({
+          id: `edge-${port}`,
+          sourceNodeId: node.id,
+          sourcePort: port,
+          targetNodeId: target,
+          targetPort: "in",
+        })),
+      );
+    }),
+  );
+  fireEvent.change(screen.getByLabelText("Case 1"), {
+    target: { value: "20" },
+  });
+  expect(getNode().data.switch!.cases[0]).toEqual({ id: first, value: 20 });
+  fireEvent.click(screen.getByTitle("删除 Case 2"));
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].edges.filter(
+        (edge) => edge.sourceNodeId === node.id,
+      )
+      .map((edge) => edge.sourcePort),
+  ).toEqual([first, "default"]);
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  fireEvent.change(screen.getByLabelText("分支模式"), {
+    target: { value: "boolean" },
+  });
+  expect(getNode().data.switch).toBeDefined();
+  confirm.mockReturnValue(true);
+  fireEvent.change(screen.getByLabelText("分支模式"), {
+    target: { value: "boolean" },
+  });
+  expect(getNode().data.switch).toBeUndefined();
+  expect(getNode().data.condition).toBeDefined();
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].edges.some((edge) => edge.sourceNodeId === node.id),
+  ).toBe(false);
+  confirm.mockRestore();
+});

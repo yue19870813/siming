@@ -3836,3 +3836,34 @@ html[data-theme="light"] .cm-editor {
   justify-content: flex-end;
   gap: 10px;
 }
+
+.switch-case-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.switch-case-editor-row > label {
+  flex: 1;
+  min-width: 0;
+}
+.switch-case-hint {
+  color: var(--muted);
+  font-size: var(--ui-font-11, 11px);
+}
+.switch-node-case {
+  position: relative;
+  margin: 0 -10px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+}
+.switch-node-case > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.switch-node-cases > code {
+  display: block;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}

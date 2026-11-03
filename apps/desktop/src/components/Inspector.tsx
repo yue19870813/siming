@@ -311,17 +311,10 @@ function NodeInspector({
           </>
         )}
         {node.type === "condition" && (
-          <ConditionEditor
-            expression={
-              node.data.condition ??
-              createConditionLeaf(project.resources.variables[0])
-            }
+          <ConditionNodeEditor
+            node={node}
             variables={project.resources.variables}
-            onChange={(expression) =>
-              update((draft) => {
-                draft.data.condition = expression;
-              }, "修改条件表达式")
-            }
+            update={update}
           />
         )}
         {node.type === "event" && (
@@ -437,6 +430,196 @@ function NodeInspector({
           <Trash2 size={14} /> 删除节点
         </button>
       </Section>
+    </>
+  );
+}
+
+function nextCaseValue(
+  variable: VariableDefinition | undefined,
+  values: (string | number | boolean)[],
+) {
+  if (variable?.type === "boolean")
+    return values.includes(false) ? true : false;
+  let sequence = 0;
+  while (
+    values.includes(
+      variable?.type === "number" ? sequence : `case-${sequence + 1}`,
+    )
+  )
+    sequence++;
+  return variable?.type === "number" ? sequence : `case-${sequence + 1}`;
+}
+
+function ConditionNodeEditor({
+  node,
+  variables,
+  update,
+}: {
+  node: DialogueNode;
+  variables: VariableDefinition[];
+  update: (
+    recipe: (draft: DialogueNode, dialogue: DialogueDocument) => void,
+    label?: string,
+  ) => void;
+}) {
+  const switchCondition = node.data.switch;
+  const variable = variables.find(
+    (item) => item.key === switchCondition?.variable,
+  );
+  const duplicateValues = switchCondition?.cases.some((item, index, cases) =>
+    cases.slice(0, index).some((previous) => previous.value === item.value),
+  );
+  return (
+    <>
+      <Field label="分支模式">
+        <select
+          value={switchCondition ? "switch" : "boolean"}
+          onChange={(event) => {
+            const mode = event.target.value;
+            const dialogue = useEditorStore
+              .getState()
+              .project.dialogues.find((item) =>
+                item.nodes.some((entry) => entry.id === node.id),
+              );
+            if (
+              dialogue?.edges.some((edge) => edge.sourceNodeId === node.id) &&
+              !window.confirm(
+                "切换分支模式会移除当前节点的出口连线，是否继续？",
+              )
+            )
+              return;
+            update((draft, dialogueDraft) => {
+              dialogueDraft.edges = dialogueDraft.edges.filter(
+                (edge) => edge.sourceNodeId !== draft.id,
+              );
+              if (mode === "switch") {
+                delete draft.data.condition;
+                draft.data.switch = {
+                  variable: variables[0]?.key ?? "",
+                  cases: [
+                    { id: createId(), value: nextCaseValue(variables[0], []) },
+                  ],
+                };
+              } else {
+                delete draft.data.switch;
+                draft.data.condition = createConditionLeaf(variables[0]);
+              }
+            }, "切换条件分支模式");
+          }}
+        >
+          <option value="boolean">布尔判断（TRUE / FALSE）</option>
+          <option value="switch">枚举分支（Switch / Case）</option>
+        </select>
+      </Field>
+      {!switchCondition ? (
+        <ConditionEditor
+          expression={node.data.condition ?? createConditionLeaf(variables[0])}
+          variables={variables}
+          onChange={(expression) =>
+            update((draft) => {
+              draft.data.condition = expression;
+            }, "修改条件表达式")
+          }
+        />
+      ) : (
+        <>
+          <Field label="判断变量">
+            <select
+              value={switchCondition.variable}
+              onChange={(event) =>
+                update((draft) => {
+                  const next = variables.find(
+                    (item) => item.key === event.target.value,
+                  );
+                  const values: (string | number | boolean)[] = [];
+                  draft.data.switch!.variable = event.target.value;
+                  draft.data.switch!.cases = draft.data.switch!.cases.map(
+                    (item) => {
+                      const value =
+                        typeof item.value === next?.type
+                          ? item.value
+                          : nextCaseValue(next, values);
+                      values.push(value);
+                      return { ...item, value };
+                    },
+                  );
+                }, "修改枚举判断变量")
+              }
+            >
+              <option value="">选择变量</option>
+              {variables.map((item) => (
+                <option key={item.id} value={item.key}>
+                  {item.key}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="switch-case-editor">
+            {switchCondition.cases.map((item, index) => (
+              <div className="switch-case-editor-row" key={item.id}>
+                <Field label={`Case ${index + 1}`}>
+                  <ConditionValueEditor
+                    variable={variable}
+                    value={item.value}
+                    onChange={(value) =>
+                      update((draft) => {
+                        draft.data.switch!.cases[index].value = value;
+                      }, "修改枚举分支值")
+                    }
+                  />
+                </Field>
+                <button
+                  title={`删除 Case ${index + 1}`}
+                  disabled={switchCondition.cases.length <= 1}
+                  onClick={() =>
+                    update((draft, dialogue) => {
+                      draft.data.switch!.cases =
+                        draft.data.switch!.cases.filter(
+                          (entry) => entry.id !== item.id,
+                        );
+                      dialogue.edges = dialogue.edges.filter(
+                        (edge) =>
+                          edge.sourceNodeId !== draft.id ||
+                          edge.sourcePort !== item.id,
+                      );
+                    }, "删除枚举分支")
+                  }
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            {duplicateValues && (
+              <p className="form-error" role="alert">
+                Case 值不能重复。
+              </p>
+            )}
+            <button
+              className="button button--ghost"
+              disabled={
+                !variable ||
+                (variable.type === "boolean" &&
+                  switchCondition.cases.length >= 2)
+              }
+              onClick={() =>
+                update((draft) => {
+                  const cases = draft.data.switch!.cases;
+                  cases.push({
+                    id: createId(),
+                    value: nextCaseValue(
+                      variable,
+                      cases.map((item) => item.value),
+                    ),
+                  });
+                }, "添加枚举分支")
+              }
+            >
+              <Plus size={13} /> 添加 Case
+            </button>
+            <p className="switch-case-hint">未匹配任何 Case 时，走默认出口。</p>
+          </div>
+        </>
+      )}
     </>
   );
 }

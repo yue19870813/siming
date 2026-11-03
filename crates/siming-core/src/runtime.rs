@@ -475,7 +475,76 @@ fn compile_dialogue(
     locales: &mut BTreeMap<String, RuntimeLocaleResource>,
 ) -> Result<RuntimeDialogue, CompileError> {
     let mut nodes = BTreeMap::new();
+    let mut reserved_ids: std::collections::BTreeSet<String> =
+        dialogue.nodes.iter().map(|node| node.id.clone()).collect();
+    let mut reserved_keys: std::collections::BTreeSet<String> =
+        dialogue.nodes.iter().map(|node| node.key.clone()).collect();
     for node in &dialogue.nodes {
+        if node.node_type == NodeType::Condition && node.data.contains_key("switch") {
+            use sha2::{Digest, Sha256};
+            let switch: crate::SwitchCondition = value(node, "switch")?;
+            let target = |port: &str| {
+                dialogue
+                    .edges
+                    .iter()
+                    .find(|edge| edge.source_node_id == node.id && edge.source_port == port)
+                    .map(|edge| edge.target_node_id.clone())
+                    .ok_or_else(|| invalid_node(node, "枚举分支缺少出口"))
+            };
+            let mut ids = vec![node.id.clone()];
+            let mut keys = vec![node.key.clone()];
+            for case in switch.cases.iter().skip(1) {
+                let mut salt = 0;
+                loop {
+                    let hash = Sha256::digest(
+                        format!("siming-switch:{}:{}:{salt}", node.id, case.id).as_bytes(),
+                    );
+                    let id = uuid::Uuid::from_bytes(hash[..16].try_into().unwrap()).to_string();
+                    let key = format!("{}.case-{}", node.key, id);
+                    if !reserved_ids.contains(&id) && !reserved_keys.contains(&key) {
+                        reserved_ids.insert(id.clone());
+                        reserved_keys.insert(key.clone());
+                        ids.push(id);
+                        keys.push(key);
+                        break;
+                    }
+                    salt += 1;
+                }
+            }
+            for (index, case) in switch.cases.iter().enumerate() {
+                nodes.insert(
+                    ids[index].clone(),
+                    RuntimeNode::Condition(RuntimeConditionNode {
+                        key: keys[index].clone(),
+                        node_type: RuntimeNodeType::Condition,
+                        host_events: if index == 0 {
+                            node.data
+                                .get("hostEvents")
+                                .cloned()
+                                .map(serde_json::from_value)
+                                .transpose()
+                                .map_err(|error| invalid_node(node, error))?
+                                .unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        },
+                        condition: ConditionExpression::Compare {
+                            variable: switch.variable.clone(),
+                            operator: crate::ComparisonOperator::Equal,
+                            value: case.value.clone(),
+                        },
+                        branches: RuntimeBranches {
+                            true_branch: target(&case.id)?,
+                            false_branch: match ids.get(index + 1) {
+                                Some(id) => id.clone(),
+                                None => target("default")?,
+                            },
+                        },
+                    }),
+                );
+            }
+            continue;
+        }
         nodes.insert(
             node.id.clone(),
             compile_node(manifest, dialogue, node, locales)?,
