@@ -597,6 +597,7 @@ test("system language and editor font size settings are applied", async () => {
   fireEvent.click(screen.getByRole("button", { name: "保存系统设置" }));
 
   await waitFor(() => {
+    expect(screen.getByRole("button", { name: "已保存" })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("en-US");
     expect(document.documentElement.dataset.uiFontSize).toBe("large");
     expect(

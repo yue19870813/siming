@@ -4,7 +4,15 @@ import {
   migrateDialogueDirectory,
   withinDialogueRoot,
 } from "../lib/dialogueDirectoryMigration";
-import { FolderCog, Info, MonitorCog, RotateCcw } from "lucide-react";
+import {
+  Check,
+  CircleAlert,
+  FolderCog,
+  Info,
+  LoaderCircle,
+  MonitorCog,
+  RotateCcw,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { chooseProjectDirectory } from "../lib/projectApi";
 import { DEFAULT_PROJECT_LOCALES, localeName } from "../model/locales";
@@ -44,7 +52,10 @@ export function SettingsView({
   onSettingsChange,
 }: {
   settings: SystemSettings;
-  onSettingsChange: (settings: SystemSettings, showNotice?: boolean) => void;
+  onSettingsChange: (
+    settings: SystemSettings,
+    showNotice?: boolean,
+  ) => void | Promise<boolean>;
 }) {
   const project = useEditorStore((state) => state.project);
   const commit = useEditorStore((state) => state.commit);
@@ -735,6 +746,7 @@ export function SettingsView({
                 }}
                 onSave={() => onSettingsChange(systemDraft)}
                 saveLabel="保存系统设置"
+                showSaveFeedback
               />
             </>
           ) : (
@@ -824,20 +836,64 @@ function SettingsActions({
   onReset,
   onSave,
   saveLabel,
+  showSaveFeedback = false,
 }: {
   note: string;
   onReset: () => void;
-  onSave: () => void;
+  onSave: () => void | Promise<boolean>;
   saveLabel: string;
+  showSaveFeedback?: boolean;
 }) {
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "failed"
+  >("idle");
+  const save = async () => {
+    if (!showSaveFeedback) {
+      await onSave();
+      return;
+    }
+    setSaveStatus("saving");
+    try {
+      const result = await onSave();
+      setSaveStatus(
+        typeof result === "boolean" ? (result ? "saved" : "failed") : "idle",
+      );
+    } catch {
+      setSaveStatus("failed");
+    }
+  };
+  const statusLabel = {
+    idle: saveLabel,
+    saving: "保存中…",
+    saved: saveLabel === "保存系统设置" ? "已保存" : "已应用",
+    failed: "保存失败",
+  }[saveStatus];
+
   return (
     <footer className="settings-actions">
       <span>{note}</span>
       <button className="button button--ghost" onClick={onReset}>
         <RotateCcw size={13} /> 恢复默认
       </button>
-      <button className="button button--primary" onClick={onSave}>
-        {saveLabel}
+      <button
+        className={`button ${
+          showSaveFeedback && saveStatus === "saved"
+            ? "button--success"
+            : showSaveFeedback && saveStatus === "failed"
+              ? "button--danger"
+              : "button--primary"
+        }`}
+        onClick={() => void save()}
+        disabled={showSaveFeedback && saveStatus === "saving"}
+      >
+        {showSaveFeedback && saveStatus === "saving" ? (
+          <LoaderCircle size={14} className="settings-save-spinner" />
+        ) : showSaveFeedback && saveStatus === "saved" ? (
+          <Check size={14} />
+        ) : showSaveFeedback && saveStatus === "failed" ? (
+          <CircleAlert size={14} />
+        ) : null}
+        {showSaveFeedback ? statusLabel : saveLabel}
       </button>
     </footer>
   );

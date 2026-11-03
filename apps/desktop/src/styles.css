@@ -2923,6 +2923,16 @@ html.is-dragging-node * {
   font-size: var(--ui-font-8, 8px);
 }
 
+.settings-save-spinner {
+  animation: settings-save-spin 0.9s linear infinite;
+}
+
+@keyframes settings-save-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .form-grid label > small {
   color: var(--faint);
   font-size: var(--ui-font-9, 9px);

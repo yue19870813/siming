@@ -529,14 +529,19 @@ export default function App() {
     }
   }
 
-  async function handleSettingsChange(next: SystemSettings, showNotice = true) {
+  async function handleSettingsChange(
+    next: SystemSettings,
+    showNotice = true,
+  ): Promise<boolean> {
     settingsRef.current = next;
     setSettings(next);
     try {
       await writeSystemSettings(next);
       if (showNotice) setNotice("系统设置已保存在本机。");
+      return true;
     } catch (error) {
       setNotice(`系统设置保存失败：${errorMessage(error)}`);
+      return false;
     }
   }
 
