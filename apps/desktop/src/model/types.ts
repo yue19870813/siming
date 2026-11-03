@@ -170,6 +170,7 @@ export type SystemSettings = {
   recoverySnapshotIntervalSeconds: number;
   restoreLastProject: boolean;
   lastProjectPath: string | null;
+  lastDialogueId?: string | null;
   projectExportDirectories: Record<string, string>;
 };
 

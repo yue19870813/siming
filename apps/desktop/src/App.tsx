@@ -55,6 +55,7 @@ const defaultSettings: SystemSettings = {
   recoverySnapshotIntervalSeconds: 60,
   restoreLastProject: true,
   lastProjectPath: null,
+  lastDialogueId: null,
   projectExportDirectories: {},
 };
 
@@ -70,6 +71,9 @@ type WorkspaceLayoutStyle = CSSProperties & {
 export default function App() {
   const project = useEditorStore((state) => state.project);
   const projectLoaded = useEditorStore((state) => state.projectLoaded);
+  const selectedDialogueId = useEditorStore(
+    (state) => state.selectedDialogueId,
+  );
   const activity = useEditorStore((state) => state.activity);
   const viewMode = useEditorStore((state) => state.viewMode);
   const dirty = useEditorStore((state) => state.dirty);
@@ -150,7 +154,7 @@ export default function App() {
             }，是否恢复？`,
           )
         ) {
-          setProject(recovery.project, true);
+          setProject(recovery.project, true, loadedSettings.lastDialogueId);
           if (recovery.sourceDraft) {
             setSourceDraft(
               recovery.sourceDraft.dialogueId,
@@ -160,7 +164,7 @@ export default function App() {
           }
           setNotice("已恢复上次未保存的编辑状态。");
         } else {
-          setProject(snapshot);
+          setProject(snapshot, false, loadedSettings.lastDialogueId);
           setNotice(`已恢复上次项目：${snapshot.rootPath}`);
         }
         if (snapshot.rootPath !== loadedSettings.lastProjectPath) {
@@ -184,6 +188,24 @@ export default function App() {
       }
     })();
   }, [setBusy, setNotice, setProject, setSourceDraft]);
+
+  useEffect(() => {
+    if (!startupReady || !projectLoaded || !project.rootPath) return;
+    const currentSettings = settingsRef.current;
+    if (
+      currentSettings.lastProjectPath === project.rootPath &&
+      currentSettings.lastDialogueId === selectedDialogueId
+    )
+      return;
+    const nextSettings = {
+      ...currentSettings,
+      lastProjectPath: project.rootPath,
+      lastDialogueId: selectedDialogueId || null,
+    };
+    settingsRef.current = nextSettings;
+    setSettings(nextSettings);
+    void writeSystemSettings(nextSettings).catch(() => undefined);
+  }, [project.rootPath, projectLoaded, selectedDialogueId, startupReady]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
@@ -520,8 +542,18 @@ export default function App() {
 
   async function rememberLastProject(rootPath: string) {
     const currentSettings = settingsRef.current;
-    if (!rootPath || currentSettings.lastProjectPath === rootPath) return;
-    const nextSettings = { ...currentSettings, lastProjectPath: rootPath };
+    const lastDialogueId = useEditorStore.getState().selectedDialogueId || null;
+    if (
+      !rootPath ||
+      (currentSettings.lastProjectPath === rootPath &&
+        currentSettings.lastDialogueId === lastDialogueId)
+    )
+      return;
+    const nextSettings = {
+      ...currentSettings,
+      lastProjectPath: rootPath,
+      lastDialogueId,
+    };
     settingsRef.current = nextSettings;
     setSettings(nextSettings);
     await writeSystemSettings(nextSettings);

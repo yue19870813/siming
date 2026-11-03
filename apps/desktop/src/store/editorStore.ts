@@ -45,7 +45,11 @@ type EditorState = {
   notice: string;
   past: HistoryEntry[];
   future: HistoryEntry[];
-  setProject: (project: ProjectSnapshot, dirty?: boolean) => void;
+  setProject: (
+    project: ProjectSnapshot,
+    dirty?: boolean,
+    selectedDialogueId?: string | null,
+  ) => void;
   setSelectedDialogue: (id: string) => void;
   setSelectedNode: (id: string | null) => void;
   setCanvasInsertionPosition: (position: { x: number; y: number }) => void;
@@ -144,12 +148,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   past: [],
   future: [],
 
-  setProject: (project, dirty = false) => {
+  setProject: (project, dirty = false, selectedDialogueId) => {
     if (!confirmDiscardHostDraft()) return;
+    const restoredDialogueId = project.dialogues.some(
+      (dialogue) => dialogue.id === selectedDialogueId,
+    )
+      ? selectedDialogueId!
+      : (project.dialogues[0]?.id ?? "");
     set({
       project,
       projectLoaded: true,
-      selectedDialogueId: project.dialogues[0]?.id ?? "",
+      selectedDialogueId: restoredDialogueId,
       selectedNodeId: null,
       canvasInsertionPosition: { x: 180, y: 120 },
       viewMode: "canvas",

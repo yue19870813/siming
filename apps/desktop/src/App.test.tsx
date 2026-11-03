@@ -79,6 +79,16 @@ test("uses dark as the default browser theme", async () => {
 test("restores the last project on startup", async () => {
   const project = createDemoProject();
   project.rootPath = "/tmp/last-siming-project";
+  const second = structuredClone(project.dialogues[0]);
+  second.id = "dialogue-second";
+  second.key = "second";
+  second.name = "第二段对话";
+  project.dialogues.push(second);
+  project.manifest.dialogues.push({
+    id: second.id,
+    key: second.key,
+    path: "dialogues/second.json",
+  });
   let resolveOpenProject!: (snapshot: typeof project) => void;
   const pendingOpenProject = new Promise<typeof project>((resolve) => {
     resolveOpenProject = resolve;
@@ -101,6 +111,7 @@ test("restores the last project on startup", async () => {
         recoverySnapshotIntervalSeconds: 60,
         restoreLastProject: true,
         lastProjectPath: project.rootPath,
+        lastDialogueId: second.id,
         projectExportDirectories: {},
       } as never;
     }
@@ -126,6 +137,22 @@ test("restores the last project on startup", async () => {
     rootPath: project.rootPath,
   });
   expect(useEditorStore.getState().project.rootPath).toBe(project.rootPath);
+  expect(useEditorStore.getState().selectedDialogueId).toBe(second.id);
+
+  act(() =>
+    useEditorStore.getState().setSelectedDialogue(project.dialogues[0].id),
+  );
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith(
+      "write_system_settings",
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          lastProjectPath: project.rootPath,
+          lastDialogueId: project.dialogues[0].id,
+        }),
+      }),
+    ),
+  );
 });
 
 test("opening a project remembers it for the next startup", async () => {

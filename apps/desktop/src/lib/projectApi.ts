@@ -207,6 +207,7 @@ function browserSystemSettings(theme: SystemSettings["theme"]): SystemSettings {
     recoverySnapshotIntervalSeconds: 60,
     restoreLastProject: true,
     lastProjectPath: null,
+    lastDialogueId: null,
     projectExportDirectories: {},
   };
 }
