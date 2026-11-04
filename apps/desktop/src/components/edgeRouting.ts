@@ -24,7 +24,7 @@ export function routeEdge(
   const segments = occupied.flatMap((path) =>
     path.slice(1).map((b, i) => ({ a: path[i], b })),
   );
-  const laneGap = 12;
+  const laneGap = 24;
   const laneXs = segments
     .filter(({ a, b }) => a.x === b.x)
     .flatMap(({ a }) => [a.x - laneGap, a.x + laneGap]);
@@ -81,23 +81,26 @@ export function routeEdge(
   });
   const first = index(start),
     last = index(end);
-  const distance = new Map<number, number>([[first, 0]]),
+  const firstState = first * 3;
+  const statePoint = (state: number) => point(Math.floor(state / 3));
+  const stateDirection = (state: number) => state % 3;
+  const distance = new Map<number, number>([[firstState, 0]]),
     previous = new Map<number, number>();
-  const pending = new Set([first]);
-  const estimate = (id: number) => {
-    const p = point(id);
-    return distance.get(id)! + Math.abs(p.x - end.x) + Math.abs(p.y - end.y);
+  const pending = new Set([firstState]);
+  const estimate = (state: number) => {
+    const p = statePoint(state);
+    return distance.get(state)! + Math.abs(p.x - end.x) + Math.abs(p.y - end.y);
   };
   while (pending.size) {
     let current = pending.values().next().value!;
     for (const id of pending)
       if (estimate(id) < estimate(current)) current = id;
     pending.delete(current);
-    if (current === last) {
+    if (Math.floor(current / 3) === last) {
       const path = [end];
       while (previous.has(current)) {
         current = previous.get(current)!;
-        path.unshift(point(current));
+        path.unshift(statePoint(current));
       }
       return [source, ...path, target].filter((p, i, all) => {
         const before = all[i - 1],
@@ -112,34 +115,47 @@ export function routeEdge(
         );
       });
     }
-    const x = current % xs.length,
-      y = Math.floor(current / xs.length);
+    const pointId = Math.floor(current / 3);
+    const x = pointId % xs.length,
+      y = Math.floor(pointId / xs.length);
     const neighbors = [
-      x > 0 ? current - 1 : -1,
-      x + 1 < xs.length ? current + 1 : -1,
-      y > 0 ? current - xs.length : -1,
-      y + 1 < ys.length ? current + xs.length : -1,
+      x > 0 ? [pointId - 1, 1] : null,
+      x + 1 < xs.length ? [pointId + 1, 1] : null,
+      y > 0 ? [pointId - xs.length, 2] : null,
+      y + 1 < ys.length ? [pointId + xs.length, 2] : null,
     ];
-    for (const id of neighbors) {
-      if (id < 0) continue;
-      const a = point(current),
-        b = point(id);
+    for (const neighbor of neighbors) {
+      if (!neighbor) continue;
+      const [neighborPointId, direction] = neighbor;
+      const a = point(pointId),
+        b = point(neighborPointId);
       if (!clear(a, b)) continue;
+      const nextState = neighborPointId * 3 + direction;
       const cost =
         distance.get(current)! +
         Math.abs(a.x - b.x) +
         Math.abs(a.y - b.y) +
+        (stateDirection(current) !== 0 && stateDirection(current) !== direction
+          ? 48
+          : 0) +
         overlapCost(a, b);
-      if (cost >= (distance.get(id) ?? Infinity)) continue;
-      distance.set(id, cost);
-      previous.set(id, current);
-      pending.add(id);
+      if (cost >= (distance.get(nextState) ?? Infinity)) continue;
+      distance.set(nextState, cost);
+      previous.set(nextState, current);
+      pending.add(nextState);
     }
   }
   return null;
 }
 
 export function roundedPath(points: Point[]): string {
+  const radiusFor = (index: number, corner: Point) => {
+    const before = points[index - 1],
+      after = points[index + 1];
+    const incoming = Math.hypot(corner.x - before.x, corner.y - before.y),
+      outgoing = Math.hypot(after.x - corner.x, after.y - corner.y);
+    return Math.min(8, incoming / 3, outgoing / 3);
+  };
   let path = `M ${points[0].x} ${points[0].y}`;
   for (let i = 1; i < points.length - 1; i++) {
     const a = points[i - 1],
@@ -147,7 +163,7 @@ export function roundedPath(points: Point[]): string {
       c = points[i + 1];
     const incoming = Math.hypot(b.x - a.x, b.y - a.y),
       outgoing = Math.hypot(c.x - b.x, c.y - b.y);
-    const radius = Math.min(8, incoming / 2, outgoing / 2);
+    const radius = radiusFor(i, b);
     if (!radius) continue;
     path += ` L ${b.x + ((a.x - b.x) * radius) / incoming} ${b.y + ((a.y - b.y) * radius) / incoming} Q ${b.x} ${b.y} ${b.x + ((c.x - b.x) * radius) / outgoing} ${b.y + ((c.y - b.y) * radius) / outgoing}`;
   }

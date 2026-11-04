@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   routeEdges,
   routeEdge,
+  roundedPath,
   type Obstacle,
   type Point,
 } from "./edgeRouting";
@@ -75,6 +76,15 @@ test("parallel detours use separate horizontal and vertical lanes", () => {
   const paths = routeEdges(requests, nodes);
   const routes = [...paths.values()] as Point[][];
   for (const route of routes) expectAvoidsNodes(route, nodes);
+  for (const route of routes) {
+    expect(route.length).toBeLessThanOrEqual(6);
+    for (let i = 1; i < route.length; i++) {
+      expect(
+        Math.abs(route[i].x - route[i - 1].x) +
+          Math.abs(route[i].y - route[i - 1].y),
+      ).toBeGreaterThanOrEqual(24);
+    }
+  }
   for (let r = 0; r < routes.length; r++)
     for (let s = r + 1; s < routes.length; s++) {
       for (let i = 1; i < routes[r].length; i++)
@@ -88,16 +98,27 @@ test("parallel detours use separate horizontal and vertical lanes", () => {
               Math.min(Math.max(a.x, b.x), Math.max(c.x, d.x)) -
               Math.max(Math.min(a.x, b.x), Math.min(c.x, d.x));
             if (overlap > 24)
-              expect(Math.abs(a.y - c.y)).toBeGreaterThanOrEqual(12);
+              expect(Math.abs(a.y - c.y)).toBeGreaterThanOrEqual(24);
           }
           if (a.x === b.x && c.x === d.x) {
             const overlap =
               Math.min(Math.max(a.y, b.y), Math.max(c.y, d.y)) -
               Math.max(Math.min(a.y, b.y), Math.min(c.y, d.y));
             if (overlap > 24)
-              expect(Math.abs(a.x - c.x)).toBeGreaterThanOrEqual(12);
+              expect(Math.abs(a.x - c.x)).toBeGreaterThanOrEqual(24);
           }
         }
     }
   expect(routeEdges([...requests].reverse(), nodes)).toEqual(paths);
+});
+
+test("short segments shrink adjacent rounded corners", () => {
+  expect(
+    roundedPath([
+      { x: 0, y: 0 },
+      { x: 12, y: 0 },
+      { x: 12, y: 12 },
+      { x: 24, y: 12 },
+    ]),
+  ).toBe("M 0 0 L 8 0 Q 12 0 12 4 L 12 8 Q 12 12 16 12 L 24 12");
 });
