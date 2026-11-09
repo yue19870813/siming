@@ -26,6 +26,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { RoutedEdge } from "./RoutedEdge";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
+import { getCanvasViewport, saveCanvasViewport } from "./canvasViewport";
 import { formatCondition } from "../model/conditions";
 import { createId } from "../model/demo";
 import type {
@@ -255,6 +256,8 @@ export function CanvasView({
   const deleteProjectEdges = useEditorStore((state) => state.deleteEdges);
   const commit = useEditorStore((state) => state.commit);
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
+  const viewportKey = `${project.rootPath}:${dialogueId}`;
+  const savedViewport = getCanvasViewport(viewportKey);
 
   const derivedNodes = useMemo<CanvasFlowNode[]>(() => {
     const canvasSelection =
@@ -471,8 +474,11 @@ export function CanvasView({
       ref={canvasRef}
     >
       <ReactFlow
+        key={viewportKey}
         nodes={nodes}
         edges={edges}
+        defaultViewport={savedViewport}
+        fitView={!savedViewport}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onInit={(instance) => {
@@ -509,6 +515,7 @@ export function CanvasView({
         }}
         onMoveEnd={(_event, viewport) => {
           viewportRef.current = viewport;
+          saveCanvasViewport(viewportKey, viewport);
           const bounds = canvasRef.current?.getBoundingClientRect();
           if (!bounds) return;
           setCanvasInsertionPosition(
@@ -517,6 +524,10 @@ export function CanvasView({
               height: bounds.height,
             }),
           );
+        }}
+        onMove={(_event, viewport) => {
+          viewportRef.current = viewport;
+          saveCanvasViewport(viewportKey, viewport);
         }}
         onNodeDragStart={(_event, node) => {
           const dragged = new Set(selectedNodeIds.current);
@@ -549,7 +560,6 @@ export function CanvasView({
             },
           );
         }}
-        fitView
         minZoom={0.2}
         maxZoom={2}
         connectionLineType={
