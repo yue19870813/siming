@@ -5,12 +5,14 @@ import {
   type EdgeProps,
   type ReactFlowState,
 } from "@xyflow/react";
+import { useEffect, useSyncExternalStore } from "react";
+import type { Obstacle, RouteRequest } from "./edgeRouting";
 import {
-  routeEdges,
-  roundedPath,
-  type Obstacle,
-  type RouteRequest,
-} from "./edgeRouting";
+  getRouteVersion,
+  getRoutedPath,
+  requestRoutes,
+  subscribeToRoutes,
+} from "./edgeRoutingClient";
 
 // Subscribe to geometry only: selecting an edge does not recompute lane routes.
 function geometrySnapshot(state: ReactFlowState) {
@@ -38,6 +40,8 @@ function geometrySnapshot(state: ReactFlowState) {
       continue;
     requests.push({
       id: edge.id,
+      sourceNodeId: edge.source,
+      targetNodeId: edge.target,
       source: {
         x: source.internals.positionAbsolute.x + from.x + from.width,
         y: source.internals.positionAbsolute.y + from.y + from.height / 2,
@@ -48,35 +52,27 @@ function geometrySnapshot(state: ReactFlowState) {
       },
     });
   }
-  return JSON.stringify({ nodes, requests });
-}
-
-// All edge components share one routing pass for the same canvas geometry.
-let cachedSnapshot = "";
-let cachedPaths = new Map<string, string>();
-function pathsFor(snapshot: string) {
-  if (snapshot !== cachedSnapshot) {
-    const { nodes, requests } = JSON.parse(snapshot) as {
-      nodes: Obstacle[];
-      requests: RouteRequest[];
-    };
-    cachedPaths = new Map(
-      [...routeEdges(requests, nodes)].flatMap(([id, path]) =>
-        path ? [[id, roundedPath(path)] as const] : [],
-      ),
-    );
-    cachedSnapshot = snapshot;
-  }
-  return cachedPaths;
+  const routingData =
+    (state.edges[0]?.data as
+      { dialogueId?: string; draggingNodeIds?: string[] } | undefined) ?? {};
+  return JSON.stringify({
+    nodes,
+    requests,
+    dialogueId: routingData.dialogueId,
+    draggingNodeIds: routingData.draggingNodeIds ?? [],
+  });
 }
 
 export function RoutedEdge(props: EdgeProps) {
   const snapshot = useStore(geometrySnapshot);
+  const scope = (props.data as { dialogueId?: string } | undefined)?.dialogueId;
+  useSyncExternalStore(subscribeToRoutes, getRouteVersion, getRouteVersion);
+  useEffect(() => requestRoutes(snapshot), [snapshot]);
   return (
     <BaseEdge
       id={props.id}
       path={
-        pathsFor(snapshot).get(props.id) ??
+        getRoutedPath(scope, props.id) ??
         getSmoothStepPath({ ...props, offset: 32, borderRadius: 8 })[0]
       }
       markerEnd={props.markerEnd}

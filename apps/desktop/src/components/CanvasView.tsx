@@ -236,6 +236,7 @@ export function CanvasView({
   } | null>(null);
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 });
   const [nodeDragOver, setNodeDragOver] = useState(false);
+  const [draggingNodeIds, setDraggingNodeIds] = useState<string[]>([]);
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -374,6 +375,7 @@ export function CanvasView({
         target: edge.targetNodeId,
         targetHandle: edge.targetPort,
         type: edgeStyle === "bezier" ? "default" : "routed",
+        data: { dialogueId, draggingNodeIds },
         interactionWidth: 24,
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -384,7 +386,7 @@ export function CanvasView({
         animated: false,
         className: "siming-edge",
       })),
-    [dialogue, selectedEdgeIds, edgeStyle],
+    [dialogue, dialogueId, selectedEdgeIds, edgeStyle, draggingNodeIds],
   );
 
   useEffect(() => {
@@ -516,7 +518,13 @@ export function CanvasView({
             }),
           );
         }}
+        onNodeDragStart={(_event, node) => {
+          const dragged = new Set(selectedNodeIds.current);
+          dragged.add(node.id);
+          setDraggingNodeIds([...dragged]);
+        }}
         onNodeDragStop={(_event, _moved, draggedNodes) => {
+          setDraggingNodeIds([]);
           const positions = new Map(
             draggedNodes.map((node) => [node.id, node.position]),
           );

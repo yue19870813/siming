@@ -3,9 +3,40 @@ import {
   routeEdges,
   routeEdge,
   roundedPath,
+  requestsForNodes,
   type Obstacle,
   type Point,
 } from "./edgeRouting";
+
+test("selects only routes connected to nodes being dragged", () => {
+  const requests = [
+    {
+      id: "incoming",
+      sourceNodeId: "a",
+      targetNodeId: "b",
+      source: { x: 0, y: 0 },
+      target: { x: 1, y: 1 },
+    },
+    {
+      id: "outgoing",
+      sourceNodeId: "b",
+      targetNodeId: "c",
+      source: { x: 1, y: 1 },
+      target: { x: 2, y: 2 },
+    },
+    {
+      id: "unrelated",
+      sourceNodeId: "c",
+      targetNodeId: "d",
+      source: { x: 2, y: 2 },
+      target: { x: 3, y: 3 },
+    },
+  ];
+  expect(requestsForNodes(requests, ["b"]).map(({ id }) => id)).toEqual([
+    "incoming",
+    "outgoing",
+  ]);
+});
 
 function expectAvoidsNodes(path: Point[], nodes: Obstacle[]) {
   for (let i = 1; i < path.length; i++) {
