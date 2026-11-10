@@ -57,9 +57,7 @@ function publish(
 }
 
 function calculateOnMainThread(snapshot: string) {
-  const { nodes, requests, draggingNodeIds } = JSON.parse(
-    snapshot,
-  ) as {
+  const { nodes, requests, draggingNodeIds } = JSON.parse(snapshot) as {
     nodes: Obstacle[];
     requests: RouteRequest[];
     draggingNodeIds: string[];
@@ -87,10 +85,7 @@ export function requestRoutes(snapshot: string) {
     requestedSnapshot = snapshot;
     return;
   }
-  const {
-    requests,
-    dialogueId,
-  } = JSON.parse(snapshot) as {
+  const { requests, dialogueId } = JSON.parse(snapshot) as {
     requests: RouteRequest[];
     draggingNodeIds?: string[];
     dialogueId?: string;
