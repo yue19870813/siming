@@ -76,7 +76,7 @@ test("source schema accepts switch cases and rejects invalid case values", () =>
     switch: {
       variable: "stage",
       cases: [
-        { id: "ready", value: "ready" },
+        { id: "ready", value: "ready", comment: "已准备完成" },
         { id: "done", value: "done" },
       ],
     },

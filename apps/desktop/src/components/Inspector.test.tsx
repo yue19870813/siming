@@ -109,6 +109,18 @@ test("switch cases keep stable ports when edited and remove only deleted connect
     target: { value: "20" },
   });
   expect(getNode().data.switch!.cases[0]).toEqual({ id: first, value: 20 });
+  fireEvent.change(screen.getByLabelText("Case 1 注释"), {
+    target: { value: "玩家已收集证据" },
+  });
+  expect(getNode().data.switch!.cases[0]).toEqual({
+    id: first,
+    value: 20,
+    comment: "玩家已收集证据",
+  });
+  fireEvent.change(screen.getByLabelText("Case 1 注释"), {
+    target: { value: "" },
+  });
+  expect(getNode().data.switch!.cases[0].comment).toBeUndefined();
   fireEvent.click(screen.getByTitle("删除 Case 2"));
   expect(
     useEditorStore

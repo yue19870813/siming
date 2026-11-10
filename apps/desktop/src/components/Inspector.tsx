@@ -557,17 +557,32 @@ function ConditionNodeEditor({
           <div className="switch-case-editor">
             {switchCondition.cases.map((item, index) => (
               <div className="switch-case-editor-row" key={item.id}>
-                <Field label={`Case ${index + 1}`}>
-                  <ConditionValueEditor
-                    variable={variable}
-                    value={item.value}
-                    onChange={(value) =>
-                      update((draft) => {
-                        draft.data.switch!.cases[index].value = value;
-                      }, "修改枚举分支值")
-                    }
-                  />
-                </Field>
+                <div className="switch-case-editor-fields">
+                  <Field label={`Case ${index + 1}`}>
+                    <ConditionValueEditor
+                      variable={variable}
+                      value={item.value}
+                      onChange={(value) =>
+                        update((draft) => {
+                          draft.data.switch!.cases[index].value = value;
+                        }, "修改枚举分支值")
+                      }
+                    />
+                  </Field>
+                  <Field label={`Case ${index + 1} 注释`}>
+                    <textarea
+                      rows={2}
+                      placeholder="说明此 Case 的含义（仅编辑器使用）"
+                      value={item.comment ?? ""}
+                      onChange={(event) =>
+                        update((draft) => {
+                          draft.data.switch!.cases[index].comment =
+                            event.target.value || undefined;
+                        }, "修改枚举分支注释")
+                      }
+                    />
+                  </Field>
+                </div>
                 <button
                   title={`删除 Case ${index + 1}`}
                   disabled={switchCondition.cases.length <= 1}

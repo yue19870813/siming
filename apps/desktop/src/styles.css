@@ -3852,7 +3852,7 @@ html[data-theme="light"] .cm-editor {
   align-items: center;
   gap: 8px;
 }
-.switch-case-editor-row > label {
+.switch-case-editor-fields {
   flex: 1;
   min-width: 0;
 }

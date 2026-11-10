@@ -243,7 +243,8 @@
                     "required": ["id", "value"],
                     "properties": {
                       "id": { "type": "string", "minLength": 1, "not": { "const": "default" } },
-                      "value": { "anyOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }] }
+                      "value": { "anyOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }] },
+                      "comment": { "type": "string" }
                     }
                   }
                 }

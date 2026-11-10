@@ -320,6 +320,8 @@ pub struct SwitchCondition {
 pub struct SwitchCase {
     pub id: String,
     pub value: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -2818,6 +2820,27 @@ mod tests {
             ];
             let compiled =
                 compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap();
+            let mut annotated = dialogue.clone();
+            annotated
+                .nodes
+                .iter_mut()
+                .find(|node| node.id == switch_id)
+                .unwrap()
+                .data
+                .get_mut("switch")
+                .unwrap()["cases"][0]["comment"] =
+                serde_json::json!("editor-only-case-description");
+            let source = serde_json::to_string(&annotated).unwrap();
+            assert!(source.contains("editor-only-case-description"));
+            let reopened = parse_dialogue_document(&source).unwrap();
+            assert_eq!(reopened, annotated);
+            let annotated_runtime = compile_runtime(&manifest, &[reopened], &resources).unwrap();
+            assert_eq!(compiled, annotated_runtime);
+            assert!(
+                !serde_json::to_string(&annotated_runtime)
+                    .unwrap()
+                    .contains("editor-only-case-description")
+            );
             assert_eq!(
                 compiled,
                 compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap()

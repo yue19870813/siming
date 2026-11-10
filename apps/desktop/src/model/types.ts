@@ -34,7 +34,7 @@ export type DialogueNodeData = {
   condition?: ConditionExpression;
   switch?: {
     variable: string;
-    cases: { id: string; value: boolean | number | string }[];
+    cases: { id: string; value: boolean | number | string; comment?: string }[];
   };
   event?: string;
   params?: Record<string, unknown>;
