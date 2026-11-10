@@ -246,8 +246,12 @@ export function CanvasView({
   const project = useEditorStore((state) => state.project);
   const dialogueId = useEditorStore((state) => state.selectedDialogueId);
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const selectedNodeIdsFromStore = useEditorStore(
+    (state) => state.selectedNodeIds,
+  );
   const locale = useEditorStore((state) => state.previewLocale);
   const setSelectedNode = useEditorStore((state) => state.setSelectedNode);
+  const setSelectedNodes = useEditorStore((state) => state.setSelectedNodes);
   const setCanvasInsertionPosition = useEditorStore(
     (state) => state.setCanvasInsertionPosition,
   );
@@ -260,10 +264,13 @@ export function CanvasView({
   const savedViewport = getCanvasViewport(viewportKey);
 
   const derivedNodes = useMemo<CanvasFlowNode[]>(() => {
-    const canvasSelection =
+    const canvasSelection = new Set(
       selectionDialogueId.current === dialogueId
-        ? selectedNodeIds.current
-        : new Set(selectedNodeId ? [selectedNodeId] : []);
+        ? selectedNodeIdsFromStore
+        : selectedNodeId
+          ? [selectedNodeId]
+          : [],
+    );
     return (dialogue?.nodes ?? []).map((node) => ({
       id: node.id,
       type: "siming",
@@ -288,6 +295,7 @@ export function CanvasView({
     project.manifest.defaultLocale,
     dialogueId,
     selectedNodeId,
+    selectedNodeIdsFromStore,
   ]);
   const [nodes, setNodes, onNodesChange] =
     useNodesState<CanvasFlowNode>(derivedNodes);
@@ -300,6 +308,11 @@ export function CanvasView({
     selectedNodeIds.current.clear();
     selectionDialogueId.current = dialogueId;
   }, [dialogueId]);
+
+  useEffect(() => {
+    if (selectionDialogueId.current !== dialogueId) return;
+    selectedNodeIds.current = new Set(selectedNodeIdsFromStore);
+  }, [dialogueId, selectedNodeIdsFromStore]);
 
   useEffect(() => {
     if (selectionDialogueId.current !== dialogueId) return;
@@ -464,6 +477,14 @@ export function CanvasView({
       if (change.type === "remove") selectedNodeIds.current.delete(change.id);
     }
 
+    if (
+      localChanges.some(
+        (change) => change.type === "select" || change.type === "remove",
+      )
+    ) {
+      setSelectedNodes([...selectedNodeIds.current]);
+    }
+
     onNodesChange(localChanges);
     if (removedIds.length > 0) deleteNodes(removedIds);
   };
@@ -497,7 +518,8 @@ export function CanvasView({
         }}
         onNodeClick={(_event, node) => {
           setSelectedEdgeIds(new Set());
-          setSelectedNode(
+          setSelectedNodes(
+            [...selectedNodeIds.current],
             selectedNodeIds.current.has(node.id)
               ? node.id
               : (selectedNodeIds.current.values().next().value ?? null),
@@ -509,7 +531,8 @@ export function CanvasView({
           setSelectedNode(null);
         }}
         onSelectionEnd={() => {
-          setSelectedNode(
+          setSelectedNodes(
+            [...selectedNodeIds.current],
             selectedNodeIds.current.values().next().value ?? null,
           );
         }}

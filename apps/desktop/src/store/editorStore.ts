@@ -13,6 +13,7 @@ import { DEFAULT_PROJECT_LOCALES } from "../model/locales";
 import type {
   Activity,
   DialogueDocument,
+  DialogueEdge,
   DialogueNode,
   NodeType,
   ProjectSnapshot,
@@ -30,7 +31,10 @@ type EditorState = {
   projectLoaded: boolean;
   selectedDialogueId: string;
   selectedNodeId: string | null;
+  selectedNodeIds: string[];
   copiedNode: DialogueNode | null;
+  copiedNodes: DialogueNode[];
+  copiedEdges: DialogueEdge[];
   clipboardPasteCount: number;
   canvasInsertionPosition: { x: number; y: number };
   viewMode: ViewMode;
@@ -52,6 +56,7 @@ type EditorState = {
   ) => void;
   setSelectedDialogue: (id: string) => void;
   setSelectedNode: (id: string | null) => void;
+  setSelectedNodes: (ids: string[], primaryId?: string | null) => void;
   setCanvasInsertionPosition: (position: { x: number; y: number }) => void;
   setViewMode: (mode: ViewMode) => void;
   setActivity: (activity: Activity) => void;
@@ -132,7 +137,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   projectLoaded: false,
   selectedDialogueId: "",
   selectedNodeId: null,
+  selectedNodeIds: [],
   copiedNode: null,
+  copiedNodes: [],
+  copiedEdges: [],
   clipboardPasteCount: 0,
   canvasInsertionPosition: { x: 180, y: 120 },
   viewMode: "canvas",
@@ -160,6 +168,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       projectLoaded: true,
       selectedDialogueId: restoredDialogueId,
       selectedNodeId: null,
+      selectedNodeIds: [],
       canvasInsertionPosition: { x: 180, y: 120 },
       viewMode: "canvas",
       previewLocale: project.manifest.defaultLocale,
@@ -184,6 +193,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       selectedDialogueId,
       selectedNodeId: null,
+      selectedNodeIds: [],
       viewMode: "canvas",
       sourceDraftDialogueId: null,
       sourceDraft: "",
@@ -193,7 +203,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedNode: (selectedNodeId) => {
     if (selectedNodeId !== get().selectedNodeId && !confirmDiscardHostDraft())
       return;
-    set({ selectedNodeId });
+    set({
+      selectedNodeId,
+      selectedNodeIds: selectedNodeId ? [selectedNodeId] : [],
+    });
+  },
+  setSelectedNodes: (selectedNodeIds, primaryId) => {
+    const ids = [...new Set(selectedNodeIds)];
+    const selectedNodeId = primaryId ?? ids[0] ?? null;
+    if (selectedNodeId !== get().selectedNodeId && !confirmDiscardHostDraft())
+      return;
+    set({ selectedNodeIds: ids, selectedNodeId });
   },
   setCanvasInsertionPosition: (canvasInsertionPosition) =>
     set({ canvasInsertionPosition }),
@@ -402,14 +422,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   copySelectedNode: () => {
     const state = get();
-    const node = state.project.dialogues
-      .find((dialogue) => dialogue.id === state.selectedDialogueId)
-      ?.nodes.find((item) => item.id === state.selectedNodeId);
-    if (!node) return;
+    const dialogue = state.project.dialogues.find(
+      (item) => item.id === state.selectedDialogueId,
+    );
+    if (!dialogue) return;
+    const selectedIds = state.selectedNodeIds.filter((id) =>
+      dialogue.nodes.some((node) => node.id === id),
+    );
+    const ids = new Set(
+      selectedIds.length > 0
+        ? selectedIds
+        : state.selectedNodeId
+          ? [state.selectedNodeId]
+          : [],
+    );
+    const copiedNodes = dialogue.nodes.filter((node) => ids.has(node.id));
+    if (copiedNodes.length === 0) return;
+    const copiedIds = new Set(copiedNodes.map((node) => node.id));
+    const copiedEdges = dialogue.edges.filter(
+      (edge) =>
+        copiedIds.has(edge.sourceNodeId) && copiedIds.has(edge.targetNodeId),
+    );
     set({
-      copiedNode: structuredClone(node),
+      copiedNode: structuredClone(copiedNodes[0]),
+      copiedNodes: structuredClone(copiedNodes),
+      copiedEdges: structuredClone(copiedEdges),
       clipboardPasteCount: 0,
-      notice: `已复制节点：${node.key}`,
+      notice:
+        copiedNodes.length === 1
+          ? `已复制节点：${copiedNodes[0].key}`
+          : `已复制 ${copiedNodes.length} 个节点`,
     });
   },
   pasteCopiedNode: () => {
@@ -418,36 +460,79 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const dialogue = state.project.dialogues.find(
       (item) => item.id === state.selectedDialogueId,
     );
-    if (!state.copiedNode || !dialogue) return;
+    const sourceNodes =
+      state.copiedNodes.length > 0
+        ? state.copiedNodes
+        : state.copiedNode
+          ? [state.copiedNode]
+          : [];
+    if (sourceNodes.length === 0 || !dialogue) return;
     const pasteCount = state.clipboardPasteCount + 1;
-    const node = structuredClone(state.copiedNode);
-    node.id = createId();
-    node.key = copiedNodeKey(node.key, dialogue);
-    node.position = {
-      x: node.position.x + pasteCount * 32,
-      y: node.position.y + pasteCount * 32,
-    };
-    if (node.data.switch) {
-      node.data.switch.cases = node.data.switch.cases.map((item) => ({
-        ...item,
-        id: createId(),
-      }));
+    const nodes = structuredClone(sourceNodes);
+    const nodeIds = new Map(nodes.map((node) => [node.id, createId()]));
+    const portIds = new Map<string, string>();
+    const targetDialogue = state.project.dialogues.find(
+      (item) => item.id === state.selectedDialogueId,
+    )!;
+    for (const node of nodes) {
+      const sourceId = node.id;
+      node.id = nodeIds.get(sourceId)!;
+      node.key = copiedNodeKey(node.key, {
+        ...targetDialogue,
+        nodes: [...targetDialogue.nodes, ...nodes],
+      });
+      node.position = {
+        x: node.position.x + pasteCount * 32,
+        y: node.position.y + pasteCount * 32,
+      };
+      if (node.data.switch) {
+        node.data.switch.cases = node.data.switch.cases.map((item) => {
+          const id = createId();
+          portIds.set(item.id, id);
+          return { ...item, id };
+        });
+      }
+      if (node.data.choices) {
+        node.data.choices = node.data.choices.map((choice) => {
+          const id = createId();
+          portIds.set(choice.id, id);
+          return { ...choice, id };
+        });
+      }
     }
-    if (node.data.choices) {
-      node.data.choices = node.data.choices.map((choice) => ({
-        ...choice,
+    const copiedIds = new Set(sourceNodes.map((node) => node.id));
+    const edges = state.copiedEdges
+      .filter(
+        (edge) =>
+          copiedIds.has(edge.sourceNodeId) && copiedIds.has(edge.targetNodeId),
+      )
+      .map((edge) => ({
+        ...edge,
         id: createId(),
+        sourceNodeId: nodeIds.get(edge.sourceNodeId)!,
+        sourcePort: portIds.get(edge.sourcePort) ?? edge.sourcePort,
+        targetNodeId: nodeIds.get(edge.targetNodeId)!,
       }));
-    }
-    state.commit(`粘贴${node.type}节点`, (draft) => {
-      draft.dialogues
-        .find((item) => item.id === state.selectedDialogueId)
-        ?.nodes.push(node);
-    });
+    state.commit(
+      nodes.length === 1
+        ? `粘贴${nodes[0].type}节点`
+        : `粘贴 ${nodes.length} 个节点`,
+      (draft) => {
+        const target = draft.dialogues.find(
+          (item) => item.id === state.selectedDialogueId,
+        );
+        target?.nodes.push(...nodes);
+        target?.edges.push(...edges);
+      },
+    );
     set({
-      selectedNodeId: node.id,
+      selectedNodeId: nodes[0].id,
+      selectedNodeIds: nodes.map((node) => node.id),
       clipboardPasteCount: pasteCount,
-      notice: `已粘贴节点：${node.key}`,
+      notice:
+        nodes.length === 1
+          ? `已粘贴节点：${nodes[0].key}`
+          : `已粘贴 ${nodes.length} 个节点`,
     });
   },
   addNode: (type, position) => {

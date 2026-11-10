@@ -59,6 +59,51 @@ test("copy and paste duplicates a selected node with new identities", () => {
   expect(state.notice).toBe(`已粘贴节点：${pasted?.key}`);
 });
 
+test("copying multiple selected nodes preserves their internal connections", () => {
+  const state = useEditorStore.getState();
+  const dialogue = state.project.dialogues[0];
+  const choice = dialogue.nodes.find((node) => node.type === "choice")!;
+  const internalEdge = dialogue.edges.find(
+    (edge) => edge.sourceNodeId === choice.id,
+  )!;
+  const target = dialogue.nodes.find(
+    (node) => node.id === internalEdge.targetNodeId,
+  )!;
+  const initialNodeCount = dialogue.nodes.length;
+  const initialEdgeCount = dialogue.edges.length;
+
+  state.setSelectedNodes([choice.id, target.id], choice.id);
+  useEditorStore.getState().copySelectedNode();
+  useEditorStore.getState().pasteCopiedNode();
+
+  const updated = useEditorStore.getState();
+  const pastedDialogue = updated.project.dialogues[0];
+  const pastedNodes = pastedDialogue.nodes.slice(initialNodeCount);
+  const pastedEdge = pastedDialogue.edges[initialEdgeCount];
+  const pastedChoice = pastedNodes.find((node) => node.type === "choice")!;
+  const pastedTarget = pastedNodes.find((node) => node.id !== pastedChoice.id)!;
+
+  expect(pastedNodes).toHaveLength(2);
+  expect(pastedNodes.map((node) => node.id)).toEqual(updated.selectedNodeIds);
+  expect(pastedChoice.id).not.toBe(choice.id);
+  expect(pastedTarget.id).not.toBe(target.id);
+  expect(pastedChoice.position.x - pastedTarget.position.x).toBe(
+    choice.position.x - target.position.x,
+  );
+  expect(pastedEdge).toMatchObject({
+    sourceNodeId: pastedChoice.id,
+    targetNodeId: pastedTarget.id,
+  });
+  expect(pastedEdge.id).not.toBe(internalEdge.id);
+  expect(pastedEdge.sourcePort).not.toBe(internalEdge.sourcePort);
+  expect(
+    pastedChoice.data.choices?.some(
+      (option) => option.id === pastedEdge.sourcePort,
+    ),
+  ).toBe(true);
+  expect(updated.notice).toBe("已粘贴 2 个节点");
+});
+
 test("deleting a node persists when another node is moved", () => {
   const initialState = useEditorStore.getState();
   const dialogue = initialState.project.dialogues[0];

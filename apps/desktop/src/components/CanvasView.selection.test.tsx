@@ -99,3 +99,21 @@ test("modifier selection keeps the first node selected", () => {
   act(() => useEditorStore.getState().setSelectedNode(null));
   expect(flowProps.nodes?.filter((node) => node.selected)).toHaveLength(0);
 });
+
+test("pasted multi-selection is selected on the canvas", () => {
+  render(<CanvasView />);
+  const state = useEditorStore.getState();
+  const [first, second] = state.project.dialogues[0].nodes;
+
+  act(() => {
+    state.setSelectedNodes([first.id, second.id], first.id);
+    useEditorStore.getState().copySelectedNode();
+    useEditorStore.getState().pasteCopiedNode();
+  });
+
+  const selectedIds = useEditorStore.getState().selectedNodeIds;
+  expect(selectedIds).toHaveLength(2);
+  expect(
+    flowProps.nodes?.filter((node) => node.selected).map((node) => node.id),
+  ).toEqual(selectedIds);
+});
