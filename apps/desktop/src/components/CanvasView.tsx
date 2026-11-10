@@ -590,7 +590,7 @@ export function CanvasView({
             ? ConnectionLineType.Bezier
             : ConnectionLineType.SmoothStep
         }
-        elevateEdgesOnSelect
+        elevateEdgesOnSelect={false}
         deleteKeyCode={["Backspace", "Delete"]}
       >
         <Background gap={22} size={1} />
