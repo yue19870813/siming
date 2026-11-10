@@ -1747,6 +1747,22 @@ html.is-dragging-node * {
   position: relative;
 }
 
+.canvas-alignment-guides {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1002;
+}
+
+.canvas-alignment-guides line {
+  stroke: var(--primary-hover);
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+
 .canvas-view.is-node-drop-target::after {
   position: absolute;
   inset: 8px;

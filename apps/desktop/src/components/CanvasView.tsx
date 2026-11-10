@@ -17,6 +17,7 @@ import {
   NodeProps,
   Position,
   ReactFlow,
+  ViewportPortal,
   useUpdateNodeInternals,
   useNodesState,
 } from "@xyflow/react";
@@ -26,6 +27,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { RoutedEdge } from "./RoutedEdge";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
+import { alignNodeCenters } from "./canvasAlignment";
 import { getCanvasViewport, saveCanvasViewport } from "./canvasViewport";
 import { formatCondition } from "../model/conditions";
 import { createId } from "../model/demo";
@@ -238,6 +240,11 @@ export function CanvasView({
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 });
   const [nodeDragOver, setNodeDragOver] = useState(false);
   const [draggingNodeIds, setDraggingNodeIds] = useState<string[]>([]);
+  const [alignmentGuides, setAlignmentGuides] = useState<{
+    x?: number;
+    y?: number;
+  }>({});
+  const alignedPositions = useRef(new Map<string, { x: number; y: number }>());
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -464,10 +471,39 @@ export function CanvasView({
     const removedIds = changes
       .filter((change) => change.type === "remove")
       .map((change) => change.id);
-    const localChanges = changes.filter(
+    let localChanges = changes.filter(
       (change) =>
         change.type !== "remove" || change.id !== dialogue.entryNodeId,
     );
+
+    const positions = new Map<string, { x: number; y: number }>();
+    for (const change of localChanges) {
+      if (change.type === "position" && change.dragging && change.position) {
+        positions.set(change.id, change.position);
+      }
+    }
+    if (positions.size) {
+      const aligned = alignNodeCenters(
+        nodes,
+        positions,
+        viewportRef.current.zoom,
+      );
+      alignedPositions.current = aligned.positions;
+      setAlignmentGuides(aligned.guides);
+      localChanges = localChanges.map((change) =>
+        change.type === "position" && aligned.positions.has(change.id)
+          ? { ...change, position: aligned.positions.get(change.id)! }
+          : change,
+      );
+    } else {
+      localChanges = localChanges.map((change) =>
+        change.type === "position" &&
+        change.dragging === false &&
+        alignedPositions.current.has(change.id)
+          ? { ...change, position: alignedPositions.current.get(change.id)! }
+          : change,
+      );
+    }
 
     for (const change of localChanges) {
       if (change.type === "select") {
@@ -504,6 +540,7 @@ export function CanvasView({
         edgeTypes={edgeTypes}
         onInit={(instance) => {
           flowInstanceRef.current = instance;
+          viewportRef.current = instance.getViewport();
         }}
         onNodesChange={nodesChange}
         selectionOnDrag
@@ -553,14 +590,19 @@ export function CanvasView({
           saveCanvasViewport(viewportKey, viewport);
         }}
         onNodeDragStart={(_event, node) => {
+          alignedPositions.current.clear();
           const dragged = new Set(selectedNodeIds.current);
           dragged.add(node.id);
           setDraggingNodeIds([...dragged]);
         }}
         onNodeDragStop={(_event, _moved, draggedNodes) => {
           setDraggingNodeIds([]);
+          setAlignmentGuides({});
           const positions = new Map(
-            draggedNodes.map((node) => [node.id, node.position]),
+            draggedNodes.map((node) => [
+              node.id,
+              alignedPositions.current.get(node.id) ?? node.position,
+            ]),
           );
           const changed = dialogue.nodes.some((node) => {
             const position = positions.get(node.id);
@@ -593,6 +635,26 @@ export function CanvasView({
         elevateEdgesOnSelect={false}
         deleteKeyCode={["Backspace", "Delete"]}
       >
+        <ViewportPortal>
+          <svg className="canvas-alignment-guides" aria-hidden="true">
+            {alignmentGuides.x !== undefined && (
+              <line
+                x1={alignmentGuides.x}
+                x2={alignmentGuides.x}
+                y1={-100000}
+                y2={100000}
+              />
+            )}
+            {alignmentGuides.y !== undefined && (
+              <line
+                y1={alignmentGuides.y}
+                y2={alignmentGuides.y}
+                x1={-100000}
+                x2={100000}
+              />
+            )}
+          </svg>
+        </ViewportPortal>
         <Background gap={22} size={1} />
         <Controls position="top-left" />
         <MiniMap
