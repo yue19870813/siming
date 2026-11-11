@@ -26,7 +26,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { GitBranch, MessageCircle, Play, Square, Zap } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { EdgeRoutingCoordinator, RoutedEdge } from "./RoutedEdge";
+import { CurvedEdge, EdgeRoutingCoordinator, RoutedEdge } from "./RoutedEdge";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 import { alignNodeCenters } from "./canvasAlignment";
@@ -232,7 +232,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
 });
 
 const nodeTypes = { siming: DialogueNodeCard };
-const edgeTypes = { routed: RoutedEdge };
+const edgeTypes = { routed: RoutedEdge, bezier: CurvedEdge };
 
 function CanvasReady({ onReady }: { onReady: () => void }) {
   const initialized = useNodesInitialized();
@@ -503,7 +503,7 @@ export function CanvasView({
         sourceHandle: edge.sourcePort,
         target: edge.targetNodeId,
         targetHandle: edge.targetPort,
-        type: edgeStyle === "bezier" ? "default" : "routed",
+        type: edgeStyle === "bezier" ? "bezier" : "routed",
         data: { dialogueId, draggingNodeIds },
         interactionWidth: 24,
         markerEnd: {

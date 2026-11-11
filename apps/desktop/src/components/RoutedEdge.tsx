@@ -1,5 +1,6 @@
 import {
   BaseEdge,
+  getBezierPath,
   getSmoothStepPath,
   useStore,
   type EdgeProps,
@@ -81,6 +82,20 @@ export function RoutedEdge(props: EdgeProps) {
         getRoutedPath(scope, props.id) ??
         getSmoothStepPath({ ...props, offset: 32, borderRadius: 8 })[0]
       }
+      markerEnd={props.markerEnd}
+      style={props.style}
+      interactionWidth={24}
+    />
+  );
+}
+
+export function CurvedEdge(props: EdgeProps) {
+  const [path] = getBezierPath({ ...props, curvature: 0.5 });
+  return (
+    <BaseEdge
+      id={props.id}
+      path={path}
+      markerStart={props.markerStart}
       markerEnd={props.markerEnd}
       style={props.style}
       interactionWidth={24}
