@@ -7,6 +7,7 @@ import type {
   MigrationReport,
   ProjectSnapshot,
   RecoverySnapshot,
+  RecoverySnapshotSummary,
   RecoverySourceDraft,
   SimulationRequest,
   SimulationSession,
@@ -120,11 +121,13 @@ export async function migrateProject(
 export async function writeRecoverySnapshot(
   project: ProjectSnapshot,
   sourceDraft?: RecoverySourceDraft,
+  isSaved = false,
 ) {
   requireTauri("恢复快照");
   return invoke<RecoverySnapshot>("write_recovery_snapshot", {
     project,
     sourceDraft: sourceDraft ?? null,
+    isSaved,
   });
 }
 
@@ -132,6 +135,24 @@ export async function readRecoverySnapshot(projectId: string) {
   requireTauri("恢复快照");
   return invoke<RecoverySnapshot | null>("read_recovery_snapshot", {
     projectId,
+  });
+}
+
+export async function listRecoverySnapshots(projectId: string) {
+  requireTauri("恢复快照");
+  return invoke<RecoverySnapshotSummary[]>("list_recovery_snapshots", {
+    projectId,
+  });
+}
+
+export async function readRecoverySnapshotAt(
+  projectId: string,
+  snapshotId: string,
+) {
+  requireTauri("恢复快照");
+  return invoke<RecoverySnapshot | null>("read_recovery_snapshot_at", {
+    projectId,
+    snapshotId,
   });
 }
 

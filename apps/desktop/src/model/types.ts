@@ -205,9 +205,20 @@ export type RecoverySnapshot = {
   projectRoot: string;
   savedFingerprint: string;
   project: ProjectSnapshot;
+  isSaved: boolean;
   sourceDraft?: RecoverySourceDraft;
   createdAtUnixMs: number;
   appVersion: string;
+};
+
+export type RecoverySnapshotSummary = {
+  snapshotId: string;
+  createdAtUnixMs: number;
+  isSaved: boolean;
+  dialogueCount: number;
+  nodeCount: number;
+  edgeCount: number;
+  changedFiles: string[];
 };
 
 export type Diagnostic = {
@@ -288,6 +299,7 @@ export type ViewMode = "canvas" | "table" | "data";
 export type Activity =
   | "welcome"
   | "project"
+  | "recovery"
   | "search"
   | "characters"
   | "variables"

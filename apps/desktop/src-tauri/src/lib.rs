@@ -224,11 +224,13 @@ fn write_recovery_snapshot(
     app: tauri::AppHandle,
     project: ProjectSnapshot,
     source_draft: Option<siming_storage::RecoverySourceDraft>,
+    is_saved: bool,
 ) -> Result<siming_storage::RecoverySnapshot, CommandError> {
     Ok(siming_storage::write_recovery_snapshot(
         &recovery_root(&app)?,
         project,
         source_draft,
+        is_saved,
     )?)
 }
 
@@ -240,6 +242,30 @@ fn read_recovery_snapshot(
     Ok(siming_storage::read_recovery_snapshot(
         &recovery_root(&app)?,
         &project_id,
+    )?)
+}
+
+#[tauri::command]
+fn list_recovery_snapshots(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<Vec<siming_storage::RecoverySnapshotSummary>, CommandError> {
+    Ok(siming_storage::list_recovery_snapshots(
+        &recovery_root(&app)?,
+        &project_id,
+    )?)
+}
+
+#[tauri::command]
+fn read_recovery_snapshot_at(
+    app: tauri::AppHandle,
+    project_id: String,
+    snapshot_id: String,
+) -> Result<Option<siming_storage::RecoverySnapshot>, CommandError> {
+    Ok(siming_storage::read_recovery_snapshot_at(
+        &recovery_root(&app)?,
+        &project_id,
+        &snapshot_id,
     )?)
 }
 
@@ -329,6 +355,8 @@ pub fn run() {
             migrate_project,
             write_recovery_snapshot,
             read_recovery_snapshot,
+            list_recovery_snapshots,
+            read_recovery_snapshot_at,
             clear_recovery_snapshot,
             read_system_settings,
             write_system_settings

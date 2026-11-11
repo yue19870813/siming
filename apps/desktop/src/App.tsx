@@ -12,6 +12,7 @@ import {
 import { CanvasView } from "./components/CanvasView";
 import { DataView } from "./components/DataView";
 import { Inspector } from "./components/Inspector";
+import { RecoveryHistoryView } from "./components/RecoveryHistoryView";
 import { ResourceView } from "./components/ResourceView";
 import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
@@ -25,7 +26,6 @@ import {
 import {
   chooseProjectDirectory,
   checkMigration,
-  clearRecoverySnapshot,
   createProject,
   exportProject,
   isTauri,
@@ -39,7 +39,13 @@ import {
 } from "./lib/projectApi";
 import { InterfaceLocaleEffect } from "./lib/interfaceLocale";
 import { beginPanelResize, clampPanelSize } from "./lib/panelResize";
-import type { ExportFormat, SystemSettings } from "./model/types";
+import type {
+  ExportFormat,
+  ProjectSnapshot,
+  RecoverySnapshot,
+  RecoverySourceDraft,
+  SystemSettings,
+} from "./model/types";
 import { useEditorStore } from "./store/editorStore";
 
 const defaultSettings: SystemSettings = {
@@ -148,13 +154,12 @@ export default function App() {
         if (
           recovery &&
           recovery.projectRoot === snapshot.rootPath &&
-          window.confirm(
-            `检测到 ${new Date(recovery.createdAtUnixMs).toLocaleString()} 的未保存恢复快照${
-              recovery.sourceDraft ? "（包含源 JSON 草稿）" : ""
-            }，是否恢复？`,
-          )
+          (!recovery.isSaved ||
+            recovery.project.savedFingerprint !== snapshot.savedFingerprint) &&
+          window.confirm(recoveryPrompt(recovery, snapshot))
         ) {
-          setProject(recovery.project, true, loadedSettings.lastDialogueId);
+          const restored = await stageRecovery(snapshot, recovery);
+          setProject(restored, true, loadedSettings.lastDialogueId);
           if (recovery.sourceDraft) {
             setSourceDraft(
               recovery.sourceDraft.dialogueId,
@@ -234,29 +239,21 @@ export default function App() {
 
   useEffect(() => {
     if (!projectLoaded || !isTauri() || !project.rootPath) return;
-    const interval = window.setInterval(
-      () => {
-        const state = recoveryState.current;
-        if (!state.dirty && !state.sourceDraftDirty) return;
-        void writeRecoverySnapshot(
-          state.project,
-          state.sourceDraftDirty && state.sourceDraftDialogueId
-            ? {
-                dialogueId: state.sourceDraftDialogueId,
-                source: state.sourceDraft,
-              }
-            : undefined,
-        ).catch(() => undefined);
-      },
-      Math.max(settings.recoverySnapshotIntervalSeconds, 10) * 1_000,
-    );
+    const interval = window.setInterval(() => {
+      const state = recoveryState.current;
+      void writeRecoverySnapshot(
+        state.project,
+        state.sourceDraftDirty && state.sourceDraftDialogueId
+          ? {
+              dialogueId: state.sourceDraftDialogueId,
+              source: state.sourceDraft,
+            }
+          : undefined,
+        !state.dirty && !state.sourceDraftDirty,
+      ).catch(() => undefined);
+    }, 60_000);
     return () => window.clearInterval(interval);
-  }, [
-    project.manifest.projectId,
-    project.rootPath,
-    projectLoaded,
-    settings.recoverySnapshotIntervalSeconds,
-  ]);
+  }, [project.manifest.projectId, project.rootPath, projectLoaded]);
 
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
@@ -369,13 +366,12 @@ export default function App() {
       if (
         recovery &&
         recovery.projectRoot === snapshot.rootPath &&
-        window.confirm(
-          `检测到 ${new Date(recovery.createdAtUnixMs).toLocaleString()} 的未保存恢复快照${
-            recovery.sourceDraft ? "（包含源 JSON 草稿）" : ""
-          }，是否恢复？`,
-        )
+        (!recovery.isSaved ||
+          recovery.project.savedFingerprint !== snapshot.savedFingerprint) &&
+        window.confirm(recoveryPrompt(recovery, snapshot))
       ) {
-        setProject(recovery.project, true);
+        const restored = await stageRecovery(snapshot, recovery);
+        setProject(restored, true);
         if (recovery.sourceDraft) {
           setSourceDraft(
             recovery.sourceDraft.dialogueId,
@@ -415,9 +411,13 @@ export default function App() {
       const savedFingerprint = await saveProject(project);
       markSaved(savedFingerprint, project);
       try {
-        await clearRecoverySnapshot(project.manifest.projectId);
+        await writeRecoverySnapshot(
+          { ...project, savedFingerprint },
+          undefined,
+          true,
+        );
       } catch (error) {
-        setNotice(`项目已保存，但恢复快照清理失败：${errorMessage(error)}`);
+        setNotice(`项目已保存，但恢复快照创建失败：${errorMessage(error)}`);
       }
     } catch (error) {
       setNotice(
@@ -425,6 +425,47 @@ export default function App() {
           ? "保存冲突：项目文件已在外部修改。请重新打开项目或先另存当前版本。"
           : `保存失败：${errorMessage(error)}`,
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRestoreSnapshot(recovery: RecoverySnapshot, file: string) {
+    if (!confirmDiscardHostDraft()) return;
+    if (!project.rootPath || recovery.projectRoot !== project.rootPath) {
+      setNotice("快照所属项目与当前项目不一致，无法恢复。");
+      return;
+    }
+    if (
+      !window.confirm(
+        `恢复会将文件「${file}」载入编辑器，不会覆盖其他项目文件。当前内存状态和磁盘版本都会先保留为恢复点；恢复结果不会立即写入项目文件。继续吗？`,
+      )
+    )
+      return;
+    try {
+      setBusy(true);
+      const disk = await openProject(project.rootPath);
+      await writeRecoverySnapshot(
+        project,
+        sourceDraftDirty && sourceDraftDialogueId
+          ? { dialogueId: sourceDraftDialogueId, source: sourceDraft }
+          : undefined,
+        !dirty && !sourceDraftDirty,
+      );
+      await stageRecovery(disk, recovery);
+      const restored = restoreProjectFile(project, recovery.project, file);
+      setProject(restored, true);
+      if (recovery.sourceDraft) {
+        setSourceDraft(
+          recovery.sourceDraft.dialogueId,
+          recovery.sourceDraft.source,
+          true,
+        );
+      }
+      setActivity("project");
+      setNotice("已恢复所选快照，检查内容后按 ⌘S 保存。");
+    } catch (error) {
+      setNotice(`恢复快照失败：${errorMessage(error)}`);
     } finally {
       setBusy(false);
     }
@@ -518,7 +559,6 @@ export default function App() {
         return;
       const migrated = await migrateProject(project.rootPath);
       const reopened = await openProject(project.rootPath);
-      await clearRecoverySnapshot(project.manifest.projectId);
       setProject(reopened);
       await rememberLastProject(reopened.rootPath);
       setNotice(`迁移完成，备份：${migrated.backupDirectory ?? "已生成"}`);
@@ -565,6 +605,7 @@ export default function App() {
   }
 
   const editorActivity = activity === "project" || activity === "search";
+  const recoveryActivity = activity === "recovery";
   const resourceActivity = [
     "characters",
     "variables",
@@ -656,7 +697,7 @@ export default function App() {
         />
         <section
           ref={workspaceRef}
-          className={`workspace ${editorActivity ? "workspace--editor" : ""} ${resourceActivity ? "workspace--resources" : ""}`}
+          className={`workspace ${editorActivity ? "workspace--editor" : ""} ${resourceActivity || recoveryActivity ? "workspace--resources" : ""}`}
           style={
             {
               "--workbench-height": workbenchPanel
@@ -674,6 +715,14 @@ export default function App() {
               <DataView />
             ))}
           {resourceActivity && <ResourceView activity={activity} />}
+          {recoveryActivity && (
+            <RecoveryHistoryView
+              project={project}
+              onRestore={(snapshot, file) =>
+                void handleRestoreSnapshot(snapshot, file)
+              }
+            />
+          )}
           {activity === "settings" && (
             <SettingsView
               settings={settings}
@@ -764,6 +813,67 @@ function errorMessage(error: unknown) {
     return String(error.message);
   }
   return "发生未知错误";
+}
+
+function recoveryPrompt(recovery: RecoverySnapshot, disk: ProjectSnapshot) {
+  const mismatch = recovery.project.savedFingerprint !== disk.savedFingerprint;
+  const timestamp = new Date(recovery.createdAtUnixMs).toLocaleString();
+  const draft = recovery.sourceDraft ? "（包含源 JSON 草稿）" : "";
+  const warning = mismatch
+    ? "\n该快照基于不同的磁盘版本。恢复会先保留当前磁盘版本，再将快照载入编辑器；确认保存后才会覆盖项目文件。"
+    : "";
+  return `检测到 ${timestamp} 的恢复快照${draft}。是否恢复？${warning}`;
+}
+
+async function stageRecovery(
+  disk: ProjectSnapshot,
+  recovery: RecoverySnapshot,
+) {
+  await writeRecoverySnapshot(disk, undefined, true);
+  const restored = {
+    ...recovery.project,
+    savedFingerprint: disk.savedFingerprint,
+  };
+  const sourceDraft: RecoverySourceDraft | undefined = recovery.sourceDraft;
+  await writeRecoverySnapshot(restored, sourceDraft);
+  return restored;
+}
+
+function restoreProjectFile(
+  current: ProjectSnapshot,
+  historical: ProjectSnapshot,
+  file: string,
+): ProjectSnapshot {
+  if (file === ".siming/project.json") {
+    return { ...current, manifest: structuredClone(historical.manifest) };
+  }
+  const dialogueIndex = historical.manifest.dialogues.findIndex(
+    (entry) => entry.path === file,
+  );
+  if (dialogueIndex >= 0) {
+    const historicalDialogue = historical.dialogues.find(
+      (dialogue) => dialogue.id === historical.manifest.dialogues[dialogueIndex].id,
+    );
+    if (!historicalDialogue) return current;
+    const currentIndex = current.dialogues.findIndex(
+      (dialogue) => dialogue.id === historicalDialogue.id,
+    );
+    const dialogues = [...current.dialogues];
+    if (currentIndex >= 0) dialogues[currentIndex] = structuredClone(historicalDialogue);
+    else dialogues.push(structuredClone(historicalDialogue));
+    return { ...current, dialogues };
+  }
+  const resourceKey = file.match(/^definitions\/(characters|variables|events|tags)\.json$/)?.[1];
+  if (!resourceKey) return current;
+  return {
+    ...current,
+    resources: {
+      ...current.resources,
+      [resourceKey]: structuredClone(
+        historical.resources[resourceKey as keyof ProjectSnapshot["resources"]],
+      ),
+    },
+  };
 }
 
 function errorCode(error: unknown) {

@@ -6,14 +6,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use siming_core::{
-    CompileError, ExportFormat, ExportLayout, RuntimeChunkedBundle, RuntimeResources,
-    compile_runtime, partition_runtime,
+    CompileError, DialogueDocument, ExportFormat, ExportLayout, ProjectManifest, ProjectResources,
+    RuntimeChunkedBundle, RuntimeResources, compile_runtime, partition_runtime,
 };
 use std::{
     collections::BTreeMap,
     fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
+    sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
@@ -914,12 +915,47 @@ pub struct RecoverySnapshot {
     pub project_id: String,
     pub project_root: String,
     pub saved_fingerprint: String,
+    #[serde(default)]
+    pub files: BTreeMap<String, String>,
     pub project: ProjectSnapshot,
+    #[serde(default)]
+    pub is_saved: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_draft: Option<RecoverySourceDraft>,
     pub created_at_unix_ms: u128,
     pub app_version: String,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoverySnapshotSummary {
+    pub snapshot_id: String,
+    pub created_at_unix_ms: u128,
+    pub is_saved: bool,
+    pub dialogue_count: usize,
+    pub node_count: usize,
+    pub edge_count: usize,
+    #[serde(default)]
+    pub changed_files: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredRecoverySnapshot {
+    schema_version: u32,
+    project_id: String,
+    project_root: String,
+    saved_fingerprint: String,
+    files: BTreeMap<String, String>,
+    project_saved_fingerprint: Option<String>,
+    is_saved: bool,
+    created_at_unix_ms: u128,
+    app_version: String,
+}
+
+const RECOVERY_RETENTION_DAYS: u128 = 7;
+const RECOVERY_MAX_SNAPSHOTS: usize = 100;
+static RECOVERY_SNAPSHOT_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -932,23 +968,79 @@ pub fn write_recovery_snapshot(
     recovery_root: &Path,
     project: ProjectSnapshot,
     source_draft: Option<RecoverySourceDraft>,
+    is_saved: bool,
 ) -> Result<RecoverySnapshot, DeliveryError> {
-    let fingerprint = hex_hash(&serde_json::to_vec(&project)?);
+    let _guard = RECOVERY_SNAPSHOT_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    prune_recovery_snapshots(recovery_root, &project.manifest.project_id)?;
+    let files = recovery_file_contents(&project, source_draft.as_ref())?;
+    let file_hashes = files
+        .iter()
+        .map(|(path, content)| (path.clone(), hex_hash(content.as_bytes())))
+        .collect::<BTreeMap<_, _>>();
+    let fingerprint = hex_hash(&serde_json::to_vec(&file_hashes)?);
+    let previous = read_latest_recovery_snapshot(recovery_root, &project.manifest.project_id)?;
+    if let Some((path, previous)) = &previous {
+        let previous_fingerprint = hex_hash(&serde_json::to_vec(&previous.files)?);
+        if previous_fingerprint == fingerprint {
+            prune_recovery_snapshots(recovery_root, &project.manifest.project_id)?;
+            if previous.is_saved != is_saved {
+                let mut updated = previous.clone();
+                updated.is_saved = is_saved;
+                write_json_atomic(path, &updated)?;
+                return Ok(updated);
+            }
+            return Ok(previous.clone());
+        }
+    }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let created_at_unix_ms = previous
+        .map(|(_, snapshot)| snapshot.created_at_unix_ms.saturating_add(1).max(now))
+        .unwrap_or(now);
     let snapshot = RecoverySnapshot {
         schema_version: 1,
         project_id: project.manifest.project_id.clone(),
         project_root: project.root_path.clone(),
         saved_fingerprint: fingerprint,
+        files: file_hashes
+            .iter()
+            .map(|(path, hash)| {
+                let content_path =
+                    recovery_content_path(recovery_root, &project.manifest.project_id, &hash);
+                write_bytes_if_missing(&content_path, files[path].as_bytes())?;
+                Ok((path.clone(), hash.clone()))
+            })
+            .collect::<Result<_, DeliveryError>>()?,
         project,
+        is_saved,
         source_draft,
-        created_at_unix_ms: SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis(),
+        created_at_unix_ms,
         app_version: siming_core::version().to_owned(),
     };
-    let path = recovery_path(recovery_root, &snapshot.project_id);
-    write_json_atomic(&path, &snapshot)?;
+    let path = recovery_path(
+        recovery_root,
+        &snapshot.project_id,
+        snapshot.created_at_unix_ms,
+    );
+    write_json_atomic(
+        &path,
+        &StoredRecoverySnapshot {
+            schema_version: snapshot.schema_version,
+            project_id: snapshot.project_id.clone(),
+            project_root: snapshot.project_root.clone(),
+            saved_fingerprint: snapshot.saved_fingerprint.clone(),
+            files: snapshot.files.clone(),
+            project_saved_fingerprint: snapshot.project.saved_fingerprint.clone(),
+            is_saved: snapshot.is_saved,
+            created_at_unix_ms: snapshot.created_at_unix_ms,
+            app_version: snapshot.app_version.clone(),
+        },
+    )?;
+    prune_recovery_snapshots(recovery_root, &snapshot.project_id)?;
     Ok(snapshot)
 }
 
@@ -956,35 +1048,381 @@ pub fn read_recovery_snapshot(
     recovery_root: &Path,
     project_id: &str,
 ) -> Result<Option<RecoverySnapshot>, DeliveryError> {
-    let path = recovery_path(recovery_root, project_id);
-    if !path.exists() {
+    Ok(read_latest_recovery_snapshot(recovery_root, project_id)?.map(|(_, snapshot)| snapshot))
+}
+
+pub fn list_recovery_snapshots(
+    recovery_root: &Path,
+    project_id: &str,
+) -> Result<Vec<RecoverySnapshotSummary>, DeliveryError> {
+    let dir = recovery_project_dir(recovery_root, project_id);
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut snapshots = Vec::new();
+    for entry in fs::read_dir(&dir)? {
+        let path = entry?.path();
+        if !path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name == "snapshot.json" || name.starts_with("snapshot-"))
+        {
+            continue;
+        }
+        let Ok(snapshot) = read_recovery_snapshot_file(recovery_root, project_id, &path) else {
+            continue;
+        };
+        if snapshot.schema_version != 1 || snapshot.project_id != project_id {
+            continue;
+        }
+        let Some(snapshot_id) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        let mut changed_files = snapshot.files.keys().cloned().collect::<Vec<_>>();
+        if changed_files.is_empty() {
+            changed_files.push(PROJECT_FILE.to_owned());
+            changed_files.extend(
+                snapshot
+                    .project
+                    .manifest
+                    .dialogues
+                    .iter()
+                    .map(|entry| entry.path.clone()),
+            );
+            changed_files.extend([
+                "definitions/characters.json".to_owned(),
+                "definitions/variables.json".to_owned(),
+                "definitions/events.json".to_owned(),
+                "definitions/tags.json".to_owned(),
+            ]);
+        }
+        let summary = RecoverySnapshotSummary {
+            snapshot_id: snapshot_id.to_owned(),
+            created_at_unix_ms: snapshot.created_at_unix_ms,
+            is_saved: snapshot.is_saved,
+            dialogue_count: snapshot.project.dialogues.len(),
+            node_count: snapshot
+                .project
+                .dialogues
+                .iter()
+                .map(|dialogue| dialogue.nodes.len())
+                .sum(),
+            edge_count: snapshot
+                .project
+                .dialogues
+                .iter()
+                .map(|dialogue| dialogue.edges.len())
+                .sum(),
+            changed_files,
+        };
+        snapshots.push((snapshot, summary));
+    }
+    snapshots.sort_by(|left, right| right.0.created_at_unix_ms.cmp(&left.0.created_at_unix_ms));
+    let mut previous_files: Option<BTreeMap<String, String>> = None;
+    let mut summaries = Vec::with_capacity(snapshots.len());
+    for (snapshot, summary) in snapshots.iter_mut().rev() {
+        summary.changed_files = match &previous_files {
+            Some(previous) => snapshot
+                .files
+                .keys()
+                .chain(previous.keys())
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .filter(|path| snapshot.files.get(*path) != previous.get(*path))
+                .map(|path| path.clone())
+                .collect(),
+            None => snapshot.files.keys().cloned().collect(),
+        };
+        previous_files = Some(snapshot.files.clone());
+    }
+    summaries.extend(snapshots.into_iter().map(|(_, summary)| summary));
+    Ok(summaries)
+}
+
+pub fn read_recovery_snapshot_at(
+    recovery_root: &Path,
+    project_id: &str,
+    snapshot_id: &str,
+) -> Result<Option<RecoverySnapshot>, DeliveryError> {
+    if snapshot_id.contains('/') || snapshot_id.contains('\\') || !snapshot_id.ends_with(".json") {
         return Ok(None);
     }
-    let snapshot: RecoverySnapshot = read_json(&path)?;
+    let path = recovery_project_dir(recovery_root, project_id).join(snapshot_id);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let snapshot = read_recovery_snapshot_file(recovery_root, project_id, &path)?;
     if snapshot.schema_version != 1 || snapshot.project_id != project_id {
         return Ok(None);
     }
     Ok(Some(snapshot))
 }
 
+fn read_latest_recovery_snapshot(
+    recovery_root: &Path,
+    project_id: &str,
+) -> Result<Option<(PathBuf, RecoverySnapshot)>, DeliveryError> {
+    let dir = recovery_project_dir(recovery_root, project_id);
+    if !dir.is_dir() {
+        return Ok(None);
+    }
+    let mut snapshots = fs::read_dir(&dir)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name == "snapshot.json" || name.starts_with("snapshot-"))
+        })
+        .collect::<Vec<_>>();
+    snapshots.sort_by(|left, right| recovery_timestamp(right).cmp(&recovery_timestamp(left)));
+    for path in snapshots {
+        let Ok(snapshot) = read_recovery_snapshot_file(recovery_root, project_id, &path) else {
+            continue;
+        };
+        if snapshot.schema_version == 1 && snapshot.project_id == project_id {
+            return Ok(Some((path, snapshot)));
+        }
+    }
+    Ok(None)
+}
+
+fn read_recovery_snapshot_file(
+    root: &Path,
+    project_id: &str,
+    path: &Path,
+) -> Result<RecoverySnapshot, DeliveryError> {
+    let value: Value = read_json(path)?;
+    if value.get("project").is_some() {
+        return Ok(serde_json::from_value(value)?);
+    }
+    let stored: StoredRecoverySnapshot = serde_json::from_value(value)?;
+    if stored.project_id != project_id || stored.schema_version != 1 {
+        return Err(DeliveryError::UnsafeOutput("快照项目不匹配".to_owned()));
+    }
+    let contents = stored
+        .files
+        .iter()
+        .map(|(relative, hash)| {
+            if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err(DeliveryError::UnsafeOutput(
+                    "快照文件哈希格式无效".to_owned(),
+                ));
+            }
+            let path = recovery_content_path(root, project_id, hash);
+            let content = fs::read_to_string(path)?;
+            if hex_hash(content.as_bytes()) != *hash {
+                return Err(DeliveryError::UnsafeOutput(
+                    "快照文件内容校验失败".to_owned(),
+                ));
+            }
+            Ok((relative.clone(), content))
+        })
+        .collect::<Result<BTreeMap<_, _>, DeliveryError>>()?;
+    let manifest: ProjectManifest = serde_json::from_str(
+        contents
+            .get(PROJECT_FILE)
+            .ok_or_else(|| DeliveryError::UnsafeOutput("快照缺少项目清单".to_owned()))?,
+    )?;
+    let dialogues = manifest
+        .dialogues
+        .iter()
+        .map(|entry| {
+            contents
+                .get(&entry.path)
+                .ok_or_else(|| DeliveryError::UnsafeOutput("快照缺少对话文件".to_owned()))
+                .and_then(|content| Ok(serde_json::from_str::<DialogueDocument>(content)?))
+        })
+        .collect::<Result<Vec<_>, DeliveryError>>()?;
+    let read_resource = |name: &str| -> Result<Value, DeliveryError> {
+        contents
+            .get(&format!("definitions/{name}.json"))
+            .map(|content| serde_json::from_str(content))
+            .transpose()?
+            .ok_or_else(|| DeliveryError::UnsafeOutput("快照缺少定义文件".to_owned()))
+    };
+    let resources = ProjectResources {
+        characters: serde_json::from_value(
+            read_resource("characters")?
+                .get("characters")
+                .cloned()
+                .unwrap_or_default(),
+        )?,
+        variables: serde_json::from_value(
+            read_resource("variables")?
+                .get("variables")
+                .cloned()
+                .unwrap_or_default(),
+        )?,
+        events: serde_json::from_value(
+            read_resource("events")?
+                .get("events")
+                .cloned()
+                .unwrap_or_default(),
+        )?,
+        tags: serde_json::from_value(
+            read_resource("tags")?
+                .get("tags")
+                .cloned()
+                .unwrap_or_default(),
+        )?,
+    };
+    let source_draft = contents.iter().find_map(|(path, source)| {
+        path.strip_prefix(".siming/drafts/")
+            .and_then(|name| name.strip_suffix(".json"))
+            .map(|dialogue_id| RecoverySourceDraft {
+                dialogue_id: dialogue_id.to_owned(),
+                source: source.clone(),
+            })
+    });
+    Ok(RecoverySnapshot {
+        schema_version: stored.schema_version,
+        project_id: stored.project_id,
+        project_root: stored.project_root.clone(),
+        saved_fingerprint: stored.saved_fingerprint,
+        project: ProjectSnapshot {
+            root_path: stored.project_root,
+            manifest,
+            dialogues,
+            resources,
+            saved_fingerprint: stored.project_saved_fingerprint,
+        },
+        files: stored.files,
+        is_saved: stored.is_saved,
+        source_draft,
+        created_at_unix_ms: stored.created_at_unix_ms,
+        app_version: stored.app_version,
+    })
+}
+
 pub fn clear_recovery_snapshot(
     recovery_root: &Path,
     project_id: &str,
 ) -> Result<(), DeliveryError> {
-    let path = recovery_path(recovery_root, project_id);
-    if path.exists() {
-        fs::remove_file(&path)?;
-    }
-    if let Some(parent) = path.parent() {
-        if parent.is_dir() && parent.read_dir()?.next().is_none() {
-            fs::remove_dir(parent)?;
-        }
+    let dir = recovery_project_dir(recovery_root, project_id);
+    if dir.is_dir() {
+        fs::remove_dir_all(&dir)?;
     }
     Ok(())
 }
 
-fn recovery_path(root: &Path, project_id: &str) -> PathBuf {
-    root.join("recovery").join(project_id).join("snapshot.json")
+fn recovery_path(root: &Path, project_id: &str, created_at_unix_ms: u128) -> PathBuf {
+    recovery_project_dir(root, project_id).join(format!(
+        "snapshot-{}-{}.json",
+        created_at_unix_ms,
+        Uuid::new_v4()
+    ))
+}
+
+fn recovery_project_dir(root: &Path, project_id: &str) -> PathBuf {
+    root.join("recovery").join(project_id)
+}
+
+fn recovery_timestamp(path: &Path) -> u128 {
+    let name = path.file_name().and_then(|name| name.to_str());
+    if name == Some("snapshot.json") {
+        return read_json::<RecoverySnapshot>(path)
+            .map(|snapshot| snapshot.created_at_unix_ms)
+            .unwrap_or(0);
+    }
+    name.and_then(|name| name.strip_prefix("snapshot-"))
+        .and_then(|name| name.split('-').next())
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0)
+}
+
+fn recovery_file_contents(
+    project: &ProjectSnapshot,
+    source_draft: Option<&RecoverySourceDraft>,
+) -> Result<BTreeMap<String, String>, DeliveryError> {
+    let mut files = BTreeMap::new();
+    files.insert(
+        PROJECT_FILE.to_owned(),
+        serde_json::to_string_pretty(&project.manifest)?,
+    );
+    for (entry, dialogue) in project.manifest.dialogues.iter().zip(&project.dialogues) {
+        files.insert(entry.path.clone(), serde_json::to_string_pretty(dialogue)?);
+    }
+    files.insert(
+        "definitions/characters.json".to_owned(),
+        definition_json("characters", &project.resources.characters)?,
+    );
+    files.insert(
+        "definitions/variables.json".to_owned(),
+        definition_json("variables", &project.resources.variables)?,
+    );
+    files.insert(
+        "definitions/events.json".to_owned(),
+        definition_json("events", &project.resources.events)?,
+    );
+    files.insert(
+        "definitions/tags.json".to_owned(),
+        definition_json("tags", &project.resources.tags)?,
+    );
+    if let Some(draft) = source_draft {
+        files.insert(
+            format!(".siming/drafts/{}.json", draft.dialogue_id),
+            draft.source.clone(),
+        );
+    }
+    Ok(files)
+}
+
+fn definition_json<T: Serialize>(key: &str, items: &[T]) -> Result<String, DeliveryError> {
+    let mut value = serde_json::Map::new();
+    value.insert("schemaVersion".to_owned(), serde_json::json!(1));
+    value.insert(key.to_owned(), serde_json::to_value(items)?);
+    Ok(serde_json::to_string_pretty(&value)?)
+}
+
+fn recovery_content_path(root: &Path, project_id: &str, hash: &str) -> PathBuf {
+    recovery_project_dir(root, project_id)
+        .join("files")
+        .join(format!("{hash}.json"))
+}
+
+fn write_bytes_if_missing(path: &Path, bytes: &[u8]) -> Result<(), DeliveryError> {
+    if path.is_file() {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temp = path.with_extension(format!("tmp-{}", Uuid::new_v4()));
+    let mut file = File::create(&temp)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    fs::rename(temp, path)?;
+    Ok(())
+}
+
+fn prune_recovery_snapshots(root: &Path, project_id: &str) -> Result<(), DeliveryError> {
+    let dir = recovery_project_dir(root, project_id);
+    if !dir.is_dir() {
+        return Ok(());
+    }
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let cutoff = now.saturating_sub(RECOVERY_RETENTION_DAYS * 24 * 60 * 60 * 1_000);
+    let mut snapshots = fs::read_dir(&dir)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name == "snapshot.json" || name.starts_with("snapshot-"))
+        })
+        .collect::<Vec<_>>();
+    snapshots.sort_by(|left, right| recovery_timestamp(right).cmp(&recovery_timestamp(left)));
+    for (index, path) in snapshots.iter().enumerate() {
+        let timestamp = recovery_timestamp(path);
+        if timestamp < cutoff || index >= RECOVERY_MAX_SNAPSHOTS {
+            fs::remove_file(path)?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1415,6 +1853,7 @@ mod tests {
                 dialogue_id: "dialogue".to_owned(),
                 source: "{ draft".to_owned(),
             }),
+            false,
         )
         .unwrap();
         let recovered = read_recovery_snapshot(&recovery_root, &project_id)
@@ -1422,12 +1861,110 @@ mod tests {
             .unwrap();
         assert_eq!(recovered.project_id, project_id);
         assert!(recovered.source_draft.is_some());
+        let history = list_recovery_snapshots(&recovery_root, &project_id).unwrap();
+        assert_eq!(history.len(), 1);
+        let stored_index: Value = read_json(
+            &recovery_project_dir(&recovery_root, &project_id).join(&history[0].snapshot_id),
+        )
+        .unwrap();
+        assert!(stored_index.get("project").is_none());
+        assert_eq!(history[0].dialogue_count, 1);
+        assert_eq!(
+            history[0].node_count,
+            recovered.project.dialogues[0].nodes.len()
+        );
+        assert_eq!(
+            read_recovery_snapshot_at(&recovery_root, &project_id, &history[0].snapshot_id)
+                .unwrap()
+                .unwrap(),
+            recovered
+        );
+        assert!(
+            read_recovery_snapshot_at(&recovery_root, &project_id, "../snapshot.json")
+                .unwrap()
+                .is_none()
+        );
         clear_recovery_snapshot(&recovery_root, &project_id).unwrap();
         assert!(
             read_recovery_snapshot(&recovery_root, &project_id)
                 .unwrap()
                 .is_none()
         );
+        fs::remove_dir_all(project_root).unwrap();
+        fs::remove_dir_all(recovery_root).unwrap();
+    }
+
+    #[test]
+    fn recovery_snapshots_deduplicate_and_keep_only_the_latest_hundred() {
+        let project_root = test_directory("recovery-history-project");
+        let recovery_root = test_directory("recovery-history-data");
+        let project = create_project(&project_root, "恢复历史", "zh-CN").unwrap();
+        let project_id = project.manifest.project_id.clone();
+
+        let first = write_recovery_snapshot(&recovery_root, project.clone(), None, false).unwrap();
+        let duplicate =
+            write_recovery_snapshot(&recovery_root, project.clone(), None, false).unwrap();
+        assert_eq!(first.created_at_unix_ms, duplicate.created_at_unix_ms);
+        let marked_saved =
+            write_recovery_snapshot(&recovery_root, project.clone(), None, true).unwrap();
+        assert_eq!(marked_saved.created_at_unix_ms, first.created_at_unix_ms);
+        assert!(marked_saved.is_saved);
+
+        let mut expired = first.clone();
+        expired.created_at_unix_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+            .saturating_sub(8 * 24 * 60 * 60 * 1_000);
+        let expired_path = recovery_project_dir(&recovery_root, &project_id).join(format!(
+            "snapshot-{}-expired.json",
+            expired.created_at_unix_ms
+        ));
+        write_json_atomic(&expired_path, &expired).unwrap();
+
+        let mut latest_project = project;
+        for index in 0..RECOVERY_MAX_SNAPSHOTS {
+            latest_project.manifest.name = format!("恢复历史 {index}");
+            write_recovery_snapshot(&recovery_root, latest_project.clone(), None, false).unwrap();
+        }
+
+        let dir = recovery_project_dir(&recovery_root, &project_id);
+        let snapshots = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().starts_with("snapshot-"))
+            .count();
+        assert_eq!(snapshots, RECOVERY_MAX_SNAPSHOTS);
+        assert!(!expired_path.exists());
+        let latest = read_recovery_snapshot(&recovery_root, &project_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(latest.project.manifest.name, "恢复历史 99");
+        let latest_summary = list_recovery_snapshots(&recovery_root, &project_id)
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+        assert_eq!(latest_summary.changed_files, vec![".siming/project.json"]);
+
+        clear_recovery_snapshot(&recovery_root, &project_id).unwrap();
+        let mut only_expired = latest.clone();
+        only_expired.created_at_unix_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+            .saturating_sub(8 * 24 * 60 * 60 * 1_000);
+        let only_expired_path = recovery_project_dir(&recovery_root, &project_id).join(format!(
+            "snapshot-{}-expired.json",
+            only_expired.created_at_unix_ms
+        ));
+        write_json_atomic(&only_expired_path, &only_expired).unwrap();
+        let refreshed =
+            write_recovery_snapshot(&recovery_root, latest.project.clone(), None, false).unwrap();
+        assert!(refreshed.created_at_unix_ms > only_expired.created_at_unix_ms);
+        assert!(!only_expired_path.exists());
+
+        clear_recovery_snapshot(&recovery_root, &project_id).unwrap();
         fs::remove_dir_all(project_root).unwrap();
         fs::remove_dir_all(recovery_root).unwrap();
     }

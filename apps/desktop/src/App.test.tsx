@@ -155,6 +155,69 @@ test("restores the last project on startup", async () => {
   );
 });
 
+test("offers recovery snapshots based on an older disk fingerprint", async () => {
+  const project = createDemoProject();
+  project.rootPath = "/tmp/latest-siming-project";
+  project.savedFingerprint = "disk-current";
+  const staleProject = structuredClone(project);
+  staleProject.savedFingerprint = "disk-older";
+  staleProject.dialogues[0].nodes[0].data.text = { "zh-CN": "旧内容" };
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    configurable: true,
+    value: {},
+  });
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === "read_system_settings") {
+      return {
+        schemaVersion: 1,
+        theme: "dark",
+        defaultProjectDirectory: null,
+        interfaceLocale: "zh-CN",
+        uiFontSize: "medium",
+        editorFontSize: 13,
+        keymap: "system",
+        autoSaveDelaySeconds: 30,
+        recoverySnapshotIntervalSeconds: 60,
+        restoreLastProject: true,
+        lastProjectPath: project.rootPath,
+        lastDialogueId: null,
+        projectExportDirectories: {},
+      } as never;
+    }
+    if (command === "open_project") return project as never;
+    if (command === "read_recovery_snapshot")
+      return {
+        schemaVersion: 1,
+        projectId: project.manifest.projectId,
+        projectRoot: project.rootPath,
+        savedFingerprint: "recovery-integrity",
+        project: staleProject,
+        isSaved: false,
+        createdAtUnixMs: Date.now(),
+        appVersion: "test",
+      } as never;
+    return undefined as never;
+  });
+
+  render(<App />);
+
+  await waitFor(() =>
+    expect(
+      useEditorStore.getState().project.dialogues[0].nodes[0].data.text,
+    ).toEqual({ "zh-CN": "旧内容" }),
+  );
+  expect(window.confirm).toHaveBeenCalledWith(
+    expect.stringContaining("基于不同的磁盘版本"),
+  );
+  expect(useEditorStore.getState().dirty).toBe(true);
+  expect(invoke).toHaveBeenCalledWith("write_recovery_snapshot", {
+    project: expect.objectContaining({ savedFingerprint: "disk-current" }),
+    sourceDraft: null,
+    isSaved: true,
+  });
+});
+
 test("opening a project remembers it for the next startup", async () => {
   const project = createDemoProject();
   project.rootPath = "/tmp/remembered-siming-project";
@@ -676,8 +739,29 @@ test("command save keeps the second dialogue and edit history selected", async (
   useEditorStore.getState().commit("编辑 002", (draft) => {
     draft.dialogues[1].name = "002-已编辑";
   });
+  Object.defineProperty(window, "__TAURI_INTERNALS__", {
+    configurable: true,
+    value: {},
+  });
   const historyLength = useEditorStore.getState().past.length;
   vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === "read_system_settings") {
+      return {
+        schemaVersion: 1,
+        theme: "dark",
+        defaultProjectDirectory: null,
+        interfaceLocale: "zh-CN",
+        uiFontSize: "medium",
+        editorFontSize: 13,
+        keymap: "system",
+        autoSaveDelaySeconds: 30,
+        recoverySnapshotIntervalSeconds: 60,
+        restoreLastProject: false,
+        lastProjectPath: null,
+        lastDialogueId: null,
+        projectExportDirectories: {},
+      } as never;
+    }
     if (command === "save_project") return "saved-disk-fingerprint" as never;
     return undefined as never;
   });
@@ -698,6 +782,15 @@ test("command save keeps the second dialogue and edit history selected", async (
       ]),
     }),
   });
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("write_recovery_snapshot", {
+      project: expect.objectContaining({
+        savedFingerprint: "saved-disk-fingerprint",
+      }),
+      sourceDraft: null,
+      isSaved: true,
+    }),
+  );
 });
 
 test("save and export protect invalid host drafts without writing files", async () => {

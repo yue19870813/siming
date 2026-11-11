@@ -10,6 +10,7 @@ import {
   Folder,
   FolderPlus,
   FolderTree,
+  History,
   Plus,
   Search,
   Settings,
@@ -37,6 +38,7 @@ const activities: Array<{
   icon: typeof FolderTree;
 }> = [
   { id: "project", label: "项目内容", icon: FolderTree },
+  { id: "recovery", label: "快照历史", icon: History },
   { id: "search", label: "项目搜索", icon: Search },
   { id: "characters", label: "角色", icon: UserRound },
   { id: "variables", label: "变量", icon: Variable },
