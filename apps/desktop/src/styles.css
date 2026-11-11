@@ -1896,6 +1896,22 @@ html.is-dragging-node * {
     0 12px 28px rgb(0 0 0 / 25%);
 }
 
+.flow-node.is-edge-related {
+  border-color: color-mix(
+    in srgb,
+    var(--primary-hover) 72%,
+    var(--border-strong)
+  );
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--primary-hover) 24%, transparent),
+    0 10px 24px rgb(0 0 0 / 24%);
+}
+
+.flow-node.is-edge-dimmed {
+  opacity: 0.28;
+  filter: saturate(0.45);
+}
+
 .flow-node > header {
   display: flex;
   align-items: center;

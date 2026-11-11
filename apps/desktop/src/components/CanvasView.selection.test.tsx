@@ -194,6 +194,45 @@ test("keeps the live position when selection changes during a node drag", () => 
   ).toEqual(movedPosition);
 });
 
+test("highlights the endpoints of a selected edge and dims unrelated nodes", () => {
+  const project = createDemoProject();
+  const dialogue = project.dialogues[0];
+  const [source, target, unrelated] = dialogue.nodes;
+  dialogue.edges = [
+    {
+      id: "highlight-edge",
+      sourceNodeId: source.id,
+      sourcePort: "next",
+      targetNodeId: target.id,
+      targetPort: "in",
+    },
+  ];
+  useEditorStore.getState().setProject(project);
+  render(<CanvasView />);
+
+  act(() => {
+    flowProps.onEdgesChange?.([
+      { type: "select", id: "highlight-edge", selected: true },
+    ]);
+  });
+
+  const dataById = new Map(
+    flowProps.nodes?.map((node) => [node.id, node.data]),
+  );
+  expect(dataById.get(source.id)?.edgeHighlight).toBe("related");
+  expect(dataById.get(target.id)?.edgeHighlight).toBe("related");
+  expect(dataById.get(unrelated.id)?.edgeHighlight).toBe("dimmed");
+
+  act(() => {
+    flowProps.onEdgesChange?.([
+      { type: "select", id: "highlight-edge", selected: false },
+    ]);
+  });
+  expect(
+    flowProps.nodes?.every((node) => node.data.edgeHighlight === undefined),
+  ).toBe(true);
+});
+
 test("pasted multi-selection is selected on the canvas", () => {
   render(<CanvasView />);
   const state = useEditorStore.getState();

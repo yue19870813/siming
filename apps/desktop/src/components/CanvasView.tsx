@@ -65,6 +65,7 @@ type CanvasNodeData = {
   projectRoot: string;
   defaultLocale: string;
   character?: CharacterDefinition;
+  edgeHighlight?: "related" | "dimmed";
 };
 
 type CanvasFlowNode = FlowNode<CanvasNodeData, "siming">;
@@ -73,7 +74,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
   data,
   selected,
 }: NodeProps) {
-  const { node, locale, projectRoot, character, defaultLocale } =
+  const { node, locale, projectRoot, character, defaultLocale, edgeHighlight } =
     data as CanvasNodeData;
   const meta = typeMeta[node.type];
   const updateNodeInternals = useUpdateNodeInternals();
@@ -99,7 +100,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
 
   return (
     <article
-      className={`flow-node flow-node--${node.type} ${selected ? "is-selected" : ""}`}
+      className={`flow-node flow-node--${node.type} ${selected ? "is-selected" : ""} ${edgeHighlight ? `is-edge-${edgeHighlight}` : ""}`}
       style={{ "--node-color": meta.color } as React.CSSProperties}
     >
       {node.type !== "start" && (
@@ -361,6 +362,12 @@ export function CanvasView({
           ? [selectedNodeId]
           : [],
     );
+    const selectedEdges = (dialogue?.edges ?? []).filter((edge) =>
+      selectedEdgeIds.has(edge.id),
+    );
+    const edgeNodeIds = new Set(
+      selectedEdges.flatMap((edge) => [edge.sourceNodeId, edge.targetNodeId]),
+    );
     return (dialogue?.nodes ?? []).map((node) => ({
       id: node.id,
       type: "siming",
@@ -375,6 +382,12 @@ export function CanvasView({
         character: project.resources.characters.find(
           (item) => item.key === node.data.speakerId,
         ),
+        edgeHighlight:
+          selectedEdges.length === 0
+            ? undefined
+            : edgeNodeIds.has(node.id)
+              ? "related"
+              : "dimmed",
       },
     }));
   }, [
@@ -386,6 +399,7 @@ export function CanvasView({
     dialogueId,
     selectedNodeId,
     selectedNodeIdsFromStore,
+    selectedEdgeIds,
   ]);
   const [nodes, setNodes, onNodesChange] =
     useNodesState<CanvasFlowNode>(derivedNodes);
