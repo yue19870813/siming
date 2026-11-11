@@ -16,6 +16,9 @@ test("undoing to the saved snapshot clears dirty state", () => {
 });
 
 test("a new node uses the current canvas center and is selected", () => {
+  const previousNodeId =
+    useEditorStore.getState().project.dialogues[0].nodes[0].id;
+  useEditorStore.getState().setSelectedNode(previousNodeId);
   const insertionPosition = { x: 640, y: 360 };
   useEditorStore.getState().setCanvasInsertionPosition(insertionPosition);
   useEditorStore.getState().addNode("dialogue");
@@ -28,6 +31,7 @@ test("a new node uses the current canvas center and is selected", () => {
 
   expect(node?.position).toEqual(insertionPosition);
   expect(state.selectedNodeId).toBe(node?.id);
+  expect(state.selectedNodeIds).toEqual([node?.id]);
 });
 
 test("copy and paste duplicates a selected node with new identities", () => {

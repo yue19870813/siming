@@ -553,7 +553,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         .find((item) => item.id === selectedDialogueId)
         ?.nodes.push(node);
     });
-    set({ selectedNodeId: node.id });
+    set({ selectedNodeId: node.id, selectedNodeIds: [node.id] });
   },
   deleteNodes: (ids) => {
     if (!confirmDiscardHostDraft()) return;
