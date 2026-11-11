@@ -389,9 +389,18 @@ export function CanvasView({
   ]);
   const [nodes, setNodes, onNodesChange] =
     useNodesState<CanvasFlowNode>(derivedNodes);
+  const activeDraggedNodeIds = useRef(new Set<string>());
 
   useEffect(() => {
-    setNodes(derivedNodes);
+    setNodes((current) => {
+      const currentById = new Map(current.map((node) => [node.id, node]));
+      return derivedNodes.map((node) => {
+        const currentNode = currentById.get(node.id);
+        return currentNode && activeDraggedNodeIds.current.has(node.id)
+          ? { ...node, position: currentNode.position }
+          : node;
+      });
+    });
   }, [derivedNodes, setNodes]);
 
   useEffect(() => {
@@ -689,6 +698,7 @@ export function CanvasView({
           alignedPositions.current.clear();
           const dragged = new Set(selectedNodeIds.current);
           dragged.add(node.id);
+          activeDraggedNodeIds.current = dragged;
           setDraggingNodeIds([...dragged]);
         }}
         onNodeDragStop={(_event, _moved, draggedNodes) => {
@@ -707,6 +717,7 @@ export function CanvasView({
               (node.position.x !== position.x || node.position.y !== position.y)
             );
           });
+          activeDraggedNodeIds.current.clear();
           if (!changed) return;
           commit(
             draggedNodes.length > 1 ? "移动多个节点" : "移动节点",

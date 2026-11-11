@@ -164,6 +164,36 @@ test("modifier selection keeps the first node selected", () => {
   expect(flowProps.nodes?.filter((node) => node.selected)).toHaveLength(0);
 });
 
+test("keeps the live position when selection changes during a node drag", () => {
+  render(<CanvasView />);
+  const [node] = useEditorStore.getState().project.dialogues[0].nodes;
+  const movedPosition = {
+    x: node.position.x + 160,
+    y: node.position.y + 72,
+  };
+
+  act(() => {
+    flowProps.onNodeDragStart?.(
+      new MouseEvent("mousedown"),
+      { id: node.id } as Node,
+      [{ id: node.id } as Node],
+    );
+    flowProps.onNodesChange?.([
+      {
+        type: "position",
+        id: node.id,
+        position: movedPosition,
+        dragging: true,
+      },
+      { type: "select", id: node.id, selected: true },
+    ]);
+  });
+
+  expect(
+    flowProps.nodes?.find((flowNode) => flowNode.id === node.id)?.position,
+  ).toEqual(movedPosition);
+});
+
 test("pasted multi-selection is selected on the canvas", () => {
   render(<CanvasView />);
   const state = useEditorStore.getState();
