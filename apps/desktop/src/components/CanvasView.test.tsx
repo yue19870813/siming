@@ -6,6 +6,28 @@ import { useEditorStore } from "../store/editorStore";
 import { CanvasView } from "./CanvasView";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 
+test("shows feedback before mounting a large canvas and cancels it on file switch", () => {
+  const project = createDemoProject();
+  const large = structuredClone(project.dialogues[0]);
+  large.id = "large-dialogue";
+  large.nodes = Array.from({ length: 80 }, (_, index) =>
+    createNode("dialogue", { x: index * 250, y: 0 }),
+  );
+  large.edges = [];
+  large.entryNodeId = large.nodes[0].id;
+  project.dialogues.push(large);
+  useEditorStore.getState().setProject(project, false, large.id);
+  const { container } = render(<CanvasView />);
+  expect(screen.getByRole("status")).toHaveTextContent("正在初始化 80 个节点");
+  expect(container.querySelector(".react-flow")).toBeNull();
+
+  act(() =>
+    useEditorStore.getState().setSelectedDialogue(project.dialogues[0].id),
+  );
+  expect(screen.queryByRole("status")).toBeNull();
+  expect(container.querySelector(".react-flow")).not.toBeNull();
+});
+
 describe("centeredNodePosition", () => {
   test("accounts for the current pan and zoom", () => {
     expect(

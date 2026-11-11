@@ -1747,6 +1747,54 @@ html.is-dragging-node * {
   position: relative;
 }
 
+.canvas-view--loading {
+  display: grid;
+  place-items: center;
+  background: var(--canvas);
+}
+
+.canvas-loading-card {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 20px 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel-raised) 92%, transparent);
+  box-shadow: var(--shadow);
+  font-size: var(--ui-font-11, 11px);
+}
+
+.canvas-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--canvas) 85%, transparent);
+}
+
+.canvas-loading-card > span:last-child {
+  color: var(--muted);
+  font-size: var(--ui-font-10, 10px);
+}
+
+.canvas-loading-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: canvas-loading-spin 0.75s linear infinite;
+}
+
+@keyframes canvas-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .canvas-alignment-guides {
   position: absolute;
   width: 1px;

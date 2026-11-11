@@ -2,7 +2,7 @@ import { act, render } from "@testing-library/react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { Node, ReactFlowProps } from "@xyflow/react";
 import { beforeEach, expect, test, vi } from "vitest";
-import { createDemoProject } from "../model/demo";
+import { createDemoProject, createNode } from "../model/demo";
 import { useEditorStore } from "../store/editorStore";
 import { CanvasView } from "./CanvasView";
 
@@ -21,6 +21,70 @@ vi.mock("@xyflow/react", async (importOriginal) => {
 
 beforeEach(() => {
   useEditorStore.getState().setProject(createDemoProject());
+});
+
+test("mounts a 123-node file in batches and keeps edges deferred until completion", () => {
+  vi.useFakeTimers();
+  const project = createDemoProject();
+  const dialogue = project.dialogues[0];
+  dialogue.nodes = Array.from({ length: 123 }, (_, index) =>
+    createNode("dialogue", { x: index * 250, y: 0 }),
+  );
+  dialogue.entryNodeId = dialogue.nodes[0].id;
+  dialogue.edges = [
+    {
+      id: "test-edge",
+      sourceNodeId: dialogue.nodes[0].id,
+      sourcePort: "next",
+      targetNodeId: dialogue.nodes[1].id,
+      targetPort: "in",
+    },
+  ];
+  useEditorStore.getState().setProject(project);
+  const { unmount } = render(<CanvasView />);
+  try {
+    act(() => vi.advanceTimersByTime(40));
+    expect(flowProps.nodes).toHaveLength(0);
+    act(() => vi.advanceTimersByTime(32));
+    expect(flowProps.nodes).toHaveLength(16);
+    expect(flowProps.edges).toHaveLength(0);
+    for (let i = 0; i < 7; i++) act(() => vi.advanceTimersByTime(32));
+    expect(flowProps.nodes).toHaveLength(123);
+    expect(flowProps.edges).toHaveLength(1);
+  } finally {
+    unmount();
+    vi.useRealTimers();
+  }
+});
+
+test("cancels a partial large-file mount when switching to a small file", () => {
+  vi.useFakeTimers();
+  const project = createDemoProject();
+  const small = project.dialogues[0];
+  const large = structuredClone(small);
+  large.id = "large-file";
+  large.nodes = Array.from({ length: 123 }, (_, index) =>
+    createNode("dialogue", { x: index * 250, y: 0 }),
+  );
+  large.edges = [];
+  large.entryNodeId = large.nodes[0].id;
+  project.dialogues.push(large);
+  useEditorStore.getState().setProject(project, false, large.id);
+  const { unmount } = render(<CanvasView />);
+  try {
+    act(() => vi.advanceTimersByTime(40));
+    act(() => vi.advanceTimersByTime(32));
+    expect(flowProps.nodes).toHaveLength(16);
+    act(() => useEditorStore.getState().setSelectedDialogue(small.id));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(flowProps.nodes?.map((node) => node.id)).toEqual(
+      small.nodes.map((node) => node.id),
+    );
+    expect(flowProps.edges).toHaveLength(small.edges.length);
+  } finally {
+    unmount();
+    vi.useRealTimers();
+  }
 });
 
 test("box selection moves multiple nodes in one undoable edit", () => {

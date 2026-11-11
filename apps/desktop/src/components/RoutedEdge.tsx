@@ -63,11 +63,17 @@ function geometrySnapshot(state: ReactFlowState) {
   });
 }
 
-export function RoutedEdge(props: EdgeProps) {
+// One subscription per canvas, rather than rebuilding the entire geometry for
+// every edge on every React Flow store update.
+export function EdgeRoutingCoordinator() {
   const snapshot = useStore(geometrySnapshot);
+  useEffect(() => requestRoutes(snapshot), [snapshot]);
+  return null;
+}
+
+export function RoutedEdge(props: EdgeProps) {
   const scope = (props.data as { dialogueId?: string } | undefined)?.dialogueId;
   useSyncExternalStore(subscribeToRoutes, getRouteVersion, getRouteVersion);
-  useEffect(() => requestRoutes(snapshot), [snapshot]);
   return (
     <BaseEdge
       id={props.id}

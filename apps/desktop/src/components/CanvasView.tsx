@@ -4,6 +4,7 @@ import { plainText } from "../model/richText";
 import {
   Background,
   type Edge,
+  type ReactFlowInstance,
   Connection,
   ConnectionLineType,
   Controls,
@@ -20,11 +21,12 @@ import {
   ViewportPortal,
   useUpdateNodeInternals,
   useNodesState,
+  useNodesInitialized,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { GitBranch, MessageCircle, Play, Square, Zap } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { RoutedEdge } from "./RoutedEdge";
+import { EdgeRoutingCoordinator, RoutedEdge } from "./RoutedEdge";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 import { alignNodeCenters } from "./canvasAlignment";
@@ -78,8 +80,14 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
   const switchPorts = JSON.stringify(
     node.data.switch?.cases.map((item) => item.id),
   );
+  const previousSwitchPorts = useRef(switchPorts);
   useEffect(() => {
-    updateNodeInternals(node.id);
+    // React Flow measures new nodes itself. Only refresh handles when ports
+    // change; refreshing every newly mounted node repeats whole-store work.
+    if (previousSwitchPorts.current !== switchPorts) {
+      previousSwitchPorts.current = switchPorts;
+      updateNodeInternals(node.id);
+    }
   }, [node.id, switchPorts, updateNodeInternals]);
   const Icon = meta.icon;
   const text = resolveBody(node.data.text, locale, defaultLocale) ?? meta.label;
@@ -225,21 +233,51 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
 const nodeTypes = { siming: DialogueNodeCard };
 const edgeTypes = { routed: RoutedEdge };
 
+function CanvasReady({ onReady }: { onReady: () => void }) {
+  const initialized = useNodesInitialized();
+  useEffect(() => {
+    if (initialized) onReady();
+  }, [initialized, onReady]);
+  return null;
+}
+
+function CanvasLoading({
+  count,
+  mounted = 0,
+}: {
+  count: number;
+  mounted?: number;
+}) {
+  return (
+    <div className="canvas-loading-overlay" role="status">
+      <div className="canvas-loading-card">
+        <span className="canvas-loading-spinner" aria-hidden="true" />
+        <strong>正在打开对话</strong>
+        <span>正在初始化 {count} 个节点…</span>
+        <small>
+          已加载 {mounted} / {count}
+        </small>
+      </div>
+    </div>
+  );
+}
+
 export function CanvasView({
   edgeStyle = "routed",
 }: {
   edgeStyle?: SystemSettings["canvasEdgeStyle"];
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const flowInstanceRef = useRef<{
-    screenToFlowPosition: (position: { x: number; y: number }) => {
-      x: number;
-      y: number;
-    };
-  } | null>(null);
+  const flowInstanceRef = useRef<ReactFlowInstance<CanvasFlowNode> | null>(
+    null,
+  );
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 });
+  const [readyViewportKey, setReadyViewportKey] = useState<string | null>(null);
   const [nodeDragOver, setNodeDragOver] = useState(false);
   const [draggingNodeIds, setDraggingNodeIds] = useState<string[]>([]);
+  const [preparedDialogueId, setPreparedDialogueId] = useState<string | null>(
+    null,
+  );
   const [alignmentGuides, setAlignmentGuides] = useState<{
     x?: number;
     y?: number;
@@ -269,6 +307,51 @@ export function CanvasView({
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
   const viewportKey = `${project.rootPath}:${dialogueId}`;
   const savedViewport = getCanvasViewport(viewportKey);
+  const [mountProgress, setMountProgress] = useState({ key: "", count: 0 });
+  const largeCanvas = Boolean(dialogue && dialogue.nodes.length >= 80);
+  const mountedCount = largeCanvas
+    ? mountProgress.key === viewportKey
+      ? mountProgress.count
+      : 0
+    : (dialogue?.nodes.length ?? 0);
+  const allNodesMounted = mountedCount >= (dialogue?.nodes.length ?? 0);
+  const preparingLargeCanvas =
+    Boolean(dialogue && dialogue.nodes.length >= 80) &&
+    preparedDialogueId !== dialogueId;
+
+  useEffect(() => {
+    if (!preparingLargeCanvas) return;
+    let nextFrame = 0;
+    const frame = requestAnimationFrame(() => {
+      nextFrame = requestAnimationFrame(() =>
+        setPreparedDialogueId(dialogueId),
+      );
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(nextFrame);
+    };
+  }, [dialogueId, preparingLargeCanvas]);
+
+  useEffect(() => {
+    if (!largeCanvas || preparingLargeCanvas || allNodesMounted) return;
+    // Yield to the browser between batches so the loading state can paint and
+    // animate instead of spending the entire opening operation in one task.
+    const timer = window.setTimeout(() => {
+      setMountProgress({
+        key: viewportKey,
+        count: Math.min(mountedCount + 16, dialogue?.nodes.length ?? 0),
+      });
+    }, 32);
+    return () => window.clearTimeout(timer);
+  }, [
+    largeCanvas,
+    preparingLargeCanvas,
+    allNodesMounted,
+    viewportKey,
+    mountedCount,
+    dialogue?.nodes.length,
+  ]);
 
   const derivedNodes = useMemo<CanvasFlowNode[]>(() => {
     const canvasSelection = new Set(
@@ -525,17 +608,30 @@ export function CanvasView({
     if (removedIds.length > 0) deleteNodes(removedIds);
   };
 
+  if (preparingLargeCanvas) {
+    return (
+      <div className="canvas-view canvas-view--loading" aria-busy="true">
+        <CanvasLoading count={dialogue?.nodes.length ?? 0} />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`canvas-view ${nodeDragOver ? "is-node-drop-target" : ""}`}
       ref={canvasRef}
+      aria-busy={
+        dialogue.nodes.length >= 80 && readyViewportKey !== viewportKey
+      }
     >
       <ReactFlow
         key={viewportKey}
-        nodes={nodes}
-        edges={edges}
+        nodes={largeCanvas ? nodes.slice(0, mountedCount) : nodes}
+        edges={allNodesMounted ? edges : []}
         defaultViewport={savedViewport}
-        fitView={!savedViewport}
+        fitView={!largeCanvas && !savedViewport}
+        nodesDraggable={allNodesMounted}
+        nodesConnectable={allNodesMounted}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onInit={(instance) => {
@@ -635,6 +731,21 @@ export function CanvasView({
         elevateEdgesOnSelect={false}
         deleteKeyCode={["Backspace", "Delete"]}
       >
+        {allNodesMounted && edgeStyle === "routed" && (
+          <EdgeRoutingCoordinator />
+        )}
+        {allNodesMounted && (
+          <CanvasReady
+            onReady={() => {
+              if (readyViewportKey === viewportKey) return;
+              if (largeCanvas && !savedViewport) {
+                // Fit only after the final batch has been measured.
+                void flowInstanceRef.current?.fitView();
+              }
+              setReadyViewportKey(viewportKey);
+            }}
+          />
+        )}
         <ViewportPortal>
           <svg className="canvas-alignment-guides" aria-hidden="true">
             {alignmentGuides.x !== undefined && (
@@ -667,6 +778,9 @@ export function CanvasView({
           }}
         />
       </ReactFlow>
+      {dialogue.nodes.length >= 80 && readyViewportKey !== viewportKey && (
+        <CanvasLoading count={dialogue.nodes.length} mounted={mountedCount} />
+      )}
     </div>
   );
 }
