@@ -4,6 +4,7 @@ import type { Node, ReactFlowProps } from "@xyflow/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { createDemoProject, createNode } from "../model/demo";
 import { useEditorStore } from "../store/editorStore";
+import { getCanvasFrames, saveCanvasFrames } from "./canvasFrames";
 import { CanvasView } from "./CanvasView";
 
 let flowProps: ReactFlowProps;
@@ -20,6 +21,7 @@ vi.mock("@xyflow/react", async (importOriginal) => {
 });
 
 beforeEach(() => {
+  localStorage.clear();
   useEditorStore.getState().setProject(createDemoProject());
 });
 
@@ -126,6 +128,71 @@ test("box selection moves multiple nodes in one undoable edit", () => {
       .project.dialogues[0].nodes.slice(0, 2)
       .map((node) => node.position),
   ).toEqual(original);
+});
+
+test("background frames move independently and persist outside dialogue data", () => {
+  const project = createDemoProject();
+  const dialogue = project.dialogues[0];
+  const frame = {
+    id: "editor-frame:test-frame",
+    x: 300,
+    y: 180,
+    width: 500,
+    height: 340,
+    title: "支线",
+    note: "规划节点",
+    color: "#f05a67",
+  };
+  saveCanvasFrames(`${project.rootPath}:${dialogue.id}`, [frame]);
+  useEditorStore.getState().setProject(project);
+  render(<CanvasView />);
+
+  expect(flowProps.nodes?.[0]).toMatchObject({
+    id: frame.id,
+    type: "backgroundFrame",
+    position: { x: frame.x, y: frame.y },
+    width: frame.width,
+    height: frame.height,
+    zIndex: -1,
+  });
+  act(() =>
+    flowProps.onNodesChange?.([
+      { type: "select", id: frame.id, selected: true },
+    ]),
+  );
+  expect(flowProps.nodes?.[0].selected).toBe(true);
+  act(() =>
+    flowProps.onNodeClick?.(
+      {} as ReactMouseEvent,
+      {
+        id: frame.id,
+        type: "backgroundFrame",
+      } as Node,
+    ),
+  );
+  expect(flowProps.nodes?.[0].selected).toBe(true);
+  expect(useEditorStore.getState().selectedNodeIds).toEqual([]);
+
+  const movedFrame = {
+    ...flowProps.nodes?.[0],
+    position: { x: 420, y: 260 },
+  } as Node;
+  act(() => {
+    flowProps.onNodeDragStop?.(new MouseEvent("mouseup"), movedFrame, [
+      movedFrame,
+    ]);
+  });
+
+  expect(
+    getCanvasFrames(`${project.rootPath}:${dialogue.id}`)[0],
+  ).toMatchObject({
+    x: 420,
+    y: 260,
+  });
+  expect(useEditorStore.getState().project.dialogues[0]).toEqual(dialogue);
+
+  act(() => flowProps.onPaneClick?.({} as ReactMouseEvent));
+  expect(flowProps.nodes?.[0].selected).toBe(false);
 });
 
 test("modifier selection keeps the first node selected", () => {

@@ -12,6 +12,8 @@ import {
   Handle,
   MarkerType,
   MiniMap,
+  NodeResizer,
+  Panel,
   SelectionMode,
   type Node as FlowNode,
   type NodeChange,
@@ -24,13 +26,25 @@ import {
   useNodesInitialized,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { GitBranch, MessageCircle, Play, Square, Zap } from "lucide-react";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Frame,
+  GitBranch,
+  MessageCircle,
+  Play,
+  Square,
+  Zap,
+} from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CurvedEdge, EdgeRoutingCoordinator, RoutedEdge } from "./RoutedEdge";
 import { CharacterAvatar } from "./CharacterAvatar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 import { alignNodeCenters } from "./canvasAlignment";
 import { getCanvasViewport, saveCanvasViewport } from "./canvasViewport";
+import {
+  getCanvasFrames,
+  saveCanvasFrames,
+  type CanvasFrame,
+} from "./canvasFrames";
 import { formatCondition } from "../model/conditions";
 import { createId } from "../model/demo";
 import type {
@@ -68,7 +82,16 @@ type CanvasNodeData = {
   edgeHighlight?: "related" | "dimmed";
 };
 
-type CanvasFlowNode = FlowNode<CanvasNodeData, "siming">;
+type CanvasFrameData = {
+  frame: CanvasFrame;
+  onUpdate: (id: string, update: Partial<CanvasFrame>) => void;
+};
+
+type CanvasFlowNode =
+  | FlowNode<CanvasNodeData, "siming">
+  | FlowNode<CanvasFrameData, "backgroundFrame">;
+
+const framePalette = ["#f05a67", "#e5a63b", "#42b8a2", "#4b8fe8", "#a176e8"];
 
 const DialogueNodeCard = memo(function DialogueNodeCard({
   data,
@@ -231,7 +254,79 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
   );
 });
 
+const BackgroundFrameNode = memo(function BackgroundFrameNode({
+  id,
+  data,
+  selected,
+}: NodeProps) {
+  const { frame, onUpdate } = data as CanvasFrameData;
+  return (
+    <section
+      className={`canvas-frame-node ${selected ? "is-selected" : ""}`}
+      style={
+        {
+          "--frame-color": frame.color,
+          "--frame-tint": `${frame.color}14`,
+        } as React.CSSProperties
+      }
+    >
+      <NodeResizer
+        isVisible={selected}
+        minWidth={220}
+        minHeight={140}
+        lineClassName="canvas-frame-resize-line"
+        handleClassName="canvas-frame-resize-handle"
+        onResizeEnd={(_event, params) =>
+          onUpdate(id, { width: params.width, height: params.height })
+        }
+      />
+      <div className="canvas-frame-content">
+        <header className="canvas-frame-header">
+          <Frame size={16} aria-hidden="true" />
+          <input
+            className="nodrag nopan"
+            aria-label="背景框标题"
+            value={frame.title}
+            placeholder="分类标题"
+            onChange={(event) => onUpdate(id, { title: event.target.value })}
+          />
+          <div
+            className="canvas-frame-colors nodrag nopan"
+            aria-label="背景框颜色"
+          >
+            {framePalette.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={frame.color === color ? "is-active" : ""}
+                aria-label={`背景框颜色 ${color}`}
+                title={color}
+                style={{ backgroundColor: color }}
+                onClick={() => onUpdate(id, { color })}
+              />
+            ))}
+            <input
+              type="color"
+              aria-label="自定义背景框颜色"
+              value={frame.color}
+              onChange={(event) => onUpdate(id, { color: event.target.value })}
+            />
+          </div>
+        </header>
+        <textarea
+          className="nodrag nopan"
+          aria-label="背景框注释"
+          placeholder="添加注释…"
+          value={frame.note}
+          onChange={(event) => onUpdate(id, { note: event.target.value })}
+        />
+      </div>
+    </section>
+  );
+});
+
 const nodeTypes = { siming: DialogueNodeCard };
+const canvasNodeTypes = { ...nodeTypes, backgroundFrame: BackgroundFrameNode };
 const edgeTypes = { routed: RoutedEdge, bezier: CurvedEdge };
 
 function CanvasReady({ onReady }: { onReady: () => void }) {
@@ -287,6 +382,13 @@ export function CanvasView({
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [selectedFrameIds, setSelectedFrameIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [frameState, setFrameState] = useState<{
+    key: string;
+    frames: CanvasFrame[];
+  }>({ key: "", frames: [] });
   const selectedNodeIds = useRef(new Set<string>());
   const selectionDialogueId = useRef<string | null>(null);
   const project = useEditorStore((state) => state.project);
@@ -307,6 +409,34 @@ export function CanvasView({
   const commit = useEditorStore((state) => state.commit);
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
   const viewportKey = `${project.rootPath}:${dialogueId}`;
+  const canvasFrames =
+    frameState.key === viewportKey
+      ? frameState.frames
+      : getCanvasFrames(viewportKey);
+  const updateFrame = useCallback(
+    (id: string, update: Partial<CanvasFrame>) => {
+      setFrameState((current) => ({
+        key: viewportKey,
+        frames: (current.key === viewportKey
+          ? current.frames
+          : getCanvasFrames(viewportKey)
+        ).map((frame) => (frame.id === id ? { ...frame, ...update } : frame)),
+      }));
+    },
+    [viewportKey],
+  );
+  const removeFrame = useCallback(
+    (id: string) => {
+      setFrameState((current) => ({
+        key: viewportKey,
+        frames: (current.key === viewportKey
+          ? current.frames
+          : getCanvasFrames(viewportKey)
+        ).filter((frame) => frame.id !== id),
+      }));
+    },
+    [viewportKey],
+  );
   const savedViewport = getCanvasViewport(viewportKey);
   const [mountProgress, setMountProgress] = useState({ key: "", count: 0 });
   const largeCanvas = Boolean(dialogue && dialogue.nodes.length >= 80);
@@ -368,28 +498,44 @@ export function CanvasView({
     const edgeNodeIds = new Set(
       selectedEdges.flatMap((edge) => [edge.sourceNodeId, edge.targetNodeId]),
     );
-    return (dialogue?.nodes ?? []).map((node) => ({
-      id: node.id,
-      type: "siming",
-      position: node.position,
-      selected: canvasSelection.has(node.id),
-      deletable: node.id !== dialogue?.entryNodeId,
-      data: {
-        node,
-        locale,
-        projectRoot: project.rootPath,
-        defaultLocale: project.manifest.defaultLocale,
-        character: project.resources.characters.find(
-          (item) => item.key === node.data.speakerId,
-        ),
-        edgeHighlight:
-          selectedEdges.length === 0
-            ? undefined
-            : edgeNodeIds.has(node.id)
-              ? "related"
-              : "dimmed",
-      },
+    const dialogueNodes = (dialogue?.nodes ?? []).map(
+      (node) =>
+        ({
+          id: node.id,
+          type: "siming",
+          position: node.position,
+          selected: canvasSelection.has(node.id),
+          deletable: node.id !== dialogue?.entryNodeId,
+          data: {
+            node,
+            locale,
+            projectRoot: project.rootPath,
+            defaultLocale: project.manifest.defaultLocale,
+            character: project.resources.characters.find(
+              (item) => item.key === node.data.speakerId,
+            ),
+            edgeHighlight:
+              selectedEdges.length === 0
+                ? undefined
+                : edgeNodeIds.has(node.id)
+                  ? "related"
+                  : "dimmed",
+          },
+        }) satisfies CanvasFlowNode,
+    );
+    const frameNodes: CanvasFlowNode[] = canvasFrames.map((frame) => ({
+      id: frame.id,
+      type: "backgroundFrame",
+      position: { x: frame.x, y: frame.y },
+      selected: selectedFrameIds.has(frame.id),
+      width: frame.width,
+      height: frame.height,
+      zIndex: -1,
+      draggable: true,
+      selectable: true,
+      data: { frame, onUpdate: updateFrame },
     }));
+    return [...frameNodes, ...dialogueNodes];
   }, [
     dialogue,
     locale,
@@ -400,10 +546,23 @@ export function CanvasView({
     selectedNodeId,
     selectedNodeIdsFromStore,
     selectedEdgeIds,
+    selectedFrameIds,
+    canvasFrames,
+    updateFrame,
   ]);
   const [nodes, setNodes, onNodesChange] =
     useNodesState<CanvasFlowNode>(derivedNodes);
   const activeDraggedNodeIds = useRef(new Set<string>());
+
+  useEffect(() => {
+    setFrameState({ key: viewportKey, frames: getCanvasFrames(viewportKey) });
+  }, [viewportKey]);
+
+  useEffect(() => {
+    if (frameState.key === viewportKey) {
+      saveCanvasFrames(viewportKey, frameState.frames);
+    }
+  }, [frameState, viewportKey]);
 
   useEffect(() => {
     setNodes((current) => {
@@ -577,14 +736,24 @@ export function CanvasView({
     const removedIds = changes
       .filter((change) => change.type === "remove")
       .map((change) => change.id);
+    const dialogueNodeIds = new Set(dialogue.nodes.map((node) => node.id));
+    removedIds
+      .filter((id) => canvasFrames.some((frame) => frame.id === id))
+      .forEach(removeFrame);
     let localChanges = changes.filter(
       (change) =>
-        change.type !== "remove" || change.id !== dialogue.entryNodeId,
+        change.type !== "remove" ||
+        (change.id !== dialogue.entryNodeId && dialogueNodeIds.has(change.id)),
     );
 
     const positions = new Map<string, { x: number; y: number }>();
     for (const change of localChanges) {
-      if (change.type === "position" && change.dragging && change.position) {
+      if (
+        change.type === "position" &&
+        change.dragging &&
+        change.position &&
+        dialogueNodeIds.has(change.id)
+      ) {
         positions.set(change.id, change.position);
       }
     }
@@ -613,22 +782,77 @@ export function CanvasView({
 
     for (const change of localChanges) {
       if (change.type === "select") {
-        if (change.selected) selectedNodeIds.current.add(change.id);
-        else selectedNodeIds.current.delete(change.id);
+        if (dialogueNodeIds.has(change.id)) {
+          if (change.selected) selectedNodeIds.current.add(change.id);
+          else selectedNodeIds.current.delete(change.id);
+        } else if (canvasFrames.some((frame) => frame.id === change.id)) {
+          setSelectedFrameIds((current) => {
+            const next = new Set(current);
+            if (change.selected) next.add(change.id);
+            else next.delete(change.id);
+            return next;
+          });
+        }
       }
-      if (change.type === "remove") selectedNodeIds.current.delete(change.id);
+      if (change.type === "remove") {
+        selectedNodeIds.current.delete(change.id);
+        setSelectedFrameIds((current) => {
+          if (!current.has(change.id)) return current;
+          const next = new Set(current);
+          next.delete(change.id);
+          return next;
+        });
+      }
     }
 
     if (
       localChanges.some(
-        (change) => change.type === "select" || change.type === "remove",
+        (change) =>
+          (change.type === "select" || change.type === "remove") &&
+          dialogueNodeIds.has(change.id),
       )
     ) {
       setSelectedNodes([...selectedNodeIds.current]);
     }
 
     onNodesChange(localChanges);
-    if (removedIds.length > 0) deleteNodes(removedIds);
+    const removedDialogueIds = removedIds.filter((id) =>
+      dialogueNodeIds.has(id),
+    );
+    if (removedDialogueIds.length > 0) deleteNodes(removedDialogueIds);
+  };
+
+  const addFrame = () => {
+    const bounds = canvasRef.current?.getBoundingClientRect();
+    const viewport = viewportRef.current;
+    const center = bounds
+      ? (flowInstanceRef.current?.screenToFlowPosition({
+          x: bounds.left + bounds.width / 2,
+          y: bounds.top + bounds.height / 2,
+        }) ?? {
+          x: (bounds.width / 2 - viewport.x) / viewport.zoom,
+          y: (bounds.height / 2 - viewport.y) / viewport.zoom,
+        })
+      : { x: 0, y: 0 };
+    const frame: CanvasFrame = {
+      id: `editor-frame:${crypto.randomUUID()}`,
+      x: center.x - 260,
+      y: center.y - 180,
+      width: 520,
+      height: 360,
+      title: "新的分类",
+      note: "",
+      color: framePalette[0],
+    };
+    setFrameState((current) => ({
+      key: viewportKey,
+      frames: [
+        ...(current.key === viewportKey
+          ? current.frames
+          : getCanvasFrames(viewportKey)),
+        frame,
+      ],
+    }));
   };
 
   if (preparingLargeCanvas) {
@@ -655,7 +879,7 @@ export function CanvasView({
         fitView={!largeCanvas && !savedViewport}
         nodesDraggable={allNodesMounted}
         nodesConnectable={allNodesMounted}
-        nodeTypes={nodeTypes}
+        nodeTypes={canvasNodeTypes}
         edgeTypes={edgeTypes}
         onInit={(instance) => {
           flowInstanceRef.current = instance;
@@ -674,6 +898,13 @@ export function CanvasView({
         }}
         onNodeClick={(_event, node) => {
           setSelectedEdgeIds(new Set());
+          if (node.type === "backgroundFrame") {
+            selectedNodeIds.current.clear();
+            setSelectedNodes([]);
+            setSelectedFrameIds(new Set([node.id]));
+            return;
+          }
+          setSelectedFrameIds(new Set());
           setSelectedNodes(
             [...selectedNodeIds.current],
             selectedNodeIds.current.has(node.id)
@@ -683,6 +914,7 @@ export function CanvasView({
         }}
         onPaneClick={() => {
           setSelectedEdgeIds(new Set());
+          setSelectedFrameIds(new Set());
           selectedNodeIds.current.clear();
           setSelectedNode(null);
         }}
@@ -724,6 +956,11 @@ export function CanvasView({
               alignedPositions.current.get(node.id) ?? node.position,
             ]),
           );
+          for (const [id, position] of positions) {
+            if (canvasFrames.some((frame) => frame.id === id)) {
+              updateFrame(id, { x: position.x, y: position.y });
+            }
+          }
           const changed = dialogue.nodes.some((node) => {
             const position = positions.get(node.id);
             return (
@@ -792,12 +1029,45 @@ export function CanvasView({
           </svg>
         </ViewportPortal>
         <Background gap={22} size={1} />
+        <Panel position="top-right" className="canvas-frame-toolbar">
+          <button
+            type="button"
+            className="button"
+            title="添加背景框"
+            aria-label="添加背景框"
+            onClick={addFrame}
+          >
+            <Frame size={14} />
+          </button>
+          {nodes.some(
+            (node) => node.type === "backgroundFrame" && node.selected,
+          ) && (
+            <button
+              type="button"
+              className="button"
+              title="删除选中的背景框"
+              aria-label="删除选中的背景框"
+              onClick={() =>
+                nodes
+                  .filter(
+                    (node) => node.type === "backgroundFrame" && node.selected,
+                  )
+                  .forEach((node) => removeFrame(node.id))
+              }
+            >
+              删除框
+            </button>
+          )}
+        </Panel>
         <Controls position="top-left" />
         <MiniMap
           position="bottom-right"
           pannable
           zoomable
           nodeColor={(node) => {
+            if (node.type === "backgroundFrame") {
+              return (node.data as CanvasFrameData).frame.color;
+            }
             const data = node.data as CanvasNodeData;
             return typeMeta[data.node.type].color;
           }}
