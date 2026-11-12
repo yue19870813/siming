@@ -430,7 +430,10 @@ export default function App() {
     }
   }
 
-  async function handleRestoreSnapshot(recovery: RecoverySnapshot, file: string) {
+  async function handleRestoreSnapshot(
+    recovery: RecoverySnapshot,
+    file: string,
+  ) {
     if (!confirmDiscardHostDraft()) return;
     if (!project.rootPath || recovery.projectRoot !== project.rootPath) {
       setNotice("快照所属项目与当前项目不一致，无法恢复。");
@@ -852,18 +855,22 @@ function restoreProjectFile(
   );
   if (dialogueIndex >= 0) {
     const historicalDialogue = historical.dialogues.find(
-      (dialogue) => dialogue.id === historical.manifest.dialogues[dialogueIndex].id,
+      (dialogue) =>
+        dialogue.id === historical.manifest.dialogues[dialogueIndex].id,
     );
     if (!historicalDialogue) return current;
     const currentIndex = current.dialogues.findIndex(
       (dialogue) => dialogue.id === historicalDialogue.id,
     );
     const dialogues = [...current.dialogues];
-    if (currentIndex >= 0) dialogues[currentIndex] = structuredClone(historicalDialogue);
+    if (currentIndex >= 0)
+      dialogues[currentIndex] = structuredClone(historicalDialogue);
     else dialogues.push(structuredClone(historicalDialogue));
     return { ...current, dialogues };
   }
-  const resourceKey = file.match(/^definitions\/(characters|variables|events|tags)\.json$/)?.[1];
+  const resourceKey = file.match(
+    /^definitions\/(characters|variables|events|tags)\.json$/,
+  )?.[1];
   if (!resourceKey) return current;
   return {
     ...current,

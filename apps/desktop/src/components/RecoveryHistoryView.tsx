@@ -35,7 +35,8 @@ export function RecoveryHistoryView({
       .then((result) => {
         if (!active) return;
         setItems(result);
-        const firstFile = result.flatMap((item) => item.changedFiles)[0] ?? null;
+        const firstFile =
+          result.flatMap((item) => item.changedFiles)[0] ?? null;
         setSelectedFile(firstFile);
         setSelectedId(
           result.find((item) => item.changedFiles.includes(firstFile ?? ""))
@@ -145,7 +146,11 @@ export function RecoveryHistoryView({
                   );
                 }}
               >
-                {files.map((path) => <option key={path} value={path}>{path}</option>)}
+                {files.map((path) => (
+                  <option key={path} value={path}>
+                    {path}
+                  </option>
+                ))}
               </select>
             </label>
           )}
@@ -191,79 +196,93 @@ export function RecoveryHistoryView({
                 <button
                   className="button button--primary"
                   disabled={!selectedSummary}
-                  onClick={() => selectedFile && onRestore(snapshot, selectedFile)}
+                  onClick={() =>
+                    selectedFile && onRestore(snapshot, selectedFile)
+                  }
                   title="将此快照恢复到编辑器"
                 >
                   <RotateCcw size={14} />
                   恢复此文件版本
                 </button>
               </div>
-              {selectedFile?.startsWith("dialogues/") && <div className="recovery-dialogue-select">
-                <label htmlFor="recovery-dialogue">预览对话</label>
-                <select
-                  id="recovery-dialogue"
-                  value={selectedDialogue?.id ?? dialogueId}
-                  onChange={(event) => setDialogueId(event.target.value)}
-                >
-                  {snapshot.project.dialogues.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name || item.key}
-                    </option>
-                  ))}
-                </select>
-                <span>{selectedFile || entry?.path}</span>
-              </div>}
+              {selectedFile?.startsWith("dialogues/") && (
+                <div className="recovery-dialogue-select">
+                  <label htmlFor="recovery-dialogue">预览对话</label>
+                  <select
+                    id="recovery-dialogue"
+                    value={selectedDialogue?.id ?? dialogueId}
+                    onChange={(event) => setDialogueId(event.target.value)}
+                  >
+                    {snapshot.project.dialogues.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name || item.key}
+                      </option>
+                    ))}
+                  </select>
+                  <span>{selectedFile || entry?.path}</span>
+                </div>
+              )}
               {selectedFile === ".siming/project.json" ? (
-                <pre className="recovery-file-preview">{JSON.stringify(snapshot.project.manifest, null, 2)}</pre>
+                <pre className="recovery-file-preview">
+                  {JSON.stringify(snapshot.project.manifest, null, 2)}
+                </pre>
               ) : selectedResource ? (
-                <pre className="recovery-file-preview">{JSON.stringify(resourcePreview, null, 2)}</pre>
-              ) : selectedFile?.startsWith("dialogues/") ? <div className="recovery-node-list">
-                {nodes.map((node, index) => {
-                  const text =
-                    node.type === "dialogue"
-                      ? plainText(
-                          node.data.text?.[
-                            snapshot.project.manifest.defaultLocale
-                          ],
-                        )
-                      : node.type === "choice"
-                        ? node.data.choices
-                            ?.map((choice) =>
-                              plainText(
-                                choice.text[
-                                  snapshot.project.manifest.defaultLocale
-                                ],
-                              ),
-                            )
-                            .join(" / ")
-                        : node.type === "condition"
-                          ? (node.data.switch?.variable ??
-                            conditionLabel(node.data.condition))
-                          : node.type === "event"
-                            ? node.data.hostEvents
-                                ?.map((event) => event.name)
-                                .join(", ")
-                            : "";
-                  return (
-                    <article className="recovery-node" key={node.id}>
-                      <span>{String(index + 1).padStart(2, "0")}</span>
-                      <div>
-                        <strong>{node.alias || node.key || node.type}</strong>
-                        <small>
-                          {node.type}
-                          {node.data.speakerId
-                            ? ` · ${node.data.speakerId}`
-                            : ""}
-                        </small>
-                        {text && <p>{text}</p>}
-                      </div>
-                    </article>
-                  );
-                })}
-                {nodes.length === 0 && (
-                  <p className="recovery-empty">此对话没有节点。</p>
-                )}
-              </div> : <p className="recovery-empty">此文件版本没有可预览的结构化内容。</p>}
+                <pre className="recovery-file-preview">
+                  {JSON.stringify(resourcePreview, null, 2)}
+                </pre>
+              ) : selectedFile?.startsWith("dialogues/") ? (
+                <div className="recovery-node-list">
+                  {nodes.map((node, index) => {
+                    const text =
+                      node.type === "dialogue"
+                        ? plainText(
+                            node.data.text?.[
+                              snapshot.project.manifest.defaultLocale
+                            ],
+                          )
+                        : node.type === "choice"
+                          ? node.data.choices
+                              ?.map((choice) =>
+                                plainText(
+                                  choice.text[
+                                    snapshot.project.manifest.defaultLocale
+                                  ],
+                                ),
+                              )
+                              .join(" / ")
+                          : node.type === "condition"
+                            ? (node.data.switch?.variable ??
+                              conditionLabel(node.data.condition))
+                            : node.type === "event"
+                              ? node.data.hostEvents
+                                  ?.map((event) => event.name)
+                                  .join(", ")
+                              : "";
+                    return (
+                      <article className="recovery-node" key={node.id}>
+                        <span>{String(index + 1).padStart(2, "0")}</span>
+                        <div>
+                          <strong>{node.alias || node.key || node.type}</strong>
+                          <small>
+                            {node.type}
+                            {node.data.speakerId
+                              ? ` · ${node.data.speakerId}`
+                              : ""}
+                          </small>
+                          {text && <p>{text}</p>}
+                        </div>
+                      </article>
+                    );
+                  })}
+                  {nodes.length === 0 && (
+                    <p className="recovery-empty">此对话没有节点。</p>
+                  )}
+                </div>
+              ) : (
+                <p className="recovery-empty">
+                  此文件版本没有可预览的结构化内容。
+                </p>
+              )}
             </>
           )}
           {!loadingSnapshot && !snapshot && !error && (

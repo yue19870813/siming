@@ -1010,7 +1010,7 @@ pub fn write_recovery_snapshot(
             .iter()
             .map(|(path, hash)| {
                 let content_path =
-                    recovery_content_path(recovery_root, &project.manifest.project_id, &hash);
+                    recovery_content_path(recovery_root, &project.manifest.project_id, hash);
                 write_bytes_if_missing(&content_path, files[path].as_bytes())?;
                 Ok((path.clone(), hash.clone()))
             })
@@ -1117,7 +1117,7 @@ pub fn list_recovery_snapshots(
         };
         snapshots.push((snapshot, summary));
     }
-    snapshots.sort_by(|left, right| right.0.created_at_unix_ms.cmp(&left.0.created_at_unix_ms));
+    snapshots.sort_by_key(|snapshot| std::cmp::Reverse(snapshot.0.created_at_unix_ms));
     let mut previous_files: Option<BTreeMap<String, String>> = None;
     let mut summaries = Vec::with_capacity(snapshots.len());
     for (snapshot, summary) in snapshots.iter_mut().rev() {
@@ -1129,7 +1129,7 @@ pub fn list_recovery_snapshots(
                 .collect::<std::collections::BTreeSet<_>>()
                 .into_iter()
                 .filter(|path| snapshot.files.get(*path) != previous.get(*path))
-                .map(|path| path.clone())
+                .cloned()
                 .collect(),
             None => snapshot.files.keys().cloned().collect(),
         };
@@ -1175,7 +1175,7 @@ fn read_latest_recovery_snapshot(
                 .is_some_and(|name| name == "snapshot.json" || name.starts_with("snapshot-"))
         })
         .collect::<Vec<_>>();
-    snapshots.sort_by(|left, right| recovery_timestamp(right).cmp(&recovery_timestamp(left)));
+    snapshots.sort_by_key(|path| std::cmp::Reverse(recovery_timestamp(path)));
     for path in snapshots {
         let Ok(snapshot) = read_recovery_snapshot_file(recovery_root, project_id, &path) else {
             continue;
@@ -1415,7 +1415,7 @@ fn prune_recovery_snapshots(root: &Path, project_id: &str) -> Result<(), Deliver
                 .is_some_and(|name| name == "snapshot.json" || name.starts_with("snapshot-"))
         })
         .collect::<Vec<_>>();
-    snapshots.sort_by(|left, right| recovery_timestamp(right).cmp(&recovery_timestamp(left)));
+    snapshots.sort_by_key(|path| std::cmp::Reverse(recovery_timestamp(path)));
     for (index, path) in snapshots.iter().enumerate() {
         let timestamp = recovery_timestamp(path);
         if timestamp < cutoff || index >= RECOVERY_MAX_SNAPSHOTS {
