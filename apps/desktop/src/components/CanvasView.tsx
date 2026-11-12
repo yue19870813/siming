@@ -40,6 +40,7 @@ import { CharacterAvatar } from "./CharacterAvatar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 import { alignNodeCenters } from "./canvasAlignment";
 import { getCanvasViewport, saveCanvasViewport } from "./canvasViewport";
+import { reconcileCanvasNodes } from "./canvasNodeSync";
 import {
   getCanvasFrames,
   saveCanvasFrames,
@@ -552,6 +553,7 @@ export function CanvasView({
   ]);
   const [nodes, setNodes, onNodesChange] =
     useNodesState<CanvasFlowNode>(derivedNodes);
+  const [nodeRepairVersion, setNodeRepairVersion] = useState(0);
   const activeDraggedNodeIds = useRef(new Set<string>());
 
   useEffect(() => {
@@ -575,6 +577,10 @@ export function CanvasView({
       });
     });
   }, [derivedNodes, setNodes]);
+
+  useEffect(() => {
+    setNodes((current) => reconcileCanvasNodes(current, derivedNodes));
+  }, [derivedNodes, nodeRepairVersion, setNodes]);
 
   useEffect(() => {
     selectedNodeIds.current.clear();
@@ -733,6 +739,15 @@ export function CanvasView({
   };
 
   const nodesChange = (changes: NodeChange<CanvasFlowNode>[]) => {
+    if (
+      changes.some(
+        (change) =>
+          change.type === "replace" ||
+          (change.type === "remove" && change.id === dialogue.entryNodeId),
+      )
+    ) {
+      setNodeRepairVersion((version) => version + 1);
+    }
     const removedIds = changes
       .filter((change) => change.type === "remove")
       .map((change) => change.id);

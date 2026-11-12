@@ -195,6 +195,31 @@ test("background frames move independently and persist outside dialogue data", (
   expect(flowProps.nodes?.[0].selected).toBe(false);
 });
 
+test("restores the entry node when React Flow marks it hidden", () => {
+  render(<CanvasView />);
+  const dialogue = useEditorStore.getState().project.dialogues[0];
+  const entryNode = flowProps.nodes?.find(
+    (node) => node.id === dialogue.entryNodeId,
+  );
+  expect(entryNode).toBeDefined();
+
+  act(() =>
+    flowProps.onNodesChange?.([
+      {
+        type: "replace",
+        id: entryNode!.id,
+        item: { ...entryNode!, hidden: true },
+      },
+    ] as never),
+  );
+
+  const restoredEntryNode = flowProps.nodes?.find(
+    (node) => node.id === dialogue.entryNodeId,
+  );
+  expect(restoredEntryNode).toBeDefined();
+  expect(restoredEntryNode?.hidden).not.toBe(true);
+});
+
 test("modifier selection keeps the first node selected", () => {
   render(<CanvasView />);
   const [first, second] = useEditorStore.getState().project.dialogues[0].nodes;
