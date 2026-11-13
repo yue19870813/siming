@@ -286,6 +286,105 @@ test("keeps the live position when selection changes during a node drag", () => 
   ).toEqual(movedPosition);
 });
 
+test("restores an unsaved dialogue node after a drag reports an invalid position", () => {
+  render(<CanvasView />);
+  act(() => useEditorStore.getState().addNode("dialogue", { x: 500, y: 200 }));
+  const dialogue = useEditorStore.getState().project.dialogues[0];
+  const addedNode = dialogue.nodes.at(-1)!;
+  const invalidPosition = { x: Number.NaN, y: 240 };
+
+  act(() => {
+    flowProps.onNodeDragStart?.(
+      new MouseEvent("mousedown"),
+      { id: addedNode.id } as Node,
+      [{ id: addedNode.id } as Node],
+    );
+    flowProps.onNodesChange?.([
+      {
+        type: "position",
+        id: addedNode.id,
+        position: invalidPosition,
+        dragging: true,
+      },
+    ]);
+  });
+  expect(
+    flowProps.nodes?.find((node) => node.id === addedNode.id)?.position,
+  ).toEqual(addedNode.position);
+
+  act(() => {
+    flowProps.onNodeDragStop?.(
+      new MouseEvent("mouseup"),
+      { id: addedNode.id, position: invalidPosition } as Node,
+      [{ id: addedNode.id, position: invalidPosition } as Node],
+    );
+  });
+
+  expect(flowProps.nodes?.map((node) => node.id)).toContain(addedNode.id);
+  expect(
+    flowProps.nodes?.find((node) => node.id === addedNode.id)?.position,
+  ).toEqual(addedNode.position);
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].nodes.find((node) => node.id === addedNode.id)
+      ?.position,
+  ).toEqual(addedNode.position);
+});
+
+test("keeps a newly added dialogue node visible and selected after a normal drag", () => {
+  render(<CanvasView />);
+  act(() => useEditorStore.getState().addNode("dialogue", { x: 500, y: 200 }));
+  const addedNode = useEditorStore
+    .getState()
+    .project.dialogues[0].nodes.at(-1)!;
+  const movedPosition = { x: 640, y: 280 };
+
+  act(() => {
+    flowProps.onNodeDragStart?.(
+      new MouseEvent("mousedown"),
+      { id: addedNode.id } as Node,
+      [{ id: addedNode.id } as Node],
+    );
+    flowProps.onNodesChange?.([
+      {
+        type: "position",
+        id: addedNode.id,
+        position: movedPosition,
+        dragging: true,
+      },
+    ]);
+  });
+  act(() => {
+    flowProps.onNodesChange?.([
+      {
+        type: "position",
+        id: addedNode.id,
+        position: movedPosition,
+        dragging: false,
+      },
+    ]);
+    flowProps.onNodeDragStop?.(
+      new MouseEvent("mouseup"),
+      { id: addedNode.id, position: movedPosition } as Node,
+      [{ id: addedNode.id, position: movedPosition } as Node],
+    );
+  });
+
+  expect(
+    flowProps.nodes?.find((node) => node.id === addedNode.id),
+  ).toMatchObject({
+    position: movedPosition,
+    selected: true,
+  });
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].nodes.find((node) => node.id === addedNode.id)
+      ?.position,
+  ).toEqual(movedPosition);
+});
+
 test("highlights the endpoints of a selected edge and dims unrelated nodes", () => {
   const project = createDemoProject();
   const dialogue = project.dialogues[0];

@@ -755,11 +755,19 @@ export function CanvasView({
     removedIds
       .filter((id) => canvasFrames.some((frame) => frame.id === id))
       .forEach(removeFrame);
-    let localChanges = changes.filter(
-      (change) =>
+    let localChanges = changes.filter((change) => {
+      if (change.type === "position" && change.position) {
+        if (
+          !Number.isFinite(change.position.x) ||
+          !Number.isFinite(change.position.y)
+        )
+          return false;
+      }
+      return (
         change.type !== "remove" ||
-        (change.id !== dialogue.entryNodeId && dialogueNodeIds.has(change.id)),
-    );
+        (change.id !== dialogue.entryNodeId && dialogueNodeIds.has(change.id))
+      );
+    });
 
     const positions = new Map<string, { x: number; y: number }>();
     for (const change of localChanges) {
@@ -966,11 +974,21 @@ export function CanvasView({
           setDraggingNodeIds([]);
           setAlignmentGuides({});
           const positions = new Map(
-            draggedNodes.map((node) => [
-              node.id,
-              alignedPositions.current.get(node.id) ?? node.position,
-            ]),
+            draggedNodes.flatMap((node) => {
+              const position =
+                alignedPositions.current.get(node.id) ?? node.position;
+              return Number.isFinite(position.x) && Number.isFinite(position.y)
+                ? [[node.id, position] as const]
+                : [];
+            }),
           );
+          setNodes((current) => {
+            const repaired = reconcileCanvasNodes(current, derivedNodes);
+            return repaired.map((node) => {
+              const position = positions.get(node.id);
+              return position ? { ...node, position } : node;
+            });
+          });
           for (const [id, position] of positions) {
             if (canvasFrames.some((frame) => frame.id === id)) {
               updateFrame(id, { x: position.x, y: position.y });
