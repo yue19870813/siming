@@ -419,6 +419,12 @@ textarea {
   background: var(--panel-raised);
 }
 
+.inspector-node-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .button--ghost:not(:disabled):hover {
   border-color: var(--border-strong);
   color: var(--text);

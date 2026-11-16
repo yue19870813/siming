@@ -411,6 +411,12 @@ export function CanvasView({
   const findMode = useEditorStore((state) => state.canvasFindMode);
   const findQuery = useEditorStore((state) => state.canvasFindQuery);
   const findSpeakerKey = useEditorStore((state) => state.canvasFindSpeakerKey);
+  const canvasFocusRequest = useEditorStore(
+    (state) => state.canvasFocusRequest,
+  );
+  const clearCanvasNodeFocusRequest = useEditorStore(
+    (state) => state.clearCanvasNodeFocusRequest,
+  );
   const setSelectedNode = useEditorStore((state) => state.setSelectedNode);
   const setSelectedNodes = useEditorStore((state) => state.setSelectedNodes);
   const setCanvasInsertionPosition = useEditorStore(
@@ -495,6 +501,44 @@ export function CanvasView({
     viewportKey,
     mountedCount,
     dialogue?.nodes.length,
+  ]);
+
+  useEffect(() => {
+    if (
+      !canvasFocusRequest ||
+      canvasFocusRequest.dialogueId !== dialogueId ||
+      !allNodesMounted
+    )
+      return;
+
+    const request = canvasFocusRequest;
+    const frame = requestAnimationFrame(() => {
+      const instance = flowInstanceRef.current;
+      const node = instance?.getNode(request.nodeId);
+      if (instance && node) {
+        const width = node.measured?.width ?? node.width ?? 200;
+        const height = node.measured?.height ?? node.height ?? 100;
+        selectedNodeIds.current.clear();
+        selectedNodeIds.current.add(request.nodeId);
+        setSelectedNode(request.nodeId);
+        setSelectedEdgeIds(new Set());
+        setSelectedFrameIds(new Set());
+        void instance.setCenter(
+          node.position.x + width / 2,
+          node.position.y + height / 2,
+          { zoom: 1, duration: 450 },
+        );
+      }
+      clearCanvasNodeFocusRequest(request.sequence);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [
+    allNodesMounted,
+    canvasFocusRequest,
+    clearCanvasNodeFocusRequest,
+    dialogueId,
+    setSelectedNode,
   ]);
 
   const derivedNodes = useMemo<CanvasFlowNode[]>(() => {

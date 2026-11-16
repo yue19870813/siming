@@ -27,6 +27,14 @@ type HistoryEntry = {
   timestamp?: number;
 };
 
+type CanvasFocusRequest = {
+  dialogueId: string;
+  nodeId: string;
+  sequence: number;
+};
+
+let canvasFocusSequence = 0;
+
 type EditorState = {
   project: ProjectSnapshot;
   projectLoaded: boolean;
@@ -43,6 +51,7 @@ type EditorState = {
   canvasFindMode: CanvasFindMode;
   canvasFindQuery: string;
   canvasFindSpeakerKey: string | null;
+  canvasFocusRequest: CanvasFocusRequest | null;
   previewLocale: string;
   dirty: boolean;
   savedProjectFingerprint: string;
@@ -69,6 +78,8 @@ type EditorState = {
     query?: string;
     speakerKey?: string | null;
   }) => void;
+  requestCanvasNodeFocus: (dialogueId: string, nodeId: string) => void;
+  clearCanvasNodeFocusRequest: (sequence: number) => void;
   setPreviewLocale: (locale: string) => void;
   setSourceDraft: (
     dialogueId: string,
@@ -157,6 +168,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   canvasFindMode: "project",
   canvasFindQuery: "",
   canvasFindSpeakerKey: null,
+  canvasFocusRequest: null,
   previewLocale: initialProject.manifest.defaultLocale,
   dirty: false,
   savedProjectFingerprint: fingerprint(initialProject),
@@ -195,6 +207,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       canvasFindMode: "project",
       canvasFindQuery: "",
       canvasFindSpeakerKey: null,
+      canvasFocusRequest: null,
     });
   },
   setSelectedDialogue: (selectedDialogueId) => {
@@ -282,6 +295,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ? state.canvasFindSpeakerKey
           : update.speakerKey,
     })),
+  requestCanvasNodeFocus: (dialogueId, nodeId) =>
+    set({
+      canvasFocusRequest: {
+        dialogueId,
+        nodeId,
+        sequence: ++canvasFocusSequence,
+      },
+    }),
+  clearCanvasNodeFocusRequest: (sequence) =>
+    set((state) =>
+      state.canvasFocusRequest?.sequence === sequence
+        ? { canvasFocusRequest: null }
+        : {},
+    ),
   setPreviewLocale: (previewLocale) => set({ previewLocale }),
   setSourceDraft: (sourceDraftDialogueId, sourceDraft, sourceDraftDirty) =>
     set({ sourceDraftDialogueId, sourceDraft, sourceDraftDirty }),
@@ -765,6 +792,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       canvasFindMode: "project",
       canvasFindQuery: "",
       canvasFindSpeakerKey: null,
+      canvasFocusRequest: null,
       previewLocale: project.manifest.defaultLocale,
       dirty: false,
       savedProjectFingerprint: fingerprint(project),

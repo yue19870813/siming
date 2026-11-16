@@ -42,6 +42,26 @@ test("focusing existing dialogue text never removes it", () => {
   expect(useEditorStore.getState().dirty).toBe(false);
 });
 
+test("node inspector can request that its node be located on the canvas", () => {
+  const project = createDemoProject();
+  const node = createNode("event", { x: 0, y: 0 });
+  project.dialogues[0].nodes.push(node);
+  useEditorStore.getState().setProject(project);
+  useEditorStore.getState().setSelectedNode(node.id);
+  render(
+    <Inspector width={320} onResizeStart={() => {}} onResizeBy={() => {}} />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "定位到画布节点" }));
+
+  expect(useEditorStore.getState().viewMode).toBe("canvas");
+  expect(useEditorStore.getState().selectedNodeId).toBe(node.id);
+  expect(useEditorStore.getState().canvasFocusRequest).toMatchObject({
+    dialogueId: project.dialogues[0].id,
+    nodeId: node.id,
+  });
+});
+
 test.each(["dialogue", "condition"] as const)(
   "%s node alias can be set and cleared in the inspector",
   (type) => {

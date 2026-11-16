@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { Node, ReactFlowProps } from "@xyflow/react";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -456,6 +456,39 @@ test("highlights every current-canvas node matching text or speaker find", () =>
   expect(highlightById.get(firstMatch.id)).toBe("match");
   expect(highlightById.get(secondMatch.id)).toBe("match");
   expect(highlightById.get(dialogue.nodes[0].id)).toBe("dimmed");
+});
+
+test("canvas focus request selects and centers its node at standard zoom", async () => {
+  const dialogue = useEditorStore.getState().project.dialogues[0];
+  const target = dialogue.nodes[1];
+  const setCenter = vi.fn().mockResolvedValue(true);
+  const focusedNode = {
+    ...target,
+    position: { x: 300, y: 500 },
+    measured: { width: 280, height: 140 },
+  };
+  render(<CanvasView />);
+  act(() =>
+    flowProps.onInit?.({
+      getViewport: () => ({ x: 0, y: 0, zoom: 0.5 }),
+      getNode: () => focusedNode,
+      setCenter,
+    } as never),
+  );
+
+  act(() =>
+    useEditorStore.getState().requestCanvasNodeFocus(dialogue.id, target.id),
+  );
+
+  await waitFor(() => {
+    expect(setCenter).toHaveBeenCalledWith(440, 570, {
+      zoom: 1,
+      duration: 450,
+    });
+  });
+  expect(useEditorStore.getState().selectedNodeId).toBe(target.id);
+  expect(useEditorStore.getState().selectedNodeIds).toEqual([target.id]);
+  expect(useEditorStore.getState().canvasFocusRequest).toBeNull();
 });
 
 test("pasted multi-selection is selected on the canvas", () => {

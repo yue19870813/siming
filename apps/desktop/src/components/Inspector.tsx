@@ -2,7 +2,7 @@ import { RichTextEditor } from "./RichTextEditor";
 import { SpeakerSelect } from "./SpeakerSelect";
 import { confirmDiscardHostDraft } from "../lib/hostDraftGuard";
 import { HostEventsEditor } from "./HostEventsEditor";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { Copy, LocateFixed, Plus, Trash2 } from "lucide-react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { createConditionLeaf } from "../model/conditions";
 import { createId } from "../model/demo";
@@ -31,6 +31,10 @@ export function Inspector({
   const locale = useEditorStore((state) => state.previewLocale);
   const commit = useEditorStore((state) => state.commit);
   const setSelectedNode = useEditorStore((state) => state.setSelectedNode);
+  const setViewMode = useEditorStore((state) => state.setViewMode);
+  const requestCanvasNodeFocus = useEditorStore(
+    (state) => state.requestCanvasNodeFocus,
+  );
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
   const node = dialogue?.nodes.find((item) => item.id === nodeId);
 
@@ -92,6 +96,11 @@ export function Inspector({
             project={project}
             locale={locale}
             update={updateNode}
+            onLocate={() => {
+              setViewMode("canvas");
+              setSelectedNode(node.id);
+              requestCanvasNodeFocus(dialogue.id, node.id);
+            }}
             onDelete={() => {
               if (!confirmDiscardHostDraft()) return;
               if (node.id === dialogue.entryNodeId) {
@@ -243,6 +252,7 @@ function NodeInspector({
   project,
   locale,
   update,
+  onLocate,
   onDelete,
 }: {
   node: DialogueNode;
@@ -252,6 +262,7 @@ function NodeInspector({
     recipe: (draft: DialogueNode, dialogue: DialogueDocument) => void,
     label?: string,
   ) => void;
+  onLocate: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -426,9 +437,19 @@ function NodeInspector({
         <Field label="UUID">
           <input value={node.id} disabled />
         </Field>
-        <button className="button button--danger" onClick={onDelete}>
-          <Trash2 size={14} /> 删除节点
-        </button>
+        <div className="inspector-node-actions">
+          <button className="button button--danger" onClick={onDelete}>
+            <Trash2 size={14} /> 删除节点
+          </button>
+          <button
+            className="button button--ghost"
+            title="定位到画布节点"
+            aria-label="定位到画布节点"
+            onClick={onLocate}
+          >
+            <LocateFixed size={14} /> 定位节点
+          </button>
+        </div>
       </Section>
     </>
   );
