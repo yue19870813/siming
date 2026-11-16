@@ -19,6 +19,7 @@ import {
   UserRound,
   Variable,
   Zap,
+  X,
 } from "lucide-react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useMemo, useState } from "react";
@@ -28,6 +29,7 @@ import {
 } from "../lib/nodeDrag";
 import { dialogueHasMissingTranslation } from "../model/i18n";
 import type { Activity, NodeType } from "../model/types";
+import { findMatchingNodeIds, nodeSearchText } from "./canvasFind";
 import { useEditorStore } from "../store/editorStore";
 
 const appIconUrl = new URL("../../assets/app-icon.svg", import.meta.url).href;
@@ -449,14 +451,20 @@ function ProjectExplorer() {
 
 function SearchPanel() {
   const project = useEditorStore((state) => state.project);
+  const locale = useEditorStore((state) => state.previewLocale);
+  const mode = useEditorStore((state) => state.canvasFindMode);
+  const findQuery = useEditorStore((state) => state.canvasFindQuery);
+  const speakerKey = useEditorStore((state) => state.canvasFindSpeakerKey);
+  const setCanvasFind = useEditorStore((state) => state.setCanvasFind);
   const setSelectedDialogue = useEditorStore(
     (state) => state.setSelectedDialogue,
   );
   const setSelectedNode = useEditorStore((state) => state.setSelectedNode);
-  const [query, setQuery] = useState("");
-  const results = useMemo(() => {
-    if (!query.trim()) return [];
-    const needle = query.toLowerCase();
+  const setActivity = useEditorStore((state) => state.setActivity);
+  const [projectQuery, setProjectQuery] = useState("");
+  const projectResults = useMemo(() => {
+    if (!projectQuery.trim()) return [];
+    const needle = projectQuery.toLocaleLowerCase();
     return project.dialogues.flatMap((dialogue) => {
       const entry = project.manifest.dialogues.find(
         (item) => item.id === dialogue.id,
@@ -475,40 +483,181 @@ function SearchPanel() {
         .map((node) => ({ dialogue, node }));
       return [...(fileMatch ? [{ dialogue, node: null }] : []), ...nodes];
     });
-  }, [project, query]);
+  }, [project, projectQuery]);
+  const nodeResults = useMemo(() => {
+    if (mode === "text" && !findQuery.trim()) return [];
+    if (mode === "speaker" && speakerKey === null) return [];
+    return project.dialogues.flatMap((dialogue) => {
+      const matchingIds = findMatchingNodeIds(
+        dialogue.nodes,
+        mode,
+        findQuery,
+        speakerKey,
+      );
+      return dialogue.nodes
+        .filter((node) => matchingIds.has(node.id))
+        .map((node) => ({ dialogue, node }));
+    });
+  }, [project, mode, findQuery, speakerKey]);
+  const characters = project.resources.characters;
 
   return (
     <>
       <header className="panel-heading">
-        <strong>项目搜索</strong>
+        <strong>查找</strong>
+        {mode !== "project" && (
+          <div className="panel-heading-actions">
+            <button
+              type="button"
+              aria-label="退出查找"
+              title="退出查找"
+              onClick={() => {
+                setCanvasFind({ mode: "project", query: "", speakerKey: null });
+                setActivity("project");
+              }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
       </header>
-      <label className="search-field">
-        <Search size={13} />
-        <input
-          autoFocus
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索文件、节点、正文…"
-        />
-      </label>
-      <div className="search-results">
-        {!query && <p>输入关键词搜索整个项目。</p>}
-        {query && results.length === 0 && <p>没有匹配结果。</p>}
-        {results.map(({ dialogue, node }, index) => (
+      <div className="segmented search-mode" aria-label="查找类型">
+        {(
+          [
+            ["project", "项目"],
+            ["text", "文本"],
+            ["speaker", "角色"],
+          ] as const
+        ).map(([id, label]) => (
           <button
-            key={`${dialogue.id}-${node?.id ?? "file"}-${index}`}
+            key={id}
+            type="button"
+            className={mode === id ? "is-active" : undefined}
+            aria-pressed={mode === id}
             onClick={() => {
-              setSelectedDialogue(dialogue.id);
-              setSelectedNode(node?.id ?? null);
-              useEditorStore.getState().setActivity("project");
+              setCanvasFind({ mode: id });
             }}
           >
-            <span>{node ? node.type : "对话文件"}</span>
-            <strong>{node?.key ?? dialogue.name}</strong>
-            <small>{dialogue.name}</small>
+            {label}
           </button>
         ))}
       </div>
+      {mode === "project" && (
+        <>
+          <label className="search-field">
+            <Search size={13} />
+            <input
+              autoFocus
+              value={projectQuery}
+              onChange={(event) => setProjectQuery(event.target.value)}
+              placeholder="搜索文件、节点、正文…"
+            />
+          </label>
+          <div className="search-results">
+            {!projectQuery && <p>输入关键词搜索整个项目。</p>}
+            {projectQuery && projectResults.length === 0 && (
+              <p>没有匹配结果。</p>
+            )}
+            {projectResults.map(({ dialogue, node }, index) => (
+              <button
+                key={`${dialogue.id}-${node?.id ?? "file"}-${index}`}
+                onClick={() => {
+                  setSelectedDialogue(dialogue.id);
+                  setSelectedNode(node?.id ?? null);
+                  setActivity("project");
+                }}
+              >
+                <span>{node ? node.type : "对话文件"}</span>
+                <strong>{node?.key ?? dialogue.name}</strong>
+                <small>{dialogue.name}</small>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {mode === "text" && (
+        <>
+          <label className="search-field">
+            <Search size={13} />
+            <input
+              autoFocus
+              value={findQuery}
+              onChange={(event) => setCanvasFind({ query: event.target.value })}
+              placeholder="查找对话文本…"
+            />
+          </label>
+          <div className="search-results">
+            {!findQuery.trim() && <p>输入文本片段查找匹配节点。</p>}
+            {findQuery.trim() && nodeResults.length === 0 && (
+              <p>没有匹配结果。</p>
+            )}
+            {nodeResults.map(({ dialogue, node }) => (
+              <button
+                key={`${dialogue.id}-${node.id}`}
+                onClick={() => {
+                  setSelectedDialogue(dialogue.id);
+                  setSelectedNode(node.id);
+                }}
+              >
+                <span>{node.type}</span>
+                <strong>{node.alias?.trim() || node.key}</strong>
+                <small title={nodeSearchText(node)}>
+                  {dialogue.name} · {nodeSearchText(node).slice(0, 60)}
+                </small>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {mode === "speaker" && (
+        <>
+          <label className="search-select-field">
+            <span>说话人</span>
+            <select
+              aria-label="按角色查找"
+              value={speakerKey ?? "__choose_speaker__"}
+              onChange={(event) =>
+                setCanvasFind({
+                  speakerKey:
+                    event.target.value === "__choose_speaker__"
+                      ? null
+                      : event.target.value,
+                })
+              }
+            >
+              <option value="__choose_speaker__">选择角色…</option>
+              <option value="">旁白</option>
+              {characters.map((character) => (
+                <option key={character.id} value={character.key}>
+                  {character.name[locale] ||
+                    Object.values(character.name).find(Boolean) ||
+                    character.key}
+                  {character.key ? ` · ${character.key}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="search-results">
+            {speakerKey === null && <p>选择角色查找对应的对话节点。</p>}
+            {speakerKey !== null && nodeResults.length === 0 && (
+              <p>没有匹配结果。</p>
+            )}
+            {nodeResults.map(({ dialogue, node }) => (
+              <button
+                key={`${dialogue.id}-${node.id}`}
+                onClick={() => {
+                  setSelectedDialogue(dialogue.id);
+                  setSelectedNode(node.id);
+                }}
+              >
+                <span>对话</span>
+                <strong>{node.alias?.trim() || node.key}</strong>
+                <small>{dialogue.name}</small>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </>
   );
 }

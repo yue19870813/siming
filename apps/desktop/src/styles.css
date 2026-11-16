@@ -746,6 +746,33 @@ textarea {
   font-size: var(--ui-font-12, 12px);
 }
 
+.search-mode {
+  margin: 10px 11px 4px;
+}
+
+.search-mode button {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 6px;
+}
+
+.search-select-field {
+  display: grid;
+  gap: 6px;
+  margin: 10px 11px;
+  color: var(--muted);
+  font-size: var(--ui-font-10, 10px);
+}
+
+.search-select-field select {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  color: var(--text);
+  background: var(--bg);
+  font-size: var(--ui-font-11, 11px);
+}
+
 .quick-section,
 .dialogue-tree,
 .node-palette,
@@ -2025,6 +2052,19 @@ html.is-dragging-node * {
 .flow-node.is-edge-dimmed {
   opacity: 0.28;
   filter: saturate(0.45);
+}
+
+.flow-node.is-find-match {
+  outline: 2px solid #f0ca4b;
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 5px rgb(240 202 75 / 17%),
+    0 10px 24px rgb(0 0 0 / 24%);
+}
+
+.flow-node.is-find-dimmed {
+  opacity: 0.28;
+  filter: saturate(0.4);
 }
 
 .flow-node > header {

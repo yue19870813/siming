@@ -19,6 +19,7 @@ import type {
   ProjectSnapshot,
   ViewMode,
 } from "../model/types";
+import type { CanvasFindMode } from "../components/canvasFind";
 
 type HistoryEntry = {
   label: string;
@@ -39,6 +40,9 @@ type EditorState = {
   canvasInsertionPosition: { x: number; y: number };
   viewMode: ViewMode;
   activity: Activity;
+  canvasFindMode: CanvasFindMode;
+  canvasFindQuery: string;
+  canvasFindSpeakerKey: string | null;
   previewLocale: string;
   dirty: boolean;
   savedProjectFingerprint: string;
@@ -60,6 +64,11 @@ type EditorState = {
   setCanvasInsertionPosition: (position: { x: number; y: number }) => void;
   setViewMode: (mode: ViewMode) => void;
   setActivity: (activity: Activity) => void;
+  setCanvasFind: (update: {
+    mode?: CanvasFindMode;
+    query?: string;
+    speakerKey?: string | null;
+  }) => void;
   setPreviewLocale: (locale: string) => void;
   setSourceDraft: (
     dialogueId: string,
@@ -145,6 +154,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   canvasInsertionPosition: { x: 180, y: 120 },
   viewMode: "canvas",
   activity: "welcome",
+  canvasFindMode: "project",
+  canvasFindQuery: "",
+  canvasFindSpeakerKey: null,
   previewLocale: initialProject.manifest.defaultLocale,
   dirty: false,
   savedProjectFingerprint: fingerprint(initialProject),
@@ -180,6 +192,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       past: [],
       future: [],
       activity: "project",
+      canvasFindMode: "project",
+      canvasFindQuery: "",
+      canvasFindSpeakerKey: null,
     });
   },
   setSelectedDialogue: (selectedDialogueId) => {
@@ -258,6 +273,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           }),
     });
   },
+  setCanvasFind: (update) =>
+    set((state) => ({
+      canvasFindMode: update.mode ?? state.canvasFindMode,
+      canvasFindQuery: update.query ?? state.canvasFindQuery,
+      canvasFindSpeakerKey:
+        update.speakerKey === undefined
+          ? state.canvasFindSpeakerKey
+          : update.speakerKey,
+    })),
   setPreviewLocale: (previewLocale) => set({ previewLocale }),
   setSourceDraft: (sourceDraftDialogueId, sourceDraft, sourceDraftDirty) =>
     set({ sourceDraftDialogueId, sourceDraft, sourceDraftDirty }),
@@ -738,6 +762,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedNodeId: null,
       viewMode: "canvas",
       activity: "welcome",
+      canvasFindMode: "project",
+      canvasFindQuery: "",
+      canvasFindSpeakerKey: null,
       previewLocale: project.manifest.defaultLocale,
       dirty: false,
       savedProjectFingerprint: fingerprint(project),

@@ -40,6 +40,7 @@ import { CharacterAvatar } from "./CharacterAvatar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 import { alignNodeCenters } from "./canvasAlignment";
 import { getCanvasViewport, saveCanvasViewport } from "./canvasViewport";
+import { findMatchingNodeIds } from "./canvasFind";
 import { reconcileCanvasNodes } from "./canvasNodeSync";
 import {
   getCanvasFrames,
@@ -81,6 +82,7 @@ type CanvasNodeData = {
   defaultLocale: string;
   character?: CharacterDefinition;
   edgeHighlight?: "related" | "dimmed";
+  findHighlight?: "match" | "dimmed";
 };
 
 type CanvasFrameData = {
@@ -98,8 +100,15 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
   data,
   selected,
 }: NodeProps) {
-  const { node, locale, projectRoot, character, defaultLocale, edgeHighlight } =
-    data as CanvasNodeData;
+  const {
+    node,
+    locale,
+    projectRoot,
+    character,
+    defaultLocale,
+    edgeHighlight,
+    findHighlight,
+  } = data as CanvasNodeData;
   const meta = typeMeta[node.type];
   const updateNodeInternals = useUpdateNodeInternals();
   const switchPorts = JSON.stringify(
@@ -124,7 +133,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
 
   return (
     <article
-      className={`flow-node flow-node--${node.type} ${selected ? "is-selected" : ""} ${edgeHighlight ? `is-edge-${edgeHighlight}` : ""}`}
+      className={`flow-node flow-node--${node.type} ${selected ? "is-selected" : ""} ${edgeHighlight ? `is-edge-${edgeHighlight}` : ""} ${findHighlight ? `is-find-${findHighlight}` : ""}`}
       style={{ "--node-color": meta.color } as React.CSSProperties}
     >
       {node.type !== "start" && (
@@ -399,6 +408,9 @@ export function CanvasView({
     (state) => state.selectedNodeIds,
   );
   const locale = useEditorStore((state) => state.previewLocale);
+  const findMode = useEditorStore((state) => state.canvasFindMode);
+  const findQuery = useEditorStore((state) => state.canvasFindQuery);
+  const findSpeakerKey = useEditorStore((state) => state.canvasFindSpeakerKey);
   const setSelectedNode = useEditorStore((state) => state.setSelectedNode);
   const setSelectedNodes = useEditorStore((state) => state.setSelectedNodes);
   const setCanvasInsertionPosition = useEditorStore(
@@ -486,6 +498,15 @@ export function CanvasView({
   ]);
 
   const derivedNodes = useMemo<CanvasFlowNode[]>(() => {
+    const matchingNodeIds = findMatchingNodeIds(
+      dialogue?.nodes ?? [],
+      findMode,
+      findQuery,
+      findSpeakerKey,
+    );
+    const findActive =
+      (findMode === "text" && Boolean(findQuery.trim())) ||
+      (findMode === "speaker" && findSpeakerKey !== null);
     const canvasSelection = new Set(
       selectionDialogueId.current === dialogueId
         ? selectedNodeIdsFromStore
@@ -521,6 +542,11 @@ export function CanvasView({
                 : edgeNodeIds.has(node.id)
                   ? "related"
                   : "dimmed",
+            findHighlight: findActive
+              ? matchingNodeIds.has(node.id)
+                ? "match"
+                : "dimmed"
+              : undefined,
           },
         }) satisfies CanvasFlowNode,
     );
@@ -548,6 +574,9 @@ export function CanvasView({
     selectedNodeIdsFromStore,
     selectedEdgeIds,
     selectedFrameIds,
+    findMode,
+    findQuery,
+    findSpeakerKey,
     canvasFrames,
     updateFrame,
   ]);

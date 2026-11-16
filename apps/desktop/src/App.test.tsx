@@ -381,6 +381,51 @@ test("dialogue directories can be collapsed and search expands matches", async (
   );
 });
 
+test("text and character find list matching nodes and keep canvas highlights active", async () => {
+  openTestProject();
+  useEditorStore.getState().setActivity("search");
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "文本" }));
+  fireEvent.change(screen.getByPlaceholderText("查找对话文本…"), {
+    target: { value: "雨还没有停" },
+  });
+  expect(screen.getAllByText("line-welcome").length).toBeGreaterThan(0);
+  expect(useEditorStore.getState().canvasFindMode).toBe("text");
+  expect(document.querySelectorAll(".flow-node.is-find-match").length).toBe(1);
+  const resultText = screen
+    .getAllByText("line-welcome")
+    .find((element) => element.closest(".search-results"));
+  fireEvent.click(resultText!.closest("button")!);
+  expect(useEditorStore.getState().activity).toBe("search");
+  expect(useEditorStore.getState().selectedNodeId).toBe(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].nodes.find((node) => node.key === "line-welcome")
+      ?.id,
+  );
+
+  fireEvent.click(screen.getAllByRole("button", { name: "角色" }).at(-1)!);
+  fireEvent.change(screen.getByRole("combobox", { name: "按角色查找" }), {
+    target: { value: "dur" },
+  });
+  expect(screen.getAllByText("line-welcome").length).toBeGreaterThan(0);
+  expect(useEditorStore.getState().canvasFindSpeakerKey).toBe("dur");
+  expect(document.querySelectorAll(".flow-node.is-find-match").length).toBe(1);
+  fireEvent.click(screen.getByRole("button", { name: "退出查找" }));
+  expect(useEditorStore.getState().activity).toBe("project");
+  expect(useEditorStore.getState().canvasFindMode).toBe("project");
+  expect(useEditorStore.getState().canvasFindQuery).toBe("");
+  expect(useEditorStore.getState().canvasFindSpeakerKey).toBeNull();
+  expect(document.querySelectorAll(".flow-node.is-find-match")).toHaveLength(0);
+  expect(document.querySelectorAll(".flow-node.is-find-dimmed")).toHaveLength(
+    0,
+  );
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});
+
 test("a dialogue directory can be created from the project explorer", async () => {
   openTestProject();
   render(<App />);

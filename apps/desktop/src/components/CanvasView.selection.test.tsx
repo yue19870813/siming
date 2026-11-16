@@ -424,6 +424,40 @@ test("highlights the endpoints of a selected edge and dims unrelated nodes", () 
   ).toBe(true);
 });
 
+test("highlights every current-canvas node matching text or speaker find", () => {
+  const project = createDemoProject();
+  const dialogue = project.dialogues[0];
+  const firstMatch = dialogue.nodes.find(
+    (node) => node.key === "line-welcome",
+  )!;
+  const secondMatch = createNode("dialogue", { x: 1280, y: 180 });
+  secondMatch.data.speakerId = "dur";
+  secondMatch.data.text = { "zh-CN": "雨停之前继续等待" };
+  dialogue.nodes.push(secondMatch);
+  useEditorStore.getState().setProject(project);
+  useEditorStore.getState().setCanvasFind({ mode: "text", query: "雨" });
+  render(<CanvasView />);
+
+  let highlightById = new Map(
+    flowProps.nodes?.map((node) => [node.id, node.data.findHighlight]),
+  );
+  expect(highlightById.get(firstMatch.id)).toBe("match");
+  expect(highlightById.get(secondMatch.id)).toBe("match");
+  expect(highlightById.get(dialogue.nodes[0].id)).toBe("dimmed");
+
+  act(() =>
+    useEditorStore
+      .getState()
+      .setCanvasFind({ mode: "speaker", speakerKey: "dur" }),
+  );
+  highlightById = new Map(
+    flowProps.nodes?.map((node) => [node.id, node.data.findHighlight]),
+  );
+  expect(highlightById.get(firstMatch.id)).toBe("match");
+  expect(highlightById.get(secondMatch.id)).toBe("match");
+  expect(highlightById.get(dialogue.nodes[0].id)).toBe("dimmed");
+});
+
 test("pasted multi-selection is selected on the canvas", () => {
   render(<CanvasView />);
   const state = useEditorStore.getState();
