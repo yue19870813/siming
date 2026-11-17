@@ -128,6 +128,26 @@ describe("CanvasView palette drop", () => {
       "line-welcome",
     );
   });
+
+  test("shows variable target and value in variable event nodes", () => {
+    const project = createDemoProject();
+    const setNode = createNode("event", { x: 0, y: 0 });
+    setNode.data.event = "variable.set";
+    setNode.data.params = { key: "quest_started", value: true };
+    const addNode = createNode("event", { x: 0, y: 0 });
+    addNode.data.event = "variable.add";
+    addNode.data.params = { key: "player_gold", value: 25 };
+    project.dialogues[0].nodes.push(setNode, addNode);
+    useEditorStore.getState().setProject(project);
+    const { container } = render(<CanvasView />);
+
+    const summaries = container.querySelectorAll(".event-node-summary");
+    expect(summaries[0]).toHaveTextContent("variable.set");
+    expect(summaries[0]).toHaveTextContent("quest_started");
+    expect(summaries[0]).toHaveTextContent("设置为 true");
+    expect(summaries[1]).toHaveTextContent("player_gold");
+    expect(summaries[1]).toHaveTextContent("增加 25");
+  });
 });
 
 test("host summaries show ordered names, overflow count and no payload", () => {

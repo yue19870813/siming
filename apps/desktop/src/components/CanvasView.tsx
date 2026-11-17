@@ -218,7 +218,19 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
           </div>
         )}
         {node.type === "event" && (
-          <code>{node.data.event || "选择业务事件"}</code>
+          <div className="event-node-summary">
+            <code>{node.data.event || "选择业务事件"}</code>
+            {(node.data.event === "variable.set" ||
+              node.data.event === "variable.add") && (
+              <span>
+                <strong>{String(node.data.params?.key ?? "选择变量")}</strong>
+                <small>
+                  {node.data.event === "variable.set" ? "设置为" : "增加"}{" "}
+                  {String(node.data.params?.value ?? "未设置")}
+                </small>
+              </span>
+            )}
+          </div>
         )}
         {node.type === "start" && <p>对话入口</p>}
         {node.type === "end" && <p>结束当前对话</p>}

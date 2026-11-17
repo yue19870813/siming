@@ -2169,6 +2169,31 @@ html.is-dragging-node * {
   white-space: normal;
 }
 
+.event-node-summary {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.event-node-summary > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.event-node-summary > span > strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--ui-font-11, 11px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-node-summary > span > small {
+  color: var(--muted);
+  font-size: var(--ui-font-10, 10px);
+}
+
 .flow-node > footer {
   padding: 5px 9px;
   border-top: 1px solid var(--border);
