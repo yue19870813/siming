@@ -41,7 +41,6 @@ import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 import { alignNodeCenters } from "./canvasAlignment";
 import { getCanvasViewport, saveCanvasViewport } from "./canvasViewport";
 import { findMatchingNodeIds } from "./canvasFind";
-import { reconcileCanvasNodes } from "./canvasNodeSync";
 import {
   getCanvasFrames,
   saveCanvasFrames,
@@ -111,18 +110,20 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
   } = data as CanvasNodeData;
   const meta = typeMeta[node.type];
   const updateNodeInternals = useUpdateNodeInternals();
-  const switchPorts = JSON.stringify(
+  const ports = JSON.stringify([
+    node.type,
+    node.data.choices?.map((item) => item.id),
     node.data.switch?.cases.map((item) => item.id),
-  );
-  const previousSwitchPorts = useRef(switchPorts);
+  ]);
+  const previousPorts = useRef(ports);
   useEffect(() => {
     // React Flow measures new nodes itself. Only refresh handles when ports
     // change; refreshing every newly mounted node repeats whole-store work.
-    if (previousSwitchPorts.current !== switchPorts) {
-      previousSwitchPorts.current = switchPorts;
+    if (previousPorts.current !== ports) {
+      previousPorts.current = ports;
       updateNodeInternals(node.id);
     }
-  }, [node.id, switchPorts, updateNodeInternals]);
+  }, [node.id, ports, updateNodeInternals]);
   const Icon = meta.icon;
   const text = resolveBody(node.data.text, locale, defaultLocale) ?? meta.label;
   const speakerName = character
@@ -640,6 +641,7 @@ export function CanvasView({
     useNodesState<CanvasFlowNode>(derivedNodes);
   const [nodeRepairVersion, setNodeRepairVersion] = useState(0);
   const activeDraggedNodeIds = useRef(new Set<string>());
+  const syncedViewportKey = useRef(viewportKey);
 
   useEffect(() => {
     setFrameState({ key: viewportKey, frames: getCanvasFrames(viewportKey) });
@@ -652,20 +654,26 @@ export function CanvasView({
   }, [frameState, viewportKey]);
 
   useEffect(() => {
+    const sameCanvas = syncedViewportKey.current === viewportKey;
+    syncedViewportKey.current = viewportKey;
     setNodes((current) => {
+      if (!sameCanvas) return derivedNodes;
       const currentById = new Map(current.map((node) => [node.id, node]));
       return derivedNodes.map((node) => {
         const currentNode = currentById.get(node.id);
-        return currentNode && activeDraggedNodeIds.current.has(node.id)
-          ? { ...node, position: currentNode.position }
-          : node;
+        if (!currentNode || currentNode.type !== node.type) return node;
+        // Losing measured dimensions also clears handles and hides the node
+        // until React Flow's ResizeObserver measures it again.
+        return {
+          ...node,
+          measured: currentNode.measured,
+          position: activeDraggedNodeIds.current.has(node.id)
+            ? currentNode.position
+            : node.position,
+        };
       });
     });
-  }, [derivedNodes, setNodes]);
-
-  useEffect(() => {
-    setNodes((current) => reconcileCanvasNodes(current, derivedNodes));
-  }, [derivedNodes, nodeRepairVersion, setNodes]);
+  }, [derivedNodes, nodeRepairVersion, setNodes, viewportKey]);
 
   useEffect(() => {
     selectedNodeIds.current.clear();
@@ -824,13 +832,7 @@ export function CanvasView({
   };
 
   const nodesChange = (changes: NodeChange<CanvasFlowNode>[]) => {
-    if (
-      changes.some(
-        (change) =>
-          change.type === "replace" ||
-          (change.type === "remove" && change.id === dialogue.entryNodeId),
-      )
-    ) {
+    if (changes.some((change) => change.type === "replace")) {
       setNodeRepairVersion((version) => version + 1);
     }
     const removedIds = changes
@@ -1067,13 +1069,6 @@ export function CanvasView({
                 : [];
             }),
           );
-          setNodes((current) => {
-            const repaired = reconcileCanvasNodes(current, derivedNodes);
-            return repaired.map((node) => {
-              const position = positions.get(node.id);
-              return position ? { ...node, position } : node;
-            });
-          });
           for (const [id, position] of positions) {
             if (canvasFrames.some((frame) => frame.id === id)) {
               updateFrame(id, { x: position.x, y: position.y });

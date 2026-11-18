@@ -213,11 +213,9 @@ test("restores the entry node when React Flow marks it hidden", () => {
     ] as never),
   );
 
-  const restoredEntryNode = flowProps.nodes?.find(
-    (node) => node.id === dialogue.entryNodeId,
-  );
-  expect(restoredEntryNode).toBeDefined();
-  expect(restoredEntryNode?.hidden).not.toBe(true);
+  expect(
+    flowProps.nodes?.find((node) => node.id === dialogue.entryNodeId)?.hidden,
+  ).not.toBe(true);
 });
 
 test("modifier selection keeps the first node selected", () => {
@@ -286,52 +284,6 @@ test("keeps the live position when selection changes during a node drag", () => 
   ).toEqual(movedPosition);
 });
 
-test("restores an unsaved dialogue node after a drag reports an invalid position", () => {
-  render(<CanvasView />);
-  act(() => useEditorStore.getState().addNode("dialogue", { x: 500, y: 200 }));
-  const dialogue = useEditorStore.getState().project.dialogues[0];
-  const addedNode = dialogue.nodes.at(-1)!;
-  const invalidPosition = { x: Number.NaN, y: 240 };
-
-  act(() => {
-    flowProps.onNodeDragStart?.(
-      new MouseEvent("mousedown"),
-      { id: addedNode.id } as Node,
-      [{ id: addedNode.id } as Node],
-    );
-    flowProps.onNodesChange?.([
-      {
-        type: "position",
-        id: addedNode.id,
-        position: invalidPosition,
-        dragging: true,
-      },
-    ]);
-  });
-  expect(
-    flowProps.nodes?.find((node) => node.id === addedNode.id)?.position,
-  ).toEqual(addedNode.position);
-
-  act(() => {
-    flowProps.onNodeDragStop?.(
-      new MouseEvent("mouseup"),
-      { id: addedNode.id, position: invalidPosition } as Node,
-      [{ id: addedNode.id, position: invalidPosition } as Node],
-    );
-  });
-
-  expect(flowProps.nodes?.map((node) => node.id)).toContain(addedNode.id);
-  expect(
-    flowProps.nodes?.find((node) => node.id === addedNode.id)?.position,
-  ).toEqual(addedNode.position);
-  expect(
-    useEditorStore
-      .getState()
-      .project.dialogues[0].nodes.find((node) => node.id === addedNode.id)
-      ?.position,
-  ).toEqual(addedNode.position);
-});
-
 test("keeps a newly added dialogue node visible and selected after a normal drag", () => {
   render(<CanvasView />);
   act(() => useEditorStore.getState().addNode("dialogue", { x: 500, y: 200 }));
@@ -383,6 +335,124 @@ test("keeps a newly added dialogue node visible and selected after a normal drag
       .project.dialogues[0].nodes.find((node) => node.id === addedNode.id)
       ?.position,
   ).toEqual(movedPosition);
+});
+
+test("ignores invalid drag coordinates and preserves the last valid node position", () => {
+  render(<CanvasView />);
+  act(() => useEditorStore.getState().addNode("dialogue", { x: 500, y: 200 }));
+  const dialogue = useEditorStore.getState().project.dialogues[0];
+  const addedNode = dialogue.nodes.at(-1)!;
+  const invalidPosition = { x: Number.NaN, y: 240 };
+
+  act(() => {
+    flowProps.onNodeDragStart?.(
+      new MouseEvent("mousedown"),
+      { id: addedNode.id } as Node,
+      [{ id: addedNode.id } as Node],
+    );
+    flowProps.onNodesChange?.([
+      {
+        type: "position",
+        id: addedNode.id,
+        position: invalidPosition,
+        dragging: true,
+      },
+    ]);
+  });
+  expect(
+    flowProps.nodes?.find((node) => node.id === addedNode.id)?.position,
+  ).toEqual(addedNode.position);
+
+  act(() => {
+    flowProps.onNodeDragStop?.(
+      new MouseEvent("mouseup"),
+      { id: addedNode.id, position: invalidPosition } as Node,
+      [{ id: addedNode.id, position: invalidPosition } as Node],
+    );
+  });
+
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].nodes.find((node) => node.id === addedNode.id)
+      ?.position,
+  ).toEqual(addedNode.position);
+});
+
+test("keeps measured nodes visible when connecting a new node and moving the source", () => {
+  render(<CanvasView />);
+  const state = useEditorStore.getState();
+  const dialogue = state.project.dialogues[0];
+  const sourceId = dialogue.entryNodeId;
+  act(() => state.addNode("dialogue", { x: 450, y: 300 }));
+  const targetId = useEditorStore
+    .getState()
+    .project.dialogues[0].nodes.at(-1)!.id;
+  const measured = { width: 210, height: 85 };
+  const visibleNodes = () =>
+    flowProps.nodes?.filter(
+      (node) => node.id === sourceId || node.id === targetId,
+    );
+
+  act(() =>
+    flowProps.onNodesChange?.(
+      [sourceId, targetId].map((id) => ({
+        type: "dimensions",
+        id,
+        dimensions: measured,
+      })),
+    ),
+  );
+  expect(visibleNodes()?.map((node) => node.measured)).toEqual([
+    measured,
+    measured,
+  ]);
+
+  act(() =>
+    flowProps.onConnect?.({
+      source: sourceId,
+      sourceHandle: "next",
+      target: targetId,
+      targetHandle: "in",
+    }),
+  );
+  expect(visibleNodes()?.map((node) => node.measured)).toEqual([
+    measured,
+    measured,
+  ]);
+
+  const source = flowProps.nodes!.find((node) => node.id === sourceId)!;
+  const position = { x: -100, y: 250 };
+  act(() => {
+    flowProps.onNodeDragStart?.(new MouseEvent("mousedown"), source, [source]);
+    flowProps.onNodesChange?.([
+      { type: "select", id: targetId, selected: false },
+      { type: "select", id: sourceId, selected: true },
+      { type: "position", id: sourceId, position, dragging: true },
+    ]);
+  });
+  act(() => {
+    const moved = { ...source, position };
+    flowProps.onNodesChange?.([
+      { type: "position", id: sourceId, position, dragging: false },
+    ]);
+    flowProps.onNodeDragStop?.(new MouseEvent("mouseup"), moved, [moved]);
+  });
+
+  expect(visibleNodes()?.map((node) => node.measured)).toEqual([
+    measured,
+    measured,
+  ]);
+  expect(
+    flowProps.nodes?.find((node) => node.id === sourceId)?.position,
+  ).toEqual(position);
+  const updated = useEditorStore.getState().project.dialogues[0];
+  expect(updated.nodes.find((node) => node.id === sourceId)?.position).toEqual(
+    position,
+  );
+  expect(
+    updated.edges.find((edge) => edge.sourceNodeId === sourceId)?.targetNodeId,
+  ).toBe(targetId);
 });
 
 test("highlights the endpoints of a selected edge and dims unrelated nodes", () => {
