@@ -557,6 +557,41 @@ export function ResourceView({ activity }: { activity: Activity }) {
                     </div>
                   </label>
                 )}
+                {resourceKey === "tags" && (
+                  <div className="tag-scope-field form-span">
+                    <span>适用范围</span>
+                    <div>
+                      {(
+                        [
+                          ["dialogue", "对话"],
+                          ["node", "节点"],
+                          ["resource", "资源"],
+                        ] as const
+                      ).map(([scope, label]) => (
+                        <label className="checkbox-field" key={scope}>
+                          <input
+                            type="checkbox"
+                            aria-label={`${label}范围`}
+                            checked={(
+                              selected as TagDefinition
+                            ).scopes.includes(scope)}
+                            onChange={(event) =>
+                              update((item) => {
+                                const tag = item as TagDefinition;
+                                tag.scopes = event.target.checked
+                                  ? [...new Set([...tag.scopes, scope])]
+                                  : tag.scopes.filter(
+                                      (value) => value !== scope,
+                                    );
+                              }, "修改标签适用范围")
+                            }
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {"type" in selected && (
                   <>
                     <label>

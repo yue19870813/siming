@@ -76,6 +76,22 @@ test("shows a visible warning when deleting a referenced resource", () => {
   confirm.mockRestore();
 });
 
+test("tag scope can be enabled for nodes on an existing tag", () => {
+  useEditorStore.getState().commit("移除节点范围", (project) => {
+    project.resources.tags[0].scopes = ["dialogue"];
+  });
+  render(<ResourceView activity="tags" />);
+
+  const nodeScope = screen.getByRole("checkbox", { name: "节点范围" });
+  expect(nodeScope).not.toBeChecked();
+  fireEvent.click(nodeScope);
+
+  expect(nodeScope).toBeChecked();
+  expect(useEditorStore.getState().project.resources.tags[0].scopes).toContain(
+    "node",
+  );
+});
+
 test("groups support creation, inherited membership, batch movement and safe deletion", () => {
   render(<ResourceView activity="characters" />);
   fireEvent.click(screen.getByText("新建分组"));

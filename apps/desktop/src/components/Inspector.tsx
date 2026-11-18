@@ -35,6 +35,7 @@ export function Inspector({
   const requestCanvasNodeFocus = useEditorStore(
     (state) => state.requestCanvasNodeFocus,
   );
+  const setActivity = useEditorStore((state) => state.setActivity);
   const dialogue = project.dialogues.find((item) => item.id === dialogueId);
   const node = dialogue?.nodes.find((item) => item.id === nodeId);
 
@@ -101,6 +102,7 @@ export function Inspector({
               setSelectedNode(node.id);
               requestCanvasNodeFocus(dialogue.id, node.id);
             }}
+            onManageTags={() => setActivity("tags")}
             onDelete={() => {
               if (!confirmDiscardHostDraft()) return;
               if (node.id === dialogue.entryNodeId) {
@@ -253,6 +255,7 @@ function NodeInspector({
   locale,
   update,
   onLocate,
+  onManageTags,
   onDelete,
 }: {
   node: DialogueNode;
@@ -263,6 +266,7 @@ function NodeInspector({
     label?: string,
   ) => void;
   onLocate: () => void;
+  onManageTags: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -293,6 +297,48 @@ function NodeInspector({
             />
           </Field>
         )}
+        <div className="inspector-field">
+          <span>标签</span>
+          <div className="tag-picker">
+            {project.resources.tags
+              .filter((tag) => tag.scopes.includes("node"))
+              .map((tag) => {
+                const active = node.data.tags?.includes(tag.key) ?? false;
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    className={active ? "is-active" : ""}
+                    aria-pressed={active}
+                    onClick={() =>
+                      update((draft) => {
+                        const tags = draft.data.tags ?? [];
+                        draft.data.tags = active
+                          ? tags.filter((key) => key !== tag.key)
+                          : [...tags, tag.key];
+                        if (draft.data.tags.length === 0)
+                          delete draft.data.tags;
+                      }, "修改节点标签")
+                    }
+                  >
+                    <i style={{ background: tag.color }} />
+                    {tag.name}
+                  </button>
+                );
+              })}
+            {project.resources.tags.every(
+              (tag) => !tag.scopes.includes("node"),
+            ) && (
+              <button
+                className="node-tags-empty"
+                type="button"
+                onClick={onManageTags}
+              >
+                暂无可用于节点的标签 · 管理标签范围
+              </button>
+            )}
+          </div>
+        </div>
         {node.type === "dialogue" && (
           <>
             <SpeakerSelect

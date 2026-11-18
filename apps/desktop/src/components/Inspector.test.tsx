@@ -92,6 +92,55 @@ test.each(["dialogue", "condition"] as const)(
   },
 );
 
+test("node inspector assigns only tags scoped to nodes", () => {
+  const project = createDemoProject();
+  const node = createNode("event", { x: 0, y: 0 });
+  project.dialogues[0].nodes.push(node);
+  useEditorStore.getState().setProject(project);
+  useEditorStore.getState().setSelectedNode(node.id);
+  render(
+    <Inspector width={320} onResizeStart={() => {}} onResizeBy={() => {}} />,
+  );
+
+  expect(screen.getByRole("button", { name: "主线" })).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "序章" }),
+  ).not.toBeInTheDocument();
+  const tag = screen.getByRole("button", { name: "主线" });
+  fireEvent.click(tag);
+  expect(tag).toHaveAttribute("aria-pressed", "true");
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].nodes.find((item) => item.id === node.id)?.data
+      .tags,
+  ).toEqual(["main-story"]);
+  fireEvent.click(tag);
+  expect(
+    useEditorStore
+      .getState()
+      .project.dialogues[0].nodes.find((item) => item.id === node.id)?.data
+      .tags,
+  ).toBeUndefined();
+});
+
+test("empty node tag state opens tag management", () => {
+  const project = createDemoProject();
+  project.resources.tags.forEach((tag) => {
+    tag.scopes = tag.scopes.filter((scope) => scope !== "node");
+  });
+  const node = createNode("event", { x: 0, y: 0 });
+  project.dialogues[0].nodes.push(node);
+  useEditorStore.getState().setProject(project);
+  useEditorStore.getState().setSelectedNode(node.id);
+  render(
+    <Inspector width={320} onResizeStart={() => {}} onResizeBy={() => {}} />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: /暂无可用于节点的标签/ }));
+  expect(useEditorStore.getState().activity).toBe("tags");
+});
+
 test("switch cases keep stable ports when edited and remove only deleted connections", () => {
   const project = createDemoProject();
   const node = createNode("condition", { x: 0, y: 0 });

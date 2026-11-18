@@ -53,6 +53,7 @@ import type {
   DialogueNode,
   NodeType,
   SystemSettings,
+  TagDefinition,
 } from "../model/types";
 import {
   nodeDragCancelEvent,
@@ -80,6 +81,7 @@ type CanvasNodeData = {
   projectRoot: string;
   defaultLocale: string;
   character?: CharacterDefinition;
+  nodeTags: TagDefinition[];
   edgeHighlight?: "related" | "dimmed";
   findHighlight?: "match" | "dimmed";
 };
@@ -104,6 +106,7 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
     locale,
     projectRoot,
     character,
+    nodeTags,
     defaultLocale,
     edgeHighlight,
     findHighlight,
@@ -250,6 +253,16 @@ const DialogueNodeCard = memo(function DialogueNodeCard({
           {node.data.hostEvents.length > 2 && (
             <b>+{node.data.hostEvents.length - 2}</b>
           )}
+        </footer>
+      )}
+      {nodeTags.length > 0 && (
+        <footer className="node-tag-list" aria-label="节点标签">
+          {nodeTags.map((tag) => (
+            <span key={tag.id} title={tag.name}>
+              <i style={{ background: tag.color }} />
+              {tag.name}
+            </span>
+          ))}
         </footer>
       )}
       {node.type === "condition" && !node.data.switch && (
@@ -590,6 +603,11 @@ export function CanvasView({
             locale,
             projectRoot: project.rootPath,
             defaultLocale: project.manifest.defaultLocale,
+            nodeTags: project.resources.tags.filter(
+              (tag) =>
+                tag.scopes.includes("node") &&
+                node.data.tags?.includes(tag.key),
+            ),
             character: project.resources.characters.find(
               (item) => item.key === node.data.speakerId,
             ),
@@ -624,6 +642,7 @@ export function CanvasView({
     dialogue,
     locale,
     project.resources.characters,
+    project.resources.tags,
     project.rootPath,
     project.manifest.defaultLocale,
     dialogueId,

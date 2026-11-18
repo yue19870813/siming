@@ -2570,6 +2570,35 @@ html.is-dragging-node * {
   border-radius: 50%;
 }
 
+.tag-scope-field {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: var(--ui-font-10, 10px);
+}
+
+.tag-scope-field > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tag-scope-field .checkbox-field {
+  margin: 0;
+}
+
+.node-tags-empty {
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: var(--ui-font-10, 10px);
+  text-align: left;
+}
+
+.node-tags-empty:hover {
+  color: var(--primary-hover);
+}
+
 .stats-row {
   display: flex;
   justify-content: space-between;
@@ -4049,6 +4078,33 @@ html[data-theme="light"] .cm-editor {
 .host-event-summary > b {
   flex-shrink: 0;
   font-size: 10px;
+}
+.node-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 5px 8px;
+  border-top: 1px solid var(--border);
+}
+.node-tag-list > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 5px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: var(--ui-font-9, 9px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.node-tag-list i {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
 }
 .character-groups {
   padding: 12px;

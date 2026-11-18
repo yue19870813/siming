@@ -148,6 +148,22 @@ describe("CanvasView palette drop", () => {
     expect(summaries[1]).toHaveTextContent("player_gold");
     expect(summaries[1]).toHaveTextContent("增加 25");
   });
+
+  test("shows node tags as colored labels on the canvas", () => {
+    const project = createDemoProject();
+    const node = createNode("event", { x: 0, y: 0 });
+    node.data.tags = ["main-story", "prologue"];
+    project.dialogues[0].nodes.push(node);
+    useEditorStore.getState().setProject(project);
+    const { container } = render(<CanvasView />);
+
+    const tagList = container.querySelector(".node-tag-list");
+    expect(tagList).toHaveTextContent("主线");
+    expect(tagList).not.toHaveTextContent("序章");
+    expect(tagList?.querySelector("i")).toHaveStyle({
+      backgroundColor: "rgb(139, 124, 246)",
+    });
+  });
 });
 
 test("host summaries show ordered names, overflow count and no payload", () => {
