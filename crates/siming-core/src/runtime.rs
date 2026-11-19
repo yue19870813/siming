@@ -1,6 +1,6 @@
 use crate::{
     ConditionExpression, Diagnostic, DiagnosticSeverity, DialogueDocument, EventParameter,
-    LocalizedText, Node, NodeType, ProjectManifest, ProjectResources, VariableType,
+    LocalizedText, Node, NodeType, ProjectManifest, ProjectResources, TagScope, VariableType,
     resolve_localized_text, validate_project,
 };
 use crate::{LocalizedBody, TextContent, resolve_body};
@@ -138,6 +138,8 @@ pub struct RuntimeStartNode {
     pub key: String,
     #[serde(rename = "type")]
     pub node_type: RuntimeNodeType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     #[serde(rename = "hostEvents", skip_serializing_if = "Vec::is_empty")]
     pub host_events: Vec<HostEventCompat>,
     pub next: String,
@@ -149,6 +151,8 @@ pub struct RuntimeDialogueNode {
     pub key: String,
     #[serde(rename = "type")]
     pub node_type: RuntimeNodeType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub speaker_id: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -164,6 +168,8 @@ pub struct RuntimeChoiceNode {
     pub key: String,
     #[serde(rename = "type")]
     pub node_type: RuntimeNodeType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     #[serde(rename = "hostEvents", skip_serializing_if = "Vec::is_empty")]
     pub host_events: Vec<HostEventCompat>,
     pub choices: Vec<RuntimeChoice>,
@@ -184,6 +190,8 @@ pub struct RuntimeConditionNode {
     pub key: String,
     #[serde(rename = "type")]
     pub node_type: RuntimeNodeType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     #[serde(rename = "hostEvents", skip_serializing_if = "Vec::is_empty")]
     pub host_events: Vec<HostEventCompat>,
     pub condition: ConditionExpression,
@@ -204,6 +212,8 @@ pub struct RuntimeEventNode {
     pub key: String,
     #[serde(rename = "type")]
     pub node_type: RuntimeNodeType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub host_events: Vec<HostEventCompat>,
     pub event: String,
@@ -216,6 +226,8 @@ pub struct RuntimeEndNode {
     pub key: String,
     #[serde(rename = "type")]
     pub node_type: RuntimeNodeType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
     #[serde(rename = "hostEvents", skip_serializing_if = "Vec::is_empty")]
     pub host_events: Vec<HostEventCompat>,
 }
@@ -285,11 +297,17 @@ pub fn compile_runtime(
         })
         .collect::<BTreeMap<_, _>>();
     let runtime_resources = compile_resources(manifest, resources, &mut locales)?;
+    let node_tag_keys = resources
+        .tags
+        .iter()
+        .filter(|tag| tag.scopes.contains(&TagScope::Node))
+        .map(|tag| tag.key.as_str())
+        .collect::<Vec<_>>();
     let mut runtime_dialogues = BTreeMap::new();
     for dialogue in dialogues {
         runtime_dialogues.insert(
             dialogue.id.clone(),
-            compile_dialogue(manifest, dialogue, &mut locales)?,
+            compile_dialogue(manifest, dialogue, &node_tag_keys, &mut locales)?,
         );
     }
 
@@ -472,6 +490,7 @@ fn compile_resources(
 fn compile_dialogue(
     manifest: &ProjectManifest,
     dialogue: &DialogueDocument,
+    node_tag_keys: &[&str],
     locales: &mut BTreeMap<String, RuntimeLocaleResource>,
 ) -> Result<RuntimeDialogue, CompileError> {
     let mut nodes = BTreeMap::new();
@@ -480,6 +499,15 @@ fn compile_dialogue(
     let mut reserved_keys: std::collections::BTreeSet<String> =
         dialogue.nodes.iter().map(|node| node.key.clone()).collect();
     for node in &dialogue.nodes {
+        let mut tags = match node.data.get("tags").and_then(Value::as_array) {
+            Some(assigned) => node_tag_keys
+                .iter()
+                .copied()
+                .filter(|key| assigned.iter().any(|tag| tag.as_str() == Some(key)))
+                .map(str::to_owned)
+                .collect(),
+            None => Vec::new(),
+        };
         if node.node_type == NodeType::Condition && node.data.contains_key("switch") {
             use sha2::{Digest, Sha256};
             let switch: crate::SwitchCondition = value(node, "switch")?;
@@ -517,6 +545,7 @@ fn compile_dialogue(
                     RuntimeNode::Condition(RuntimeConditionNode {
                         key: keys[index].clone(),
                         node_type: RuntimeNodeType::Condition,
+                        tags: std::mem::take(&mut tags),
                         host_events: if index == 0 {
                             node.data
                                 .get("hostEvents")
@@ -547,7 +576,7 @@ fn compile_dialogue(
         }
         nodes.insert(
             node.id.clone(),
-            compile_node(manifest, dialogue, node, locales)?,
+            compile_node(manifest, dialogue, node, tags, locales)?,
         );
     }
     Ok(RuntimeDialogue {
@@ -561,6 +590,7 @@ fn compile_node(
     manifest: &ProjectManifest,
     dialogue: &DialogueDocument,
     node: &Node,
+    tags: Vec<String>,
     locales: &mut BTreeMap<String, RuntimeLocaleResource>,
 ) -> Result<RuntimeNode, CompileError> {
     let host_events = node
@@ -583,6 +613,7 @@ fn compile_node(
         NodeType::Start => Ok(RuntimeNode::Start(RuntimeStartNode {
             key: node.key.clone(),
             node_type: RuntimeNodeType::Start,
+            tags,
             host_events,
             next: next("next")?,
         })),
@@ -593,6 +624,7 @@ fn compile_node(
             Ok(RuntimeNode::Dialogue(RuntimeDialogueNode {
                 key: node.key.clone(),
                 node_type: RuntimeNodeType::Dialogue,
+                tags,
                 speaker_id: node
                     .data
                     .get("speakerId")
@@ -629,6 +661,7 @@ fn compile_node(
             Ok(RuntimeNode::Choice(RuntimeChoiceNode {
                 key: node.key.clone(),
                 node_type: RuntimeNodeType::Choice,
+                tags,
                 host_events,
                 choices,
             }))
@@ -636,6 +669,7 @@ fn compile_node(
         NodeType::Condition => Ok(RuntimeNode::Condition(RuntimeConditionNode {
             key: node.key.clone(),
             node_type: RuntimeNodeType::Condition,
+            tags,
             host_events,
             condition: value(node, "condition")?,
             branches: RuntimeBranches {
@@ -646,6 +680,7 @@ fn compile_node(
         NodeType::Event => Ok(RuntimeNode::Event(RuntimeEventNode {
             key: node.key.clone(),
             node_type: RuntimeNodeType::Event,
+            tags,
             host_events,
             event: node
                 .data
@@ -666,6 +701,7 @@ fn compile_node(
         NodeType::End => Ok(RuntimeNode::End(RuntimeEndNode {
             key: node.key.clone(),
             node_type: RuntimeNodeType::End,
+            tags,
             host_events,
         })),
     }

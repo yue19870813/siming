@@ -108,7 +108,12 @@
         "type": {
           "enum": ["start", "dialogue", "choice", "condition", "event", "end"]
         },
-        "hostEvents": { "$ref": "#/$defs/hostEvents" }
+        "hostEvents": { "$ref": "#/$defs/hostEvents" },
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/key" }
+        }
       }
     },
     "node": {

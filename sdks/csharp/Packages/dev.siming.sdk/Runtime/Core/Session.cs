@@ -20,6 +20,7 @@ namespace Siming
         public string? DialogueId { get; }
         public string? NodeId { get; }
         public string? NodeKey { get; }
+        public IReadOnlyList<string> Tags { get; }
         public long VisitSequence { get; }
         public string Locale { get; }
         public string? SpeakerId { get; }
@@ -34,7 +35,8 @@ namespace Siming
             string locale, string? speaker, string? text, IEnumerable<DisplayChoice> choices, double remaining, SimingException? error, RichText? richText = null)
         { Status = status; DialogueId = dialogueId; NodeId = nodeId; NodeKey = node?.Key; VisitSequence = visit; Locale = locale;
             SpeakerId = node?.SpeakerId; SpeakerName = speaker; Text = text; RichText = richText; Choices = Immutable.List(choices);
-            AutoDelayMs = node?.AutoDelayMs; RemainingDelayMs = remaining; Error = error; }
+            Tags = node?.Tags ?? Array.Empty<string>(); AutoDelayMs = node?.AutoDelayMs; RemainingDelayMs = remaining; Error = error; }
+        public bool HasTag(string key) => Tags.Contains(key, StringComparer.Ordinal);
     }
     public sealed class PlaybackState
     {

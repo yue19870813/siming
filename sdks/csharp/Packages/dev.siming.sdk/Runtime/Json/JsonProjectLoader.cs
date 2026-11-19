@@ -263,6 +263,7 @@ namespace Siming.Serialization.Json
                 var messages = new List<HostMessage>();
                 if (n["hostEvents"] != null) foreach (var message in Array(n, "hostEvents"))
                 { var m = Object(message); messages.Add(new HostMessage(Text(m, "name"), Data(Obj(m, "payload")))); }
+                var tags = n["tags"] == null ? null : Array(n, "tags").Select(String);
                 string? next = null, speaker = null, text = null, yes = null, no = null, eventName = null;
                 double? delay = null; Condition? condition = null; DataValue? parameters = null; var choices = new List<Choice>();
                 if (type == NodeType.Start || type == NodeType.Dialogue || type == NodeType.Event) next = Text(n, "next");
@@ -291,7 +292,7 @@ namespace Siming.Serialization.Json
                 if (type == NodeType.Condition)
                 { condition = ParseCondition(Obj(n, "condition")); yes = Text(Obj(n, "branches"), "true"); no = Text(Obj(n, "branches"), "false"); }
                 if (type == NodeType.Event) { eventName = Text(n, "event"); parameters = ParseParameters(eventName, Obj(n, "params")); }
-                nodes.Add(p.Name, new RuntimeNode(Text(n, "key"), type, messages, next, speaker, text, delay, choices, condition, yes, no, eventName, parameters));
+                nodes.Add(p.Name, new RuntimeNode(Text(n, "key"), type, messages, next, speaker, text, delay, choices, condition, yes, no, eventName, parameters, tags));
             }
             void Target(string target) { Uuid(target); if (!nodes.ContainsKey(target)) throw Invalid("MissingNode", target); }
             var entry = Text(definition, "entryNodeId"); Target(entry);

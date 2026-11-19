@@ -2776,6 +2776,14 @@ mod tests {
             let (manifest, mut dialogue, mut resources) = simulation_fixture();
             resources.variables[0].variable_type = variable_type;
             resources.variables[0].default_value = unmatched.clone();
+            resources.tags.push(TagDefinition {
+                id: Uuid::new_v4().to_string(),
+                key: "branch-marker".to_owned(),
+                name: "Branch marker".to_owned(),
+                color: default_color(),
+                scopes: vec![TagScope::Node],
+                description: String::new(),
+            });
             dialogue
                 .nodes
                 .retain(|node| matches!(node.key.as_str(), "start" | "line" | "condition" | "end"));
@@ -2801,6 +2809,8 @@ mod tests {
                 .unwrap();
             let switch_id = node.id.clone();
             node.data.remove("condition");
+            node.data
+                .insert("tags".to_owned(), serde_json::json!(["branch-marker"]));
             node.data.insert(
                 "switch".to_owned(),
                 serde_json::json!({"variable": "favor", "cases": [
@@ -2849,6 +2859,18 @@ mod tests {
             assert_eq!(parse_dialogue_document(&source).unwrap(), dialogue);
             let runtime = &compiled.project.dialogues[&dialogue.id];
             assert_eq!(runtime.nodes.len(), dialogue.nodes.len() + 1);
+            let nodes = serde_json::to_value(&runtime.nodes).unwrap();
+            assert_eq!(
+                nodes[&switch_id]["tags"],
+                serde_json::json!(["branch-marker"])
+            );
+            assert!(
+                nodes
+                    .as_object()
+                    .unwrap()
+                    .iter()
+                    .all(|(id, node)| id == &switch_id || node.get("tags").is_none())
+            );
             for (actual, port, expected) in [
                 (values[0].clone(), "first", &line),
                 (values[1].clone(), "second", &end),

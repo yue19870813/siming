@@ -20,6 +20,8 @@ internal static class Program
         foreach (var layout in new[] { "bundled", "directory-chunks" })
         {
             await Test(layout + ": rich text v2", () => RichTextContract(layout));
+            await Test(layout + ": node tags", () => NodeTags(layout));
+            await Test(layout + ": old v1 and v2 exports without node tags", () => LegacyNodeTags(layout));
             await Test(layout + ": behavior contract", () => Behavior(layout));
             await Test(layout + ": state and language", () => StateAndLocale(layout));
             await Test(layout + ": dynamic choice visibility", () => DynamicChoices(layout));
@@ -89,6 +91,58 @@ internal static class Program
         Assert(session.Current.Choices.Select(c => c.Id).SequenceEqual(new[] { "accept", "reject" }));
         using var other = project.CreateSession(); await other.RestoreStateAsync(initial);
         Assert(other.Current.VisitSequence == initial.VisitSequence && other.Current.Status == SessionStatus.WaitingDialogue);
+    }
+    private static async Task NodeTags(string layout)
+    {
+        const string slowTag = "tag-print-slowly";
+        var loader = new JsonProjectLoader(new MemorySource(layout));
+        using var project = await SimingProject.OpenAsync(loader);
+        using var session = project.CreateSession();
+        Assert(session.Current.Tags.Count == 0);
+        SessionSnapshot? displayed = null;
+        session.StateChanged += view => { if (view.Status == SessionStatus.WaitingDialogue) displayed = view; };
+
+        await session.StartByKeyAsync("sdk_demo");
+        var welcome = displayed ?? throw new Exception("No dialogue snapshot was published");
+        Assert(welcome.HasTag(slowTag) && !welcome.HasTag("TAG-PRINT-SLOWLY"));
+        Assert(welcome.Tags.SequenceEqual(new[] { slowTag }));
+        using var loaded = await loader.LoadAsync(welcome.DialogueId!, welcome.Locale, CancellationToken.None);
+        Assert(loaded.Dialogue.Nodes.TryGetValue(welcome.NodeId!, out var node) &&
+            node.Key == "welcome" && node.HasTag(slowTag) && !node.HasTag("TAG-PRINT-SLOWLY") && node.Tags.SequenceEqual(welcome.Tags));
+
+        var state = session.CaptureState();
+        await session.SetLocaleAsync("en-US");
+        Assert(session.Current.Locale == "en-US" && session.Current.HasTag(slowTag));
+        await session.ContinueAsync();
+        Assert(session.Current.Status == SessionStatus.WaitingChoice && session.Current.Tags.Count == 0);
+        await session.ChooseAsync("reject");
+        Assert(displayed?.NodeKey == "reject" && displayed.Tags.Count == 0 && !displayed.HasTag(slowTag));
+        Assert(welcome.HasTag(slowTag));
+
+        using var restored = project.CreateSession();
+        await restored.RestoreStateAsync(state);
+        Assert(restored.Current.Status == SessionStatus.WaitingDialogue && restored.Current.HasTag(slowTag));
+    }
+    private static async Task LegacyNodeTags(string layout)
+    {
+        foreach (var version in new[] { 1, 2 })
+        {
+            var source = new MemorySource(layout);
+            source.Edit(source.StructurePath, structure =>
+            {
+                foreach (var node in Nodes(structure).Properties()) ((JObject)node.Value).Remove("tags");
+            });
+            if (version == 2)
+            {
+                foreach (var path in source.Bytes.Keys.Where(path => path.EndsWith(".json") && path != "manifest.json").ToArray())
+                    source.Edit(path, document => document["schemaVersion"] = version);
+                source.Edit("manifest.json", manifest => manifest["runtimeSchemaVersion"] = version, false);
+            }
+            using var project = await Open(source);
+            using var session = project.CreateSession();
+            await session.StartByKeyAsync("sdk_demo");
+            Assert(session.Current.Status == SessionStatus.WaitingDialogue && session.Current.Tags.Count == 0 && !session.Current.HasTag("tag-print-slowly"));
+        }
     }
     private static async Task DynamicChoices(string layout)
     {
@@ -167,6 +221,7 @@ internal static class Program
         using var project = await Open(source); using var session = project.CreateSession();
         await session.StartByKeyAsync("sdk_demo");
         Assert(session.Current.Text == "富文本<test>\n");
+        Assert(session.Current.HasTag("tag-print-slowly"));
         var rich = session.Current.RichText!;
         Assert(rich.Runs[0].Style.Bold && rich.Runs[0].Style.Italic && rich.Runs[0].Style.Color == "#12ABEF");
         Assert(TextMeshProFormatter.Format(rich) == "<b><i><color=#12ABEF>富文本<noparse><</noparse>test>\n</color></i></b>");
@@ -186,6 +241,7 @@ internal static class Program
         foreach (var item in new (string Code, Action<JObject> Edit)[] {
             ("MissingNode", j => Nodes(j).Properties().First(p => p.Value["type"]!.Value<string>() == "start").Value["next"] = "00000000-0000-0000-0000-000000000000"),
             ("UnknownNodeType", j => Nodes(j).Properties().First().Value["type"] = "future"),
+            ("InvalidJson", j => Nodes(j).Properties().First().Value["tags"] = new JArray(42)),
             ("InvalidCondition", j => Nodes(j).Properties().First(p => p.Value["type"]!.Value<string>() == "condition").Value["condition"] = JObject.Parse("{\"variable\":\"score\",\"operator\":\"==\",\"value\":\"bad\"}")),
             ("DuplicateChoice", j => { var a = (JArray)Nodes(j).Properties().First(p => p.Value["type"]!.Value<string>() == "choice").Value["choices"]!; a.Add(a[0].DeepClone()); }),
             ("MissingText", j => Nodes(j).Properties().First(p => p.Value["type"]!.Value<string>() == "dialogue").Value["textKey"] = "missing") })

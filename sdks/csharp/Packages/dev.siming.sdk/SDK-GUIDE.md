@@ -67,6 +67,22 @@ await session.ChooseAsync(choiceId, token);
 
 状态依次按流程进入 `NotStarted`、`Running`、`WaitingDialogue` / `WaitingChoice` / `WaitingEvent`，最后到 `Completed`、`Stopped` 或 `Faulted`。完成时释放分片，最后一个显示快照仍可读取。非法操作直接抛出结构化错误，不破坏等待状态。有效操作的执行错误进入故障状态；语言切换或恢复失败保留原位置。取消启动/推进会停止会话；取消语言切换/恢复保留原位置。调用方应观察返回的 Task 并处理异常。
 
+## 查询节点标签
+
+`SessionSnapshot.Tags` 和 `RuntimeNode.Tags` 返回只读的标签 key 列表。`HasTag(key)` 区分大小写。展示对白时，可以让宿主按标签选择打字机速度：
+
+```csharp
+session.StateChanged += view =>
+{
+    if (view.Status == SessionStatus.WaitingDialogue)
+        RenderDialogue(view, slowTyping: view.HasTag("tag-print-slowly"));
+};
+```
+
+`RenderDialogue` 和打字机效果由宿主实现，标签不会改变 SDK 的推进逻辑。也可用 `session.Current.HasTag(key)` 查当前节点，或通过 `loaded.Dialogue.Nodes.TryGetValue(nodeId, out var node)` 获取已加载节点，再调用 `node.HasTag(key)`。
+
+请用新版导出器重新导出项目，并升级 SDK。旧导出包没有 `tags` 字段时，SDK 返回空列表。
+
 ## 变量与业务事件
 
 ```csharp

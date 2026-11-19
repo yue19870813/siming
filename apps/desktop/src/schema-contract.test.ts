@@ -103,7 +103,12 @@ test("runtime schema accepts compiled editor-free nodes", () => {
         key: "intro",
         entryNodeId: startId,
         nodes: {
-          [startId]: { key: "start", type: "start", next: endId },
+          [startId]: {
+            key: "start",
+            type: "start",
+            next: endId,
+            tags: ["tag-print-slowly"],
+          },
           [endId]: { key: "end", type: "end" },
         },
       },
@@ -112,6 +117,8 @@ test("runtime schema accepts compiled editor-free nodes", () => {
 
   expect(validate(runtime), JSON.stringify(validate.errors)).toBe(true);
   expect(JSON.stringify(runtime)).not.toContain("position");
+  runtime.dialogues[dialogueId].nodes[startId].tags = ["bad key"];
+  expect(validate(runtime)).toBe(false);
 });
 
 test("chunked runtime schemas accept index, dialogue, and locale files", () => {
@@ -159,7 +166,7 @@ test("chunked runtime schemas accept index, dialogue, and locale files", () => {
           entryNodeId: startId,
           nodes: {
             [startId]: { key: "start", type: "start", next: endId },
-            [endId]: { key: "end", type: "end" },
+            [endId]: { key: "end", type: "end", tags: ["chapter-end"] },
           },
         },
       },

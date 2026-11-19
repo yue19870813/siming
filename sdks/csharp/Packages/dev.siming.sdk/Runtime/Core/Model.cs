@@ -67,6 +67,7 @@ namespace Siming
         public string? TextKey { get; }
         public double? AutoDelayMs { get; }
         public IReadOnlyList<HostMessage> HostEvents { get; }
+        public IReadOnlyList<string> Tags { get; }
         public IReadOnlyList<Choice> Choices { get; }
         public Condition? Condition { get; }
         public string? TrueTarget { get; }
@@ -76,12 +77,18 @@ namespace Siming
         public RuntimeNode(string key, NodeType type, IEnumerable<HostMessage> hostEvents, string? next = null,
             string? speakerId = null, string? textKey = null, double? autoDelayMs = null, IEnumerable<Choice>? choices = null,
             Condition? condition = null, string? trueTarget = null, string? falseTarget = null, string? businessEvent = null, DataValue? parameters = null)
+            : this(key, type, hostEvents, next, speakerId, textKey, autoDelayMs, choices, condition, trueTarget, falseTarget, businessEvent, parameters, null) { }
+        public RuntimeNode(string key, NodeType type, IEnumerable<HostMessage> hostEvents, string? next,
+            string? speakerId, string? textKey, double? autoDelayMs, IEnumerable<Choice>? choices,
+            Condition? condition, string? trueTarget, string? falseTarget, string? businessEvent, DataValue? parameters, IEnumerable<string>? tags)
         {
             Key = key; Type = type; HostEvents = Immutable.List(hostEvents); Next = next; SpeakerId = speakerId; TextKey = textKey;
             AutoDelayMs = autoDelayMs; Choices = Immutable.List(choices ?? Array.Empty<Choice>()); Condition = condition;
             TrueTarget = trueTarget; FalseTarget = falseTarget; Event = businessEvent;
             Parameters = parameters ?? DataValue.From(new Dictionary<string, DataValue>());
+            Tags = tags == null ? Array.Empty<string>() : Immutable.List(tags);
         }
+        public bool HasTag(string key) => Tags.Contains(key, StringComparer.Ordinal);
     }
     public sealed class RuntimeDialogue
     {

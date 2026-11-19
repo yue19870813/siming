@@ -24,6 +24,7 @@ with tempfile.TemporaryDirectory(prefix='siming-sdk-') as temp:
     source = json.loads((project / 'dialogues/intro.json').read_text())
     source['key'] = 'sdk_demo'
     source['name'] = 'SDK demo'
+    source['tags'] = ['dialogue-only', 'tag-not-inherited']
     source['nodes'] = []
     source['edges'] = []
     source['entryNodeId'] = uid('start')
@@ -32,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='siming-sdk-') as temp:
     def edge(a, b, port='next'):
         source['edges'].append({'id': a+'-'+port+'-'+b, 'sourceNodeId': uid(a), 'targetNodeId': uid(b), 'sourcePort': port, 'targetPort': 'in'})
     node('start', 'start', hostEvents=[{'name': 'camera.prepare', 'payload': {'nested': [1, True, None]}}, {'name': 'analytics.enter', 'payload': {}}])
-    node('welcome', 'dialogue', speakerId='narrator', text={'zh-CN': '欢迎使用司命。', 'en-US': 'Welcome to Siming.'}, hostEvents=[{'name':'ui.show','payload':{}}])
+    node('welcome', 'dialogue', speakerId='narrator', text={'zh-CN': '欢迎使用司命。', 'en-US': 'Welcome to Siming.'}, hostEvents=[{'name':'ui.show','payload':{}}], tags=['tag-print-slowly', 'dialogue-only'])
     node('choice', 'choice', choices=[{'id':'accept','text':{'zh-CN':'接受任务','en-US':'Accept'}}, {'id':'reject','text':{'zh-CN':'稍后再来','en-US':'Later'}}])
     node('set', 'event', event='variable.set', params={'key':'accepted','value':True})
     node('add', 'event', event='variable.add', params={'key':'score','value':2})
@@ -51,6 +52,10 @@ with tempfile.TemporaryDirectory(prefix='siming-sdk-') as temp:
     write(project / 'dialogues/root.json', root_dialogue)
     write(project / 'definitions/variables.json', {'schemaVersion':1,'variables':[{'id':uid(k),'key':k,'type':t,'defaultValue':v} for k,t,v in [('accepted','boolean',False),('score','number',0),('title','string','hero')]]})
     write(project / 'definitions/events.json', {'schemaVersion':1,'events':[{'id':uid('event'),'key':'quest.begin','name':{'zh-CN':'开始任务','en-US':'Begin quest'},'params':[{'key':'quest','type':'string','required':True}]}]})
+    write(project / 'definitions/tags.json', {'schemaVersion':1,'tags':[
+        {'id':uid(key),'key':key,'name':name,'scopes':scopes}
+        for key,name,scopes in [('tag-print-slowly','Slow typewriter',['node']), ('dialogue-only','Dialogue only',['dialogue']), ('tag-not-inherited','Not inherited',['dialogue','node'])]
+    ]})
     manifest = json.loads((project / '.siming/project.json').read_text())
     manifest['dialogues'] = [{'id':source['id'],'key':source['key'],'path':'dialogues/Chapter1/intro.json'}, {'id':root_dialogue['id'],'key':root_dialogue['key'],'path':'dialogues/root.json'}]
     write(project / '.siming/project.json', manifest)
