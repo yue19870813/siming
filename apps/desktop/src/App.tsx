@@ -18,6 +18,7 @@ import { SettingsView } from "./components/SettingsView";
 import { Sidebar } from "./components/Sidebar";
 import { TableView } from "./components/TableView";
 import { TopBar } from "./components/TopBar";
+import { UpdateProvider } from "./components/UpdateControl";
 import { WelcomeView } from "./components/WelcomeView";
 import {
   WorkbenchPanel,
@@ -75,6 +76,14 @@ type WorkspaceLayoutStyle = CSSProperties & {
 };
 
 export default function App() {
+  return (
+    <UpdateProvider>
+      <AppContent />
+    </UpdateProvider>
+  );
+}
+
+function AppContent() {
   const project = useEditorStore((state) => state.project);
   const projectLoaded = useEditorStore((state) => state.projectLoaded);
   const selectedDialogueId = useEditorStore(

@@ -10,7 +10,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { hasInvalidHostDraft } from "../lib/hostDraftGuard";
 import { useEditorStore } from "../store/editorStore";
-import { UpdateControl } from "./UpdateControl";
+import { UpdateControl, UpdateProvider } from "./UpdateControl";
 
 vi.mock("@tauri-apps/api/app", () => ({
   getVersion: vi.fn(async () => "0.1.2"),
@@ -40,13 +40,17 @@ beforeEach(() => {
   vi.mocked(check).mockResolvedValue(update);
 });
 
+function renderUpdateControl() {
+  return render(<UpdateControl />, { wrapper: UpdateProvider });
+}
+
 async function findUpdate() {
-  render(<UpdateControl />);
   fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
   fireEvent.click(await screen.findByRole("button", { name: "查看更新" }));
 }
 
 async function downloadUpdate() {
+  renderUpdateControl();
   await findUpdate();
   fireEvent.click(screen.getByRole("button", { name: "下载更新" }));
   await screen.findByRole("button", { name: "安装并重启" });
@@ -54,7 +58,7 @@ async function downloadUpdate() {
 
 test("shows current version and no-update result", async () => {
   vi.mocked(check).mockResolvedValue(null);
-  render(<UpdateControl />);
+  renderUpdateControl();
   expect(await screen.findByText("v0.1.2")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
   expect(await screen.findByText("当前已是最新版本。")).toBeInTheDocument();
@@ -62,7 +66,7 @@ test("shows current version and no-update result", async () => {
 
 test("keeps checking errors visible and permits retry", async () => {
   vi.mocked(check).mockRejectedValueOnce(new Error("network offline"));
-  render(<UpdateControl />);
+  renderUpdateControl();
   fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
   expect(
     await screen.findByText(/检查失败.*network offline/),
@@ -95,10 +99,53 @@ test("downloads before installing and only relaunches after successful installat
   expect(update.install).toHaveBeenCalledOnce();
 });
 
+test("reopens a downloaded update without discarding it or checking again", async () => {
+  await downloadUpdate();
+  fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "检查更新" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "查看更新" }));
+
+  expect(screen.queryByRole("button", { name: "下载更新" })).toBeNull();
+  expect(check).toHaveBeenCalledOnce();
+  expect(update.download).toHaveBeenCalledOnce();
+  expect(update.close).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "安装并重启" }));
+  await waitFor(() => expect(update.install).toHaveBeenCalledOnce());
+});
+
+test("keeps downloading after dismissal and retains the update when the view remounts", async () => {
+  let finishDownload!: () => void;
+  vi.mocked(update.download).mockReturnValueOnce(
+    new Promise((resolve) => {
+      finishDownload = resolve;
+    }),
+  );
+  const view = renderUpdateControl();
+  await findUpdate();
+  fireEvent.click(screen.getByRole("button", { name: "下载更新" }));
+  fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByText("正在下载更新…")).toBeInTheDocument();
+
+  view.rerender(<></>);
+  await act(async () => finishDownload());
+  view.rerender(<UpdateControl />);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "查看更新" }));
+  expect(screen.getByRole("button", { name: "安装并重启" })).toBeEnabled();
+  expect(update.download).toHaveBeenCalledOnce();
+  expect(update.close).not.toHaveBeenCalled();
+
+  view.unmount();
+  expect(update.close).toHaveBeenCalledOnce();
+});
+
 test("signature failure never enables installation and allows retry", async () => {
   vi.mocked(update.download).mockRejectedValueOnce(
     new Error("invalid signature"),
   );
+  renderUpdateControl();
   await findUpdate();
   fireEvent.click(screen.getByRole("button", { name: "下载更新" }));
   expect(
@@ -129,14 +176,14 @@ test("install failure does not restart and can be retried", async () => {
   ).toBeInTheDocument();
 });
 
-test("closes an update resource if checking completes after unmount", async () => {
+test("closes an update resource if checking completes after the provider unmounts", async () => {
   let resolve!: (value: Update) => void;
   vi.mocked(check).mockReturnValue(
     new Promise((done) => {
       resolve = done;
     }),
   );
-  const view = render(<UpdateControl />);
+  const view = renderUpdateControl();
   fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
   await act(async () => {});
   view.unmount();

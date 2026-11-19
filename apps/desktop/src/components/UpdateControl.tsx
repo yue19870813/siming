@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -19,11 +26,9 @@ type Phase =
   | "installed"
   | "error";
 
-export function UpdateControl() {
-  const [version, setVersion] = useState("");
+function useUpdateSession() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [message, setMessage] = useState("");
-  const [showDetails, setShowDetails] = useState(false);
   const [downloaded, setDownloaded] = useState(0);
   const [total, setTotal] = useState<number>();
   const update = useRef<Update | null>(null);
@@ -31,30 +36,33 @@ export function UpdateControl() {
   const mounted = useRef(true);
   const busy =
     phase === "checking" || phase === "downloading" || phase === "installing";
+  const canCheck = !busy && phase !== "ready" && phase !== "installed";
+
+  function releaseUpdate() {
+    const previous = update.current;
+    update.current = null;
+    return previous?.close().catch(() => {});
+  }
 
   useEffect(() => {
     mounted.current = true;
-    if (isTauri())
-      void getVersion()
-        .then(setVersion)
-        .catch(() => {});
     return () => {
       mounted.current = false;
-      if (!locked.current) void update.current?.close().catch(() => {});
+      if (!locked.current) void releaseUpdate();
     };
   }, []);
 
   async function checkUpdate() {
-    if (locked.current) return;
+    if (locked.current || !canCheck) return;
     locked.current = true;
     setPhase("checking");
     setMessage("");
     try {
-      await update.current?.close();
-      update.current = null;
+      await releaseUpdate();
+      if (!mounted.current) return;
       const result = await check({ timeout: 20000 });
       if (!mounted.current) {
-        await result?.close();
+        await result?.close().catch(() => {});
         return;
       }
       update.current = result;
@@ -71,7 +79,7 @@ export function UpdateControl() {
   }
 
   async function download() {
-    if (locked.current || !update.current) return;
+    if (locked.current || phase !== "available" || !update.current) return;
     locked.current = true;
     setPhase("downloading");
     setMessage("");
@@ -93,15 +101,12 @@ export function UpdateControl() {
       setMessage(`下载或签名校验失败：${String(error)}。可重试下载。`);
     } finally {
       locked.current = false;
-      if (!mounted.current) {
-        await update.current?.close().catch(() => {});
-        update.current = null;
-      }
+      if (!mounted.current) await releaseUpdate();
     }
   }
 
   async function install() {
-    if (locked.current || !update.current) return;
+    if (locked.current || phase !== "ready" || !update.current) return;
     const state = useEditorStore.getState();
     if (state.dirty || state.sourceDraftDirty || hasInvalidHostDraft()) {
       setMessage(
@@ -124,8 +129,51 @@ export function UpdateControl() {
       setPhase((current) => (current === "installed" ? "installed" : "ready"));
     } finally {
       locked.current = false;
+      if (!mounted.current) await releaseUpdate();
     }
   }
+
+  return {
+    release: update.current,
+    phase,
+    message,
+    downloaded,
+    total,
+    canCheck,
+    checkUpdate,
+    download,
+    install,
+  };
+}
+
+const UpdateContext = createContext<ReturnType<typeof useUpdateSession> | null>(
+  null,
+);
+
+export function UpdateProvider({ children }: { children: ReactNode }) {
+  const session = useUpdateSession();
+  return (
+    <UpdateContext.Provider value={session}>{children}</UpdateContext.Provider>
+  );
+}
+
+export function UpdateControl() {
+  const session = useContext(UpdateContext);
+  const [version, setVersion] = useState("");
+  const [showDetails, setShowDetails] = useState(false);
+
+  useEffect(() => {
+    if (isTauri())
+      void getVersion()
+        .then(setVersion)
+        .catch(() => {});
+  }, []);
+
+  if (!session) throw new Error("UpdateControl requires an UpdateProvider");
+  const { release, phase, message, downloaded, total, canCheck } = session;
+  const canView =
+    phase === "available" || phase === "downloading" || phase === "ready";
+  const canClose = phase !== "installing";
 
   return (
     <>
@@ -137,13 +185,13 @@ export function UpdateControl() {
           </span>
           <button
             className="button button--ghost"
-            disabled={!isTauri() || busy || phase === "installed"}
-            onClick={() => void checkUpdate()}
+            disabled={!isTauri() || !canCheck}
+            onClick={() => void session.checkUpdate()}
           >
             <RefreshCw size={15} aria-hidden="true" />
             {phase === "checking" ? "正在检查…" : "检查更新"}
           </button>
-          {(phase === "available" || phase === "ready") && (
+          {canView && (
             <button
               className="button button--ghost"
               onClick={() => setShowDetails(true)}
@@ -151,20 +199,24 @@ export function UpdateControl() {
               查看更新
             </button>
           )}
-          {!showDetails && message && <span role="status">{message}</span>}
+          {!showDetails && (phase === "downloading" || message) && (
+            <span role="status">
+              {phase === "downloading" ? "正在下载更新…" : message}
+            </span>
+          )}
           {!isTauri() && <span>请在桌面应用中检查更新。</span>}
         </dd>
       </div>
       {showDetails && (
         <Modal
-          title={`更新司命至 v${update.current?.version ?? ""}`}
+          title={`更新司命至 v${release?.version ?? ""}`}
           onClose={() => {
-            if (!busy) setShowDetails(false);
+            if (canClose) setShowDetails(false);
           }}
         >
           <p>更新来源：GitHub 最新正式 Release。安装时应用将退出并重启。</p>
           <pre className="update-notes">
-            {update.current?.body || "此版本未提供更新说明。"}
+            {release?.body || "此版本未提供更新说明。"}
           </pre>
           {phase === "downloading" && (
             <div role="status">
@@ -180,14 +232,14 @@ export function UpdateControl() {
           )}
           {message && <p role="status">{message}</p>}
           <div className="update-actions">
-            <button disabled={busy} onClick={() => setShowDetails(false)}>
+            <button disabled={!canClose} onClick={() => setShowDetails(false)}>
               关闭
             </button>
             {phase === "available" && (
-              <button onClick={() => void download()}>下载更新</button>
+              <button onClick={() => void session.download()}>下载更新</button>
             )}
             {phase === "ready" && (
-              <button onClick={() => void install()}>安装并重启</button>
+              <button onClick={() => void session.install()}>安装并重启</button>
             )}
           </div>
         </Modal>
