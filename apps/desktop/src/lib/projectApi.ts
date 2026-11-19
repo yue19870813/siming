@@ -44,6 +44,11 @@ export async function openProject(rootPath: string) {
   return invoke<ProjectSnapshot>("open_project", { rootPath });
 }
 
+export async function showProjectItem(rootPath: string, relativePath: string) {
+  requireTauri("在文件夹里打开");
+  return invoke<void>("show_project_item", { rootPath, relativePath });
+}
+
 export async function saveProject(snapshot: ProjectSnapshot) {
   return invoke<string>("save_project", { snapshot });
 }

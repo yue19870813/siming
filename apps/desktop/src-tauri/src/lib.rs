@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use siming_storage::ProjectSnapshot;
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 use tauri::Manager;
 
 #[derive(Debug, Serialize)]
@@ -147,6 +151,38 @@ fn create_project(
 #[tauri::command]
 fn open_project(root_path: String) -> Result<ProjectSnapshot, CommandError> {
     Ok(siming_storage::open_project(Path::new(&root_path))?)
+}
+
+#[tauri::command]
+fn show_project_item(root_path: String, relative_path: String) -> Result<(), CommandError> {
+    let path = resolve_project_item(Path::new(&root_path), Path::new(&relative_path))?;
+    if path.is_dir() {
+        tauri_plugin_opener::open_path(&path, None::<&str>)
+    } else {
+        tauri_plugin_opener::reveal_item_in_dir(&path)
+    }
+    .map_err(|error| CommandError::new("PROJECT_ITEM_OPEN_FAILED", error, true))
+}
+
+fn resolve_project_item(root: &Path, relative: &Path) -> Result<PathBuf, CommandError> {
+    let invalid = || CommandError::new("PROJECT_ITEM_INVALID_PATH", "路径不在项目目录内。", true);
+    let unavailable = || {
+        CommandError::new(
+            "PROJECT_ITEM_UNAVAILABLE",
+            "文件或目录还未保存到磁盘，或已被移除。",
+            true,
+        )
+    };
+    if !root.is_absolute() {
+        return Err(invalid());
+    }
+    let path = root.join(siming_storage::normalize_project_relative_path(relative)?);
+    let canonical_root = root.canonicalize().map_err(|_| unavailable())?;
+    let canonical_path = path.canonicalize().map_err(|_| unavailable())?;
+    if !canonical_path.starts_with(&canonical_root) {
+        return Err(invalid());
+    }
+    Ok(path)
 }
 
 #[tauri::command]
@@ -345,6 +381,7 @@ pub fn run() {
             core_version,
             create_project,
             open_project,
+            show_project_item,
             save_project,
             import_character_avatar,
             read_project_asset,
@@ -367,6 +404,31 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
+    #[test]
+    fn resolves_existing_project_items_and_rejects_invalid_paths() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures/minimal-project");
+        assert!(
+            super::resolve_project_item(&root, Path::new("dialogues"))
+                .unwrap()
+                .is_dir()
+        );
+        assert!(
+            super::resolve_project_item(&root, Path::new("dialogues/intro.json"))
+                .unwrap()
+                .is_file()
+        );
+        assert!(super::resolve_project_item(&root, Path::new("../outside")).is_err());
+        assert!(super::resolve_project_item(&root, &root.join("dialogues")).is_err());
+        assert_eq!(
+            super::resolve_project_item(&root, Path::new("dialogues/not-yet-saved"))
+                .unwrap_err()
+                .code,
+            "PROJECT_ITEM_UNAVAILABLE",
+        );
+    }
+
     #[test]
     fn ipc_version_comes_from_shared_core() {
         assert_eq!(super::core_version(), siming_core::VERSION);

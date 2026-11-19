@@ -445,6 +445,70 @@ test("dialogue files default to natural name order and remember creation-time or
   );
 });
 
+test.each([
+  ["Macintosh", "在访达里打开"],
+  ["Windows NT", "在文件夹里打开"],
+])("opens the right-clicked project item on %s", async (userAgent, label) => {
+  const userAgentMock = vi.spyOn(navigator, "userAgent", "get");
+  userAgentMock.mockReturnValue(userAgent);
+  try {
+    const project = createDemoProject();
+    project.rootPath = "/tmp/测试项目";
+    useEditorStore.getState().setProject(project);
+    render(<App />);
+    await act(async () => undefined);
+
+    Object.defineProperty(window, "__TAURI_INTERNALS__", {
+      configurable: true,
+      value: {},
+    });
+
+    const folder = screen.getByRole("button", { name: "prologue" });
+    fireEvent.contextMenu(folder);
+    const menuItem = screen.getByRole("menuitem", { name: label });
+    expect(menuItem).toHaveFocus();
+    fireEvent.keyDown(menuItem, { key: "Escape" });
+    expect(screen.queryByRole("menuitem", { name: label })).toBeNull();
+    expect(folder).toHaveFocus();
+
+    fireEvent.contextMenu(folder);
+    const openFolder = screen.getByRole("menuitem", { name: label });
+    fireEvent.pointerDown(openFolder);
+    if (userAgent === "Macintosh") act(() => openFolder.blur());
+    expect(openFolder).toBeInTheDocument();
+    fireEvent.pointerUp(openFolder);
+    fireEvent.click(openFolder);
+    expect(invoke).toHaveBeenCalledWith("show_project_item", {
+      rootPath: project.rootPath,
+      relativePath: "dialogues/prologue",
+    });
+    expect(folder).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.contextMenu(screen.getByText("对话目录", { selector: "small" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: label }));
+    expect(invoke).toHaveBeenCalledWith("show_project_item", {
+      rootPath: project.rootPath,
+      relativePath: "dialogues",
+    });
+
+    const entry = project.manifest.dialogues[0];
+    vi.mocked(invoke).mockRejectedValueOnce({
+      message: "文件或目录还未保存到磁盘，或已被移除。",
+    });
+    fireEvent.contextMenu(
+      screen.getByRole("button", { name: /^序章 · 雨夜来客 \d+ 个节点$/ }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: label }));
+    expect(invoke).toHaveBeenCalledWith("show_project_item", {
+      rootPath: project.rootPath,
+      relativePath: entry.path,
+    });
+    expect(await screen.findByText(/无法打开文件位置.*还未保存/)).toBeVisible();
+  } finally {
+    userAgentMock.mockRestore();
+  }
+});
+
 test("text and character find list matching nodes and keep canvas highlights active", async () => {
   openTestProject();
   useEditorStore.getState().setActivity("search");

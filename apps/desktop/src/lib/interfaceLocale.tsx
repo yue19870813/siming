@@ -216,6 +216,8 @@ const english = new Map<string, string>([
   ["最近编辑", "Recently edited"],
   ["翻译未完成", "Translation incomplete"],
   ["对话目录", "Dialogue files"],
+  ["在访达里打开", "Open in Finder"],
+  ["在文件夹里打开", "Open in File Manager"],
   ["对话文件排序", "Sort dialogue files"],
   ["名称", "Name"],
   ["创建时间", "Creation time"],

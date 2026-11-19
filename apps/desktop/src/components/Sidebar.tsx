@@ -3,11 +3,13 @@ import { withinDialogueRoot } from "../lib/dialogueDirectoryMigration";
 import { collectDialogueDirectories } from "../lib/dialogueCreation";
 import { CreationDialog } from "./CreationDialog";
 import { confirmDiscardHostDraft } from "../lib/hostDraftGuard";
+import { isTauri, showProjectItem } from "../lib/projectApi";
 import {
   Braces,
   ChevronDown,
   FileText,
   Folder,
+  FolderOpen,
   FolderPlus,
   FolderTree,
   History,
@@ -21,8 +23,11 @@ import {
   Zap,
   X,
 } from "lucide-react";
-import type { PointerEvent as ReactPointerEvent } from "react";
-import { useMemo, useState } from "react";
+import type {
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   beginNodePointerDrag,
   consumeSuppressedPaletteClick,
@@ -159,6 +164,15 @@ function ProjectExplorer() {
   const select = useEditorStore((state) => state.setSelectedDialogue);
   const deleteDialogue = useEditorStore((state) => state.deleteDialogue);
   const addNode = useEditorStore((state) => state.addNode);
+  const setNotice = useEditorStore((state) => state.setNotice);
+  const [itemMenu, setItemMenu] = useState<{
+    rootPath: string;
+    relativePath: string;
+    left: number;
+    top: number;
+    trigger: HTMLElement;
+  } | null>(null);
+  const itemMenuRef = useRef<HTMLDivElement>(null);
   const [sortOrder, setSortOrder] = useState<DialogueSortOrder>(() => {
     try {
       return localStorage.getItem(dialogueSortStorageKey) === "created"
@@ -179,6 +193,54 @@ function ProjectExplorer() {
   const [collapsedDirectories, setCollapsedDirectories] = useState<Set<string>>(
     () => new Set(),
   );
+
+  useLayoutEffect(() => {
+    const menu = itemMenuRef.current;
+    if (!itemMenu || !menu) return;
+    menu.style.left = `${Math.max(0, Math.min(itemMenu.left, window.innerWidth - menu.offsetWidth - 4))}px`;
+    menu.style.top = `${Math.max(0, Math.min(itemMenu.top, window.innerHeight - menu.offsetHeight - 4))}px`;
+    menu.querySelector("button")?.focus({ preventScroll: true });
+
+    const dismiss = (event: PointerEvent) => {
+      if (event.target instanceof Node && !menu.contains(event.target))
+        setItemMenu(null);
+    };
+    window.addEventListener("pointerdown", dismiss);
+    return () => window.removeEventListener("pointerdown", dismiss);
+  }, [itemMenu]);
+
+  function openItemMenu(
+    event: ReactMouseEvent<HTMLElement>,
+    relativePath: string,
+  ) {
+    if (!isTauri() || !project.rootPath) return;
+    event.preventDefault();
+    const trigger = event.currentTarget;
+    const bounds = trigger.getBoundingClientRect();
+    const hasPointer = event.clientX !== 0 || event.clientY !== 0;
+    setItemMenu({
+      rootPath: project.rootPath,
+      relativePath,
+      left: hasPointer ? event.clientX : bounds.left,
+      top: hasPointer ? event.clientY : bounds.bottom,
+      trigger,
+    });
+  }
+
+  async function openMenuItem() {
+    if (!itemMenu) return;
+    setItemMenu(null);
+    itemMenu.trigger.focus({ preventScroll: true });
+    try {
+      await showProjectItem(itemMenu.rootPath, itemMenu.relativePath);
+    } catch (error) {
+      const detail =
+        error && typeof error === "object" && "message" in error
+          ? String(error.message)
+          : String(error);
+      setNotice(`无法打开文件位置：${detail}`);
+    }
+  }
 
   const rootEntries = project.manifest.dialogues.filter((entry) =>
     withinDialogueRoot(entry.path, project.manifest.paths.dialogues),
@@ -344,7 +406,9 @@ function ProjectExplorer() {
       </section>
       <section className="dialogue-tree">
         <div className="section-label dialogue-tree-heading">
-          <small>对话目录</small>
+          <small onContextMenu={(event) => openItemMenu(event, dialogueRoot)}>
+            对话目录
+          </small>
           <span>{entries.length}</span>
           <select
             aria-label="对话文件排序"
@@ -382,6 +446,7 @@ function ProjectExplorer() {
                   type="button"
                   className="tree-folder"
                   aria-expanded={!isCollapsed}
+                  onContextMenu={(event) => openItemMenu(event, directory)}
                   onClick={() => {
                     setActiveDirectory(directory);
                     setCollapsedDirectories((collapsed) => {
@@ -405,6 +470,7 @@ function ProjectExplorer() {
                   <button
                     key={entry.id}
                     className={`tree-file ${selectedId === entry.id ? "is-active" : ""}`}
+                    onContextMenu={(event) => openItemMenu(event, entry.path)}
                     onClick={() => {
                       setActiveDirectory(null);
                       select(entry.id);
@@ -439,6 +505,37 @@ function ProjectExplorer() {
           <p className="empty-list">暂无对话目录或匹配的对话</p>
         )}
       </section>
+      {itemMenu && (
+        <div
+          ref={itemMenuRef}
+          className="project-menu dialogue-item-menu"
+          role="menu"
+          onBlur={(event) => {
+            if (
+              event.relatedTarget &&
+              !event.currentTarget.contains(event.relatedTarget)
+            )
+              setItemMenu(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.stopPropagation();
+            setItemMenu(null);
+            itemMenu.trigger.focus({ preventScroll: true });
+          }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void openMenuItem()}
+          >
+            <FolderOpen size={15} aria-hidden="true" />
+            {/(Macintosh|Mac OS X)/i.test(navigator.userAgent)
+              ? "在访达里打开"
+              : "在文件夹里打开"}
+          </button>
+        </div>
+      )}
       <section className="node-palette">
         <div className="section-label">
           <small>添加节点</small>

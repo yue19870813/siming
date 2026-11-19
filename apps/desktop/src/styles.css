@@ -312,6 +312,13 @@ textarea {
   font-size: var(--ui-font-9, 9px);
 }
 
+.dialogue-item-menu {
+  position: fixed;
+  width: max-content;
+  max-width: calc(100vw - 8px);
+  z-index: 200;
+}
+
 .topbar-center {
   display: flex;
   align-items: center;
