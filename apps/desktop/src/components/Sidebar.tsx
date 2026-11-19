@@ -33,6 +33,9 @@ import { findMatchingNodeIds, nodeSearchText } from "./canvasFind";
 import { useEditorStore } from "../store/editorStore";
 
 const appIconUrl = new URL("../../assets/app-icon.svg", import.meta.url).href;
+const dialogueNameCollator = new Intl.Collator(undefined, { numeric: true });
+const dialogueSortStorageKey = "siming.dialogue-file-sort";
+type DialogueSortOrder = "name" | "created";
 
 const activities: Array<{
   id: Activity;
@@ -156,6 +159,15 @@ function ProjectExplorer() {
   const select = useEditorStore((state) => state.setSelectedDialogue);
   const deleteDialogue = useEditorStore((state) => state.deleteDialogue);
   const addNode = useEditorStore((state) => state.addNode);
+  const [sortOrder, setSortOrder] = useState<DialogueSortOrder>(() => {
+    try {
+      return localStorage.getItem(dialogueSortStorageKey) === "created"
+        ? "created"
+        : "name";
+    } catch {
+      return "name";
+    }
+  });
   const [filter, setFilter] = useState("");
   const [quickFilter, setQuickFilter] = useState<
     "all" | "recent" | "translation"
@@ -235,6 +247,20 @@ function ProjectExplorer() {
       ([directory, items]) => directory !== dialogueRoot || items.length > 0,
     )
     .sort(([left], [right]) => left.localeCompare(right));
+  for (const [, items] of groupedEntries) {
+    items.sort((left, right) => {
+      const creationOrder =
+        (right.entry.createdAtUnixMs ?? -1) -
+        (left.entry.createdAtUnixMs ?? -1);
+      if (sortOrder === "created" && creationOrder !== 0) return creationOrder;
+      return (
+        dialogueNameCollator.compare(
+          left.dialogue?.name ?? left.entry.key,
+          right.dialogue?.name ?? right.entry.key,
+        ) || left.entry.path.localeCompare(right.entry.path)
+      );
+    });
+  }
 
   return (
     <>
@@ -317,9 +343,27 @@ function ProjectExplorer() {
         </button>
       </section>
       <section className="dialogue-tree">
-        <div className="section-label">
+        <div className="section-label dialogue-tree-heading">
           <small>对话目录</small>
           <span>{entries.length}</span>
+          <select
+            aria-label="对话文件排序"
+            title="对话文件排序"
+            value={sortOrder}
+            onChange={(event) => {
+              const order =
+                event.target.value === "created" ? "created" : "name";
+              setSortOrder(order);
+              try {
+                localStorage.setItem(dialogueSortStorageKey, order);
+              } catch {
+                return;
+              }
+            }}
+          >
+            <option value="name">名称</option>
+            <option value="created">创建时间</option>
+          </select>
         </div>
         {groupedEntries.map(([directory, groupEntries]) => {
           const isRoot = directory === dialogueRoot;

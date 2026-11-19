@@ -835,6 +835,22 @@ textarea {
   font-size: var(--ui-font-10, 10px);
 }
 
+.dialogue-tree-heading {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 6px;
+}
+
+.dialogue-tree-heading select {
+  min-width: 0;
+  max-width: 55%;
+  height: 24px;
+  margin-left: auto;
+  color: var(--muted);
+  background-color: var(--bg);
+  font-size: var(--ui-font-11, 11px);
+}
+
 .tree-file-group {
   position: relative;
   margin-bottom: 2px;

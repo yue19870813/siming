@@ -11,6 +11,7 @@ use std::{
     fs::{self, File},
     io::Write,
     path::{Component, Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
 use uuid::Uuid;
@@ -186,6 +187,7 @@ pub fn create_project(
             id: dialogue_id,
             key: "intro".to_owned(),
             path: dialogue_path,
+            created_at_unix_ms: unix_millis(SystemTime::now()),
         }],
     };
 
@@ -212,13 +214,20 @@ pub fn open_project(root: &Path) -> StorageResult<ProjectSnapshot> {
         ));
     }
 
-    let manifest: ProjectManifest = read_json(&manifest_path)?;
+    let mut manifest: ProjectManifest = read_json(&manifest_path)?;
     let dialogues = manifest
         .dialogues
-        .iter()
+        .iter_mut()
         .map(|entry| {
             let path = resolve_project_path(&root, &entry.path)?;
-            read_json(&path)
+            let dialogue = read_json(&path)?;
+            if entry.created_at_unix_ms.is_none() {
+                entry.created_at_unix_ms = fs::metadata(&path)
+                    .and_then(|metadata| metadata.created())
+                    .ok()
+                    .and_then(unix_millis);
+            }
+            Ok(dialogue)
         })
         .collect::<StorageResult<Vec<_>>>()?;
     if let Some(diagnostic) = validate_editable_project(&manifest, &dialogues)
@@ -247,6 +256,14 @@ pub fn open_project(root: &Path) -> StorageResult<ProjectSnapshot> {
         resources,
         saved_fingerprint: Some(fingerprint),
     })
+}
+
+fn unix_millis(time: SystemTime) -> Option<u64> {
+    time.duration_since(UNIX_EPOCH)
+        .ok()?
+        .as_millis()
+        .try_into()
+        .ok()
 }
 
 pub fn import_character_avatar(
@@ -828,6 +845,42 @@ fn write_definition<T: Serialize>(path: &Path, key: &str, items: &[T]) -> Storag
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dialogue_creation_time_survives_saves_and_backfills_legacy_files() {
+        let root = std::env::temp_dir().join(format!("siming-created-{}", Uuid::new_v4()));
+        let mut snapshot = create_project(&root, "Created", "zh-CN").unwrap();
+        let initial = snapshot.manifest.dialogues[0].created_at_unix_ms;
+        assert!(initial.is_some());
+        snapshot.dialogues[0].name = "Updated".to_owned();
+        save_project(&snapshot).unwrap();
+        assert_eq!(
+            open_project(&root).unwrap().manifest.dialogues[0].created_at_unix_ms,
+            initial
+        );
+
+        let manifest_path = root.join(PROJECT_FILE);
+        let dialogue_path = root.join(&snapshot.manifest.dialogues[0].path);
+        snapshot.manifest.dialogues[0].created_at_unix_ms = None;
+        write_json_atomic(&manifest_path, &snapshot.manifest).unwrap();
+        let before_open = fs::read(&manifest_path).unwrap();
+        let file_created = fs::metadata(dialogue_path)
+            .unwrap()
+            .created()
+            .ok()
+            .and_then(unix_millis);
+        let mut reopened = open_project(&root).unwrap();
+        assert_eq!(
+            reopened.manifest.dialogues[0].created_at_unix_ms,
+            file_created
+        );
+        assert_eq!(fs::read(&manifest_path).unwrap(), before_open);
+        reopened.dialogues[0].name = "Updated legacy dialogue".to_owned();
+        save_project(&reopened).unwrap();
+        let saved: ProjectManifest = read_json(&manifest_path).unwrap();
+        assert_eq!(saved.dialogues[0].created_at_unix_ms, file_created);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn rich_text_upgrade_backs_up_round_trips_and_rejects_downgrade() {

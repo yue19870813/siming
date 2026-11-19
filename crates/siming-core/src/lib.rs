@@ -66,6 +66,12 @@ pub struct DialogueIndexEntry {
     pub id: String,
     pub key: String,
     pub path: String,
+    #[serde(
+        rename = "createdAtUnixMs",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub created_at_unix_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

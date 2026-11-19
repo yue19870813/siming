@@ -730,6 +730,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         id,
         key: dialogue.key,
         path: `${normalizedFolder}/${dialogue.key}.json`,
+        createdAtUnixMs: Date.now(),
       });
     });
     set({ selectedDialogueId: id, selectedNodeId: null, activity: "project" });

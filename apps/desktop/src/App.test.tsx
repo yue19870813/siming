@@ -381,6 +381,70 @@ test("dialogue directories can be collapsed and search expands matches", async (
   );
 });
 
+test("dialogue files default to natural name order and remember creation-time order", async () => {
+  openTestProject();
+  const store = useEditorStore.getState();
+  store.addDialogue("dialogues/prologue", { name: "第 10 节" });
+  store.addDialogue("dialogues/prologue", { name: "第 2 节" });
+  store.addDialogue("dialogues/prologue", { name: "第 1 节" });
+  store.addDialogue("dialogues/another", { name: "另一目录" });
+  store.commit("设置测试时间", (project) => {
+    project.manifest.dialogues[1].createdAtUnixMs = 200;
+    project.manifest.dialogues[2].createdAtUnixMs = 100;
+    project.manifest.dialogues[3].createdAtUnixMs = 100;
+  });
+  store.markSaved();
+  const view = render(<App />);
+  const sort = screen.getByRole("combobox", { name: "对话文件排序" });
+  const namesInPrologue = () =>
+    [
+      ...screen
+        .getByRole("button", { name: "prologue" })
+        .closest(".tree-file-group")!
+        .querySelectorAll(".tree-file strong"),
+    ].map((element) => element.textContent);
+  const numberedNames = () =>
+    namesInPrologue().filter((name) => name?.startsWith("第"));
+  expect(sort).toHaveValue("name");
+  expect(numberedNames()).toEqual(["第 1 节", "第 2 节", "第 10 节"]);
+
+  fireEvent.click(screen.getByRole("button", { name: "第 2 节 2 个节点" }));
+  const beforeSort = useEditorStore.getState();
+  fireEvent.change(sort, { target: { value: "created" } });
+  expect(namesInPrologue()).toEqual([
+    "第 10 节",
+    "第 1 节",
+    "第 2 节",
+    "序章 · 雨夜来客",
+  ]);
+  expect(screen.getByRole("button", { name: "第 2 节 2 个节点" })).toHaveClass(
+    "is-active",
+  );
+  expect(useEditorStore.getState().project).toBe(beforeSort.project);
+  expect(useEditorStore.getState().dirty).toBe(false);
+  expect(screen.getByRole("button", { name: "another" })).toBeVisible();
+
+  fireEvent.change(screen.getByPlaceholderText("搜索对话、路径…"), {
+    target: { value: "第" },
+  });
+  expect(namesInPrologue()).toEqual(["第 10 节", "第 1 节", "第 2 节"]);
+  expect(
+    screen.queryByRole("button", { name: "another" }),
+  ).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+  view.unmount();
+  render(<App />);
+  expect(screen.getByRole("combobox", { name: "对话文件排序" })).toHaveValue(
+    "created",
+  );
+  expect(numberedNames()).toEqual(["第 10 节", "第 1 节", "第 2 节"]);
+  await waitFor(() =>
+    expect(document.documentElement.dataset.theme).toBe("dark"),
+  );
+});
+
 test("text and character find list matching nodes and keep canvas highlights active", async () => {
   openTestProject();
   useEditorStore.getState().setActivity("search");

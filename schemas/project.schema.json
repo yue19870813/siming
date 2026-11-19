@@ -81,6 +81,10 @@
           },
           "path": {
             "$ref": "#/$defs/projectRelativePath"
+          },
+          "createdAtUnixMs": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }

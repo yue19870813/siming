@@ -76,6 +76,7 @@ export type DialogueIndexEntry = {
   id: string;
   key: string;
   path: string;
+  createdAtUnixMs?: number;
 };
 
 export type ExportFormat = "json" | "xml" | "binary";
