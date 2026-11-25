@@ -201,7 +201,7 @@
           "type": "string"
         },
         "type": {
-          "enum": ["start", "dialogue", "choice", "condition", "event", "end"]
+          "enum": ["start", "dialogue", "choice", "condition", "event", "end", "empty"]
         },
         "position": {
           "type": "object",

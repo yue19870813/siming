@@ -17,6 +17,7 @@ const nodeTypes: NodeType[] = [
   "condition",
   "event",
   "end",
+  "empty",
 ];
 
 let suppressNextPaletteClick = false;

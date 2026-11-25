@@ -27,6 +27,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
+  CirclePause,
   Frame,
   GitBranch,
   MessageCircle,
@@ -72,6 +73,7 @@ const typeMeta: Record<
   choice: { label: "选项", color: "#4ec6b8", icon: GitBranch },
   condition: { label: "条件", color: "#e49a57", icon: GitBranch },
   event: { label: "事件", color: "#d27da8", icon: Zap },
+  empty: { label: "空节点", color: "#85a7b8", icon: CirclePause },
   end: { label: "结束", color: "#7f8698", icon: Square },
 };
 

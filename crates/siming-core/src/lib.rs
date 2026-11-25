@@ -112,6 +112,7 @@ pub enum NodeType {
     Condition,
     Event,
     End,
+    Empty,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -1230,12 +1231,14 @@ fn advance_simulation(
                 );
             }
         }
-        log_text_fallback(manifest, node, session);
+        if node.node_type != NodeType::Empty {
+            log_text_fallback(manifest, node, session);
+        }
         match node.node_type {
             NodeType::Start => {
                 session.current_node_id = outgoing_target(dialogue, &node.id, "next");
             }
-            NodeType::Dialogue => {
+            NodeType::Dialogue | NodeType::Empty => {
                 session.status = SimulationStatus::WaitingContinue;
             }
             NodeType::Choice => {
@@ -1710,7 +1713,7 @@ fn validate_node_ports(
 ) {
     let ports: Vec<_> = edges.iter().map(|edge| edge.source_port.as_str()).collect();
     let valid = match node.node_type {
-        NodeType::Start | NodeType::Dialogue | NodeType::Event => {
+        NodeType::Start | NodeType::Dialogue | NodeType::Event | NodeType::Empty => {
             ports.len() == 1 && ports[0] == "next"
         }
         NodeType::End => ports.is_empty(),

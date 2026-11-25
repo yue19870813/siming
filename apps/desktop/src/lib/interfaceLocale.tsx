@@ -240,6 +240,8 @@ const english = new Map<string, string>([
   ["事件", "Event"],
   ["开始", "Start"],
   ["结束", "End"],
+  ["空节点", "Empty node"],
+  ["业务状态", "Business state"],
   ["角色或旁白", "Character or narration"],
   ["玩家分支", "Player branch"],
   ["变量判断", "Variable condition"],

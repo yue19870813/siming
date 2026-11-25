@@ -125,12 +125,36 @@ pub struct RuntimeDialogue {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum RuntimeNode {
+    Empty(RuntimeEmptyNode),
     Start(RuntimeStartNode),
     Dialogue(RuntimeDialogueNode),
     Choice(RuntimeChoiceNode),
     Condition(RuntimeConditionNode),
     Event(RuntimeEventNode),
     End(RuntimeEndNode),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeEmptyNode {
+    pub key: String,
+    #[serde(rename = "type", deserialize_with = "deserialize_empty_type")]
+    pub node_type: RuntimeNodeType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub host_events: Vec<HostEventCompat>,
+    pub next: String,
+}
+
+fn deserialize_empty_type<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<RuntimeNodeType, D::Error> {
+    let kind = RuntimeNodeType::deserialize(deserializer)?;
+    if kind != RuntimeNodeType::Empty {
+        return Err(serde::de::Error::custom("expected empty node type"));
+    }
+    Ok(kind)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -241,6 +265,7 @@ pub enum RuntimeNodeType {
     Condition,
     Event,
     End,
+    Empty,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -617,6 +642,13 @@ fn compile_node(
             host_events,
             next: next("next")?,
         })),
+        NodeType::Empty => Ok(RuntimeNode::Empty(RuntimeEmptyNode {
+            key: node.key.clone(),
+            node_type: RuntimeNodeType::Empty,
+            tags,
+            host_events,
+            next: next("next")?,
+        })),
         NodeType::Dialogue => {
             let text: LocalizedBody = value(node, "text")?;
             let text_key = format!("dialogue.{}.{}.text", dialogue.id, node.id);
@@ -782,6 +814,91 @@ mod tests {
         CharacterDefinition, EventDefinition, TagDefinition, VariableDefinition,
         parse_dialogue_document, parse_project_manifest,
     };
+
+    #[test]
+    fn empty_nodes_wait_and_compile_without_text() {
+        let manifest = parse_project_manifest(include_str!(
+            "../../../fixtures/minimal-project/.siming/project.json"
+        ))
+        .unwrap();
+        let mut dialogue = parse_dialogue_document(include_str!(
+            "../../../fixtures/minimal-project/dialogues/intro.json"
+        ))
+        .unwrap();
+        let resources = fixture_resources();
+        dialogue.nodes[1].node_type = NodeType::Empty;
+        let empty_id = dialogue.nodes[1].id.clone();
+        let end_id = dialogue.nodes[2].id.clone();
+        let simulate = |session, action| {
+            crate::simulate_step(crate::SimulationRequest {
+                manifest: manifest.clone(),
+                dialogue: dialogue.clone(),
+                resources: resources.clone(),
+                session,
+                action,
+            })
+            .unwrap()
+        };
+        let waiting = simulate(
+            None,
+            crate::SimulationAction::Start {
+                start_node_id: None,
+                locale: "en-US".to_owned(),
+            },
+        );
+        assert_eq!(waiting.status, crate::SimulationStatus::WaitingContinue);
+        assert_eq!(waiting.current_node_id.as_deref(), Some(empty_id.as_str()));
+        assert!(
+            !waiting
+                .trace
+                .iter()
+                .any(|item| { item.kind == crate::SimulationLogKind::LocaleFallback })
+        );
+        let completed = simulate(Some(waiting), crate::SimulationAction::Continue);
+        assert_eq!(completed.status, crate::SimulationStatus::Completed);
+
+        let bundle =
+            compile_runtime(&manifest, std::slice::from_ref(&dialogue), &resources).unwrap();
+        let node = &bundle.project.dialogues[&dialogue.id].nodes[&empty_id];
+        assert!(matches!(node, RuntimeNode::Empty(empty) if empty.next == end_id));
+        let mut json = serde_json::to_value(node).unwrap();
+        assert_eq!(json["type"], "empty");
+        for key in ["textKey", "speakerId", "choices", "advancePolicy"] {
+            assert!(json.get(key).is_none());
+        }
+        assert_eq!(
+            serde_json::from_value::<RuntimeNode>(json.clone()).unwrap(),
+            *node
+        );
+        json.as_object_mut().unwrap().remove("tags");
+        json.as_object_mut().unwrap().remove("hostEvents");
+        assert!(
+            matches!(serde_json::from_value::<RuntimeNode>(json).unwrap(), RuntimeNode::Empty(empty) if empty.tags.is_empty() && empty.host_events.is_empty())
+        );
+        assert!(
+            bundle
+                .locales
+                .values()
+                .all(|locale| locale.texts.keys().all(|key| !key.contains(&empty_id)))
+        );
+
+        dialogue
+            .edges
+            .retain(|edge| edge.source_node_id != empty_id);
+        dialogue.entry_node_id = empty_id;
+        let error = compile_runtime(&manifest, &[dialogue], &resources).unwrap_err();
+        let diagnostics = error.diagnostics().unwrap();
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == "NODE_INVALID_PORTS")
+        );
+        assert!(
+            diagnostics
+                .iter()
+                .any(|item| item.code == "DIALOGUE_ENTRY_NOT_START")
+        );
+    }
 
     #[test]
     fn editor_node_aliases_round_trip_without_entering_runtime() {

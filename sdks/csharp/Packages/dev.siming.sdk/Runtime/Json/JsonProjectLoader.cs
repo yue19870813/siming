@@ -259,14 +259,14 @@ namespace Siming.Serialization.Json
             foreach (var p in Obj(definition, "nodes").Properties())
             {
                 Uuid(p.Name); var n = Object(p.Value); var kind = Text(n, "type");
-                var type = kind switch { "start" => NodeType.Start, "dialogue" => NodeType.Dialogue, "choice" => NodeType.Choice, "condition" => NodeType.Condition, "event" => NodeType.Event, "end" => NodeType.End, _ => throw Invalid("UnknownNodeType", kind) };
+                var type = kind switch { "start" => NodeType.Start, "dialogue" => NodeType.Dialogue, "choice" => NodeType.Choice, "condition" => NodeType.Condition, "event" => NodeType.Event, "end" => NodeType.End, "empty" => NodeType.Empty, _ => throw Invalid("UnknownNodeType", kind) };
                 var messages = new List<HostMessage>();
                 if (n["hostEvents"] != null) foreach (var message in Array(n, "hostEvents"))
                 { var m = Object(message); messages.Add(new HostMessage(Text(m, "name"), Data(Obj(m, "payload")))); }
                 var tags = n["tags"] == null ? null : Array(n, "tags").Select(String);
                 string? next = null, speaker = null, text = null, yes = null, no = null, eventName = null;
                 double? delay = null; Condition? condition = null; DataValue? parameters = null; var choices = new List<Choice>();
-                if (type == NodeType.Start || type == NodeType.Dialogue || type == NodeType.Event) next = Text(n, "next");
+                if (type == NodeType.Start || type == NodeType.Dialogue || type == NodeType.Event || type == NodeType.Empty) next = Text(n, "next");
                 if (type == NodeType.Dialogue)
                 {
                     text = Text(n, "textKey"); if (n["speakerId"] != null) speaker = Text(n, "speakerId");

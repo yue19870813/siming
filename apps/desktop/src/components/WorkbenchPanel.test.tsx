@@ -110,6 +110,53 @@ test("simulator starts from shared IPC and submits player choices", async () => 
   );
 });
 
+test("simulator waits at an empty node without rendering a dialogue", async () => {
+  const project = createDemoProject();
+  const node = project.dialogues[0].nodes.find(
+    (node) => node.type === "dialogue",
+  )!;
+  node.type = "empty";
+  node.key = "await-host";
+  node.data.text = { "zh-CN": "不应显示的正文" };
+  useEditorStore.getState().setProject(project);
+  const waiting: SimulationSession = {
+    currentNodeId: node.id,
+    status: "waitingContinue",
+    locale: "zh-CN",
+    variables: {},
+    consecutiveSteps: 0,
+    visitSequence: 2,
+    trace: [],
+  };
+  api.simulateStep.mockResolvedValueOnce(waiting).mockResolvedValueOnce({
+    ...waiting,
+    currentNodeId: null,
+    status: "completed",
+  });
+  render(
+    <WorkbenchPanel
+      mode="simulator"
+      height={430}
+      onModeChange={vi.fn()}
+      onClose={vi.fn()}
+      onResizeStart={vi.fn()}
+      onResizeBy={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /开始模拟/ }));
+  expect(await screen.findByText("await-host")).toBeInTheDocument();
+  expect(screen.getByText("空节点")).toBeInTheDocument();
+  expect(screen.queryByText("不应显示的正文")).not.toBeInTheDocument();
+  expect(screen.queryByText("杜尔")).not.toBeInTheDocument();
+  expect(screen.queryByText("旁白")).not.toBeInTheDocument();
+  expect(api.simulateStep).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: "继续" }));
+  expect(await screen.findByText("模拟已结束")).toBeInTheDocument();
+  expect(api.simulateStep).toHaveBeenLastCalledWith(
+    expect.objectContaining({ action: { type: "continue" } }),
+  );
+});
+
 test("simulator displays complete fallback body with safe combined styles", async () => {
   const project = createDemoProject();
   const node = project.dialogues[0].nodes.find(

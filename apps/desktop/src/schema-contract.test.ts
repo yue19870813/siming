@@ -121,6 +121,38 @@ test("runtime schema accepts compiled editor-free nodes", () => {
   expect(validate(runtime)).toBe(false);
 });
 
+test("exported empty nodes share the bundled and chunked schema", () => {
+  const ajv = new Ajv2020({ allErrors: true, strict: true });
+  addFormats(ajv);
+  const runtimeSchema = readJson("schemas/runtime.schema.json");
+  const validateBundled = ajv.compile(runtimeSchema);
+  const validateChunk = ajv.compile(
+    readJson("schemas/runtime-dialogue-chunk.schema.json"),
+  );
+  for (const [validate, path] of [
+    [validateBundled, "bundled/dialogues.runtime.json"],
+    [validateChunk, "directory-chunks/dialogues/Chapter1/runtime.json"],
+  ] as const) {
+    const runtime = readJson(`sdks/csharp/contracts/${path}`);
+    const dialogue = Object.values<{
+      key: string;
+      nodes: Record<string, object>;
+    }>(runtime.dialogues).find((item) => item.key === "empty_demo")!;
+    const empty = Object.values(dialogue.nodes).find(
+      (node): node is Record<string, unknown> =>
+        "type" in node && node.type === "empty",
+    )!;
+    expect(validate(runtime), JSON.stringify(validate.errors)).toBe(true);
+    for (const field of ["textKey", "speakerId", "choices", "advancePolicy"]) {
+      empty[field] = "not allowed";
+      expect(validate(runtime)).toBe(false);
+      delete empty[field];
+    }
+    delete empty.next;
+    expect(validate(runtime)).toBe(false);
+  }
+});
+
 test("chunked runtime schemas accept index, dialogue, and locale files", () => {
   const ajv = new Ajv2020({ allErrors: true, strict: true });
   addFormats(ajv);

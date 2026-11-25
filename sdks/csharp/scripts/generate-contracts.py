@@ -45,6 +45,17 @@ with tempfile.TemporaryDirectory(prefix='siming-sdk-') as temp:
     for a,b,p in [('start','welcome','next'),('welcome','choice','next'),('choice','set','accept'),('choice','reject','reject'),('set','add','next'),('add','condition','next'),('condition','business','true'),('condition','reject','false'),('business','auto','next'),('auto','end','next'),('reject','end','next')]: edge(a,b,p)
     (project / 'dialogues/intro.json').unlink()
     write(project / 'dialogues/Chapter1/intro.json', source)
+    sdk_dialogue = source
+    source = {'schemaVersion': sdk_dialogue['schemaVersion'], 'id': uid('empty-dialogue'), 'key': 'empty_demo', 'name': 'Empty node demo', 'entryNodeId': uid('empty-start'), 'nodes': [], 'edges': []}
+    node('empty-start', 'start')
+    node('await-host', 'empty', tags=['tag-await-host'], hostEvents=[{'name':'host.prepare','payload':{}}, {'name':'host.ready','payload':{}}])
+    node('check-host-result', 'condition', condition={'variable':'accepted','operator':'==','value':True})
+    node('host-accepted', 'dialogue', text={'zh-CN':'业务已确认。','en-US':'Host accepted.'})
+    node('host-rejected', 'dialogue', text={'zh-CN':'业务未确认。','en-US':'Host declined.'})
+    node('empty-end', 'end')
+    for a,b,p in [('empty-start','await-host','next'),('await-host','check-host-result','next'),('check-host-result','host-accepted','true'),('check-host-result','host-rejected','false'),('host-accepted','empty-end','next'),('host-rejected','empty-end','next')]: edge(a,b,p)
+    empty_dialogue = source
+    write(project / 'dialogues/Chapter1/empty.json', empty_dialogue)
     # A separate root chunk makes eager-loading regressions observable.
     root_dialogue = json.loads((root / 'fixtures/minimal-project/dialogues/intro.json').read_text())
     root_dialogue['id'] = uid('root-dialogue')
@@ -54,21 +65,24 @@ with tempfile.TemporaryDirectory(prefix='siming-sdk-') as temp:
     write(project / 'definitions/events.json', {'schemaVersion':1,'events':[{'id':uid('event'),'key':'quest.begin','name':{'zh-CN':'开始任务','en-US':'Begin quest'},'params':[{'key':'quest','type':'string','required':True}]}]})
     write(project / 'definitions/tags.json', {'schemaVersion':1,'tags':[
         {'id':uid(key),'key':key,'name':name,'scopes':scopes}
-        for key,name,scopes in [('tag-print-slowly','Slow typewriter',['node']), ('dialogue-only','Dialogue only',['dialogue']), ('tag-not-inherited','Not inherited',['dialogue','node'])]
+        for key,name,scopes in [('tag-print-slowly','Slow typewriter',['node']), ('dialogue-only','Dialogue only',['dialogue']), ('tag-not-inherited','Not inherited',['dialogue','node']), ('tag-await-host','Wait for host',['node'])]
     ]})
     manifest = json.loads((project / '.siming/project.json').read_text())
-    manifest['dialogues'] = [{'id':source['id'],'key':source['key'],'path':'dialogues/Chapter1/intro.json'}, {'id':root_dialogue['id'],'key':root_dialogue['key'],'path':'dialogues/root.json'}]
+    manifest['dialogues'] = [{'id':sdk_dialogue['id'],'key':sdk_dialogue['key'],'path':'dialogues/Chapter1/intro.json'}, {'id':root_dialogue['id'],'key':root_dialogue['key'],'path':'dialogues/root.json'}, {'id':empty_dialogue['id'],'key':empty_dialogue['key'],'path':'dialogues/Chapter1/empty.json'}]
     write(project / '.siming/project.json', manifest)
     for layout in ['bundled', 'directory-chunks']:
         subprocess.run(['cargo','run','-p','siming-cli','--','export',str(project),'--output',str(out/layout),'--format','json','--layout',layout],cwd=root,check=True)
     resources = {key: json.loads((project / ('definitions/' + key + '.json')).read_text())[key] for key in ['characters', 'variables', 'events', 'tags']}
     scenarios = []
     for choice in ['accept', 'reject']:
-        request = {'request': {'manifest': manifest, 'dialogue': source, 'resources': resources, 'action': {'type':'start','locale':'en-US'}}, 'choice': choice}
+        request = {'request': {'manifest': manifest, 'dialogue': sdk_dialogue, 'resources': resources, 'action': {'type':'start','locale':'en-US'}}, 'choice': choice}
         reference = subprocess.run(['cargo','run','--quiet','--locked','--manifest-path',str(sdk / 'tests/RustReference/Cargo.toml'),'--target-dir',str(root / 'target')], input=json.dumps(request), text=True, stdout=subprocess.PIPE, cwd=root, check=True)
         scenarios.append(json.loads(reference.stdout))
     write(out / 'behavior.json', {'contractVersion':1,'dialogueKey':'sdk_demo','locale':'en-US','scenarios':scenarios})
 # Importable Unity sample data, always identical to the Rust-generated chunked export.
 sample = sdk / 'Packages/dev.siming.sdk/Samples~/BasicDialogue/RuntimeData'
-if sample.exists(): shutil.rmtree(sample)
-shutil.copytree(out / 'directory-chunks', sample)
+chunked = out / 'directory-chunks'
+for path in sample.rglob('*.json'):
+    if not (chunked / path.relative_to(sample)).is_file():
+        path.unlink()
+shutil.copytree(chunked, sample, dirs_exist_ok=True)

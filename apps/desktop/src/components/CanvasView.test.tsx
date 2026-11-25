@@ -1,9 +1,10 @@
-import { act, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, test } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createDemoProject, createNode } from "../model/demo";
 import { nodeDropEvent } from "../lib/nodeDrag";
 import { useEditorStore } from "../store/editorStore";
 import { CanvasView } from "./CanvasView";
+import { Sidebar } from "./Sidebar";
 import { centeredNodePosition, nodePositionAtPoint } from "./canvasGeometry";
 
 test("shows feedback before mounting a large canvas and cancels it on file switch", () => {
@@ -90,6 +91,56 @@ describe("CanvasView palette drop", () => {
     );
     expect(created?.type).toBe("condition");
     expect(created?.position).toEqual({ x: 395, y: 307 });
+  });
+
+  test("adds empty nodes from the palette by click and drag with in and next handles", () => {
+    const { container } = render(
+      <>
+        <Sidebar width={280} onResizeStart={vi.fn()} onResizeBy={vi.fn()} />
+        <CanvasView />
+      </>,
+    );
+    const palette = screen.getByRole("button", { name: /空节点/ });
+    const canvas = container.querySelector(".canvas-view")!;
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(100, 50, 1000, 700),
+    );
+    fireEvent.click(palette);
+    expect(container.querySelectorAll(".flow-node--empty")).toHaveLength(1);
+    fireEvent(
+      palette,
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        clientX: 35,
+        clientY: 125,
+      }),
+    );
+    fireEvent(
+      window,
+      new MouseEvent("pointermove", { clientX: 400, clientY: 350 }),
+    );
+    fireEvent(
+      window,
+      new MouseEvent("pointerup", { clientX: 600, clientY: 400 }),
+    );
+    fireEvent.click(palette);
+
+    const cards = container.querySelectorAll(".flow-node--empty");
+    expect(cards).toHaveLength(2);
+    for (const card of cards) {
+      expect(card.querySelectorAll(".react-flow__handle")).toHaveLength(2);
+      expect(card.querySelector('.target[data-handleid="in"]')).not.toBeNull();
+      expect(
+        card.querySelector('.source[data-handleid="next"]'),
+      ).not.toBeNull();
+    }
+    const state = useEditorStore.getState();
+    expect(state.project.dialogues[0].nodes.at(-1)).toMatchObject({
+      id: state.selectedNodeId,
+      type: "empty",
+      position: { x: 395, y: 307 },
+      data: { hostEvents: [] },
+    });
   });
 
   test("shows the character name and portrait placeholder on dialogue nodes", () => {

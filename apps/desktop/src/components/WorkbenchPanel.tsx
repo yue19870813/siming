@@ -312,7 +312,10 @@ function Simulator() {
   }
 
   const node = dialogue.nodes.find((item) => item.id === session.currentNodeId);
-  const text = node ? localizedNodeText(node, project, session.locale) : null;
+  const text =
+    node && node.type !== "empty"
+      ? localizedNodeText(node, project, session.locale)
+      : null;
   const choices =
     node?.type === "choice"
       ? (node.data.choices ?? [])
@@ -374,7 +377,12 @@ function Simulator() {
             ))}
           </select>
         </header>
-        {node ? (
+        {node?.type === "empty" ? (
+          <div className="simulator-dialogue">
+            <small>空节点</small>
+            <strong>{node.key}</strong>
+          </div>
+        ) : node ? (
           <div className="simulator-dialogue">
             <small>
               {node.type} · {node.key}

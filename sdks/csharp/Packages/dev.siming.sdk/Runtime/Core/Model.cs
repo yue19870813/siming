@@ -43,7 +43,7 @@ namespace Siming
         }
     }
 
-    public enum NodeType { Start, Dialogue, Choice, Condition, Event, End }
+    public enum NodeType { Start, Dialogue, Choice, Condition, Event, End, Empty }
     public sealed class HostMessage
     {
         public string Name { get; }

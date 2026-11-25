@@ -106,7 +106,7 @@
       "properties": {
         "key": { "$ref": "#/$defs/key" },
         "type": {
-          "enum": ["start", "dialogue", "choice", "condition", "event", "end"]
+          "enum": ["start", "dialogue", "choice", "condition", "event", "end", "empty"]
         },
         "hostEvents": { "$ref": "#/$defs/hostEvents" },
         "tags": {
@@ -124,7 +124,7 @@
           "oneOf": [
             {
               "properties": {
-                "type": { "const": "start" },
+                "type": { "enum": ["start", "empty"] },
                 "next": { "$ref": "#/$defs/uuid" }
               },
               "required": ["next"]

@@ -71,6 +71,7 @@ const nodePalette: Array<{
   { type: "choice", label: "选项", hint: "玩家分支", color: "#55c9ba" },
   { type: "condition", label: "条件", hint: "变量判断", color: "#e6a15f" },
   { type: "event", label: "事件", hint: "通知游戏侧", color: "#d783ad" },
+  { type: "empty", label: "空节点", hint: "业务状态", color: "#85a7b8" },
   { type: "start", label: "开始", hint: "入口节点", color: "#8b7cf6" },
   { type: "end", label: "结束", hint: "流程终点", color: "#858b9d" },
 ];

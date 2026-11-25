@@ -57,7 +57,7 @@ await session.ChooseAsync(choiceId, token);
 | `PreloadAsync(dialogueId, locale, token)` | 预加载目标对话，完成后允许清理缓存 |
 | `ClearUnusedChunks()` | 清理无活动会话引用的已完成分片加载 |
 | `StartAsync(id)` / `StartByKeyAsync(key)` | 从入口开始；允许未启动、停止、完成或故障的会话启动 |
-| `ContinueAsync()` / `ChooseAsync(id)` | 仅对白等待或选项等待状态允许对应操作 |
+| `ContinueAsync()` / `ChooseAsync(id)` | 前者用于对白或空节点等待，后者仅用于选项等待 |
 | `TickAsync(deltaSeconds)` | 宿主提供经过秒数，自动推进；每次调用最多越过一条自动对白 |
 | `SetLocaleAsync(locale)` | 仅等待状态允许；原子更新当前显示，保留访问序号和剩余计时 |
 | `CaptureState()` / `RestoreStateAsync(state)` | 安全等待点的最小状态接口，不持久化 |
@@ -65,7 +65,15 @@ await session.ChooseAsync(choiceId, token);
 
 `Current` 是不可变显示快照，包含 `Status`、`DialogueId`、`NodeId`、`NodeKey`、`VisitSequence`、`Locale`、`SpeakerId`、`SpeakerName`、`Text`、`Choices`、`AutoDelayMs`、`RemainingDelayMs`、`Error`。计时递减会更新 `Current`，无需每帧广播 `StateChanged`。
 
-状态依次按流程进入 `NotStarted`、`Running`、`WaitingDialogue` / `WaitingChoice` / `WaitingEvent`，最后到 `Completed`、`Stopped` 或 `Faulted`。完成时释放分片，最后一个显示快照仍可读取。非法操作直接抛出结构化错误，不破坏等待状态。有效操作的执行错误进入故障状态；语言切换或恢复失败保留原位置。取消启动/推进会停止会话；取消语言切换/恢复保留原位置。调用方应观察返回的 Task 并处理异常。
+状态依次按流程进入 `NotStarted`、`Running`、`WaitingDialogue` / `WaitingChoice` / `WaitingEvent` / `WaitingEmpty`，最后到 `Completed`、`Stopped` 或 `Faulted`。完成时释放分片，最后一个显示快照仍可读取。非法操作直接抛出结构化错误，不破坏等待状态。有效操作的执行错误进入故障状态；语言切换或恢复失败保留原位置。取消启动/推进会停止会话；取消语言切换/恢复保留原位置。调用方应观察返回的 Task 并处理异常。
+
+### 空节点：等待宿主继续
+
+到达空节点时，先按顺序发送可选的宿主消息，再发布 `WaitingEmpty` 快照。不必注册 `IBusinessEventHandler`。按 `NodeKey` 或 `HasTag(key)` 识别业务状态；此时 `Text`、`RichText`、说话人和 `AutoDelayMs` 为空，`Choices` 为空列表，`TickAsync()` 不推进。
+
+`StateChanged` 回调内只记录快照，不要重入会话。等触发回调的 SDK 操作返回后，由业务处理该状态，再调用 `ContinueAsync()`。空节点支持切换语言和保存播放位置；恢复后仍等待继续，不重发进入时的宿主消息。业务变量仍由宿主单独保存。
+
+独立示例：`dotnet run --project sdks/csharp/examples/Console -- sdks/csharp/contracts/directory-chunks empty_demo en-US`。输入 `y` 可在继续前更新变量，进入确认分支。含 `empty` 的数据需要先升级 SDK，再重新导出部署；新 SDK 仍支持旧 v1/v2 包。
 
 ## 查询节点标签
 

@@ -21,6 +21,7 @@ internal static class Program
         {
             await Test(layout + ": rich text v2", () => RichTextContract(layout));
             await Test(layout + ": node tags", () => NodeTags(layout));
+            await Test(layout + ": empty node host wait and restore", () => EmptyNode(layout));
             await Test(layout + ": old v1 and v2 exports without node tags", () => LegacyNodeTags(layout));
             await Test(layout + ": behavior contract", () => Behavior(layout));
             await Test(layout + ": state and language", () => StateAndLocale(layout));
@@ -122,6 +123,62 @@ internal static class Program
         using var restored = project.CreateSession();
         await restored.RestoreStateAsync(state);
         Assert(restored.Current.Status == SessionStatus.WaitingDialogue && restored.Current.HasTag(slowTag));
+    }
+    private static async Task EmptyNode(string layout)
+    {
+        const string hostTag = "tag-await-host";
+        var source = new MemorySource(layout);
+        var loader = new JsonProjectLoader(source);
+        using var project = await SimingProject.OpenAsync(loader);
+        using var session = project.CreateSession(locale: "zh-CN");
+        var sequence = new List<string>();
+        var notifications = new List<HostEventNotification>();
+        SessionSnapshot? waiting = null;
+        session.HostEventReceived += message => { notifications.Add(message); sequence.Add(message.Message.Name); };
+        session.StateChanged += view =>
+        {
+            if (view.Status == SessionStatus.WaitingEmpty) { waiting = view; sequence.Add("waiting"); }
+        };
+
+        await session.StartByKeyAsync("empty_demo");
+        var initial = waiting ?? throw new Exception("No empty-node snapshot was published");
+        Assert(ReferenceEquals(initial, session.Current) && initial.NodeKey == "await-host" && initial.VisitSequence == 2);
+        Assert(initial.HasTag(hostTag) && initial.Tags.SequenceEqual(new[] { hostTag }));
+        Assert(initial.Text == null && initial.RichText == null && initial.SpeakerName == null && initial.SpeakerId == null);
+        Assert(initial.AutoDelayMs == null && initial.RemainingDelayMs == 0 && initial.Choices.Count == 0);
+        Assert(sequence.SequenceEqual(new[] { "host.prepare", "host.ready", "waiting" }));
+        Assert(notifications.Select(message => message.MessageIndex).SequenceEqual(new[] { 0, 1 }));
+        Assert(notifications.All(message => message.NodeId == initial.NodeId && message.VisitSequence == initial.VisitSequence));
+        using var loaded = await loader.LoadAsync(initial.DialogueId!, initial.Locale, CancellationToken.None);
+        Assert(loaded.Dialogue.Nodes.TryGetValue(initial.NodeId!, out var node) &&
+            node.Type == NodeType.Empty && node.HasTag(hostTag) && node.TextKey == null &&
+            node.Next != null && loaded.Dialogue.Nodes[node.Next].Key == "check-host-result");
+        foreach (var path in source.Bytes.Keys.Where(path => path.StartsWith("locales/", StringComparison.Ordinal)))
+            Assert(!Encoding.UTF8.GetString(source.Bytes[path]).Contains(initial.NodeId!, StringComparison.Ordinal));
+
+        await session.TickAsync(999);
+        Assert(ReferenceEquals(initial, session.Current));
+        await Error("InvalidAction", () => session.ChooseAsync("anything"));
+        await session.SetLocaleAsync("en-US");
+        Assert(waiting?.Locale == "en-US" && waiting.NodeId == initial.NodeId && waiting.HasTag(hostTag));
+        Assert(notifications.Count == 2);
+        var state = session.CaptureState();
+        using var restored = project.CreateSession();
+        var restoredMessages = 0;
+        SessionSnapshot? restoredWaiting = null;
+        restored.HostEventReceived += _ => restoredMessages++;
+        restored.StateChanged += view => { if (view.Status == SessionStatus.WaitingEmpty) restoredWaiting = view; };
+        await restored.RestoreStateAsync(state);
+        Assert(restoredWaiting != null && restoredWaiting.NodeId == initial.NodeId && restoredWaiting.VisitSequence == initial.VisitSequence &&
+            restoredWaiting.Locale == "en-US" && restoredWaiting.HasTag(hostTag) && restoredMessages == 0);
+
+        await session.ContinueAsync();
+        Assert(session.Current.Status == SessionStatus.WaitingDialogue && session.Current.NodeKey == "host-rejected" &&
+            session.Current.Text == "Host declined." && session.Current.Tags.Count == 0);
+        restored.Variables.Set("accepted", new VariableValue(true));
+        await restored.ContinueAsync();
+        Assert(restored.Current.Status == SessionStatus.WaitingDialogue && restored.Current.NodeKey == "host-accepted" &&
+            restored.Current.Text == "Host accepted." && restored.Current.Tags.Count == 0 && restoredMessages == 0);
     }
     private static async Task LegacyNodeTags(string layout)
     {

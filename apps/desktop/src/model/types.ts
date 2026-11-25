@@ -1,6 +1,6 @@
 import type { LocalizedBody } from "./richText";
 export type NodeType =
-  "start" | "dialogue" | "choice" | "condition" | "event" | "end";
+  "start" | "dialogue" | "choice" | "condition" | "event" | "end" | "empty";
 
 export type LocalizedText = Record<string, string>;
 

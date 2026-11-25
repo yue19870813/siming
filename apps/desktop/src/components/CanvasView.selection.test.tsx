@@ -379,12 +379,12 @@ test("ignores invalid drag coordinates and preserves the last valid node positio
   ).toEqual(addedNode.position);
 });
 
-test("keeps measured nodes visible when connecting a new node and moving the source", () => {
+test("connects a new empty node and keeps measured nodes visible when moving the source", () => {
   render(<CanvasView />);
   const state = useEditorStore.getState();
   const dialogue = state.project.dialogues[0];
   const sourceId = dialogue.entryNodeId;
-  act(() => state.addNode("dialogue", { x: 450, y: 300 }));
+  act(() => state.addNode("empty", { x: 450, y: 300 }));
   const targetId = useEditorStore
     .getState()
     .project.dialogues[0].nodes.at(-1)!.id;
@@ -413,6 +413,15 @@ test("keeps measured nodes visible when connecting a new node and moving the sou
       source: sourceId,
       sourceHandle: "next",
       target: targetId,
+      targetHandle: "in",
+    }),
+  );
+  const endId = dialogue.nodes.find((node) => node.type === "end")!.id;
+  act(() =>
+    flowProps.onConnect?.({
+      source: targetId,
+      sourceHandle: "next",
+      target: endId,
       targetHandle: "in",
     }),
   );
@@ -453,6 +462,13 @@ test("keeps measured nodes visible when connecting a new node and moving the sou
   expect(
     updated.edges.find((edge) => edge.sourceNodeId === sourceId)?.targetNodeId,
   ).toBe(targetId);
+  expect(
+    updated.edges.find((edge) => edge.sourceNodeId === targetId),
+  ).toMatchObject({
+    sourcePort: "next",
+    targetNodeId: endId,
+    targetPort: "in",
+  });
 });
 
 test("highlights the endpoints of a selected edge and dims unrelated nodes", () => {

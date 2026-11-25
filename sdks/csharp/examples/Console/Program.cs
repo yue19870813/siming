@@ -9,9 +9,22 @@ using var project = await SimingProject.OpenAsync(new JsonProjectLoader(new Dire
 using var session = project.CreateSession(businessEvents: new Events(), locale: args.Length > 2 ? args[2] : null);
 session.HostEventReceived += message => Console.WriteLine($"HOST {message.Message.Name}");
 await session.StartByKeyAsync(args.Length > 1 ? args[1] : "sdk_demo");
-while (session.Current.Status == SessionStatus.WaitingDialogue || session.Current.Status == SessionStatus.WaitingChoice)
+while (session.Current.Status == SessionStatus.WaitingDialogue || session.Current.Status == SessionStatus.WaitingChoice || session.Current.Status == SessionStatus.WaitingEmpty)
 {
     var view = session.Current;
+    if (view.Status == SessionStatus.WaitingEmpty)
+    {
+        Console.WriteLine($"BUSINESS STATE {view.NodeKey}");
+        if (view.HasTag("tag-await-host"))
+        {
+            Console.WriteLine("Accept? [y/N]");
+            var answer = Console.ReadLine(); if (answer == null) break;
+            session.Variables.Set("accepted", new VariableValue(string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase)));
+        }
+        else if (Console.ReadLine() == null) break;
+        await session.ContinueAsync();
+        continue;
+    }
     Console.WriteLine($"{view.SpeakerName}: {view.Text}");
     if (view.Status == SessionStatus.WaitingDialogue) { Console.ReadLine(); await session.ContinueAsync(); }
     else
